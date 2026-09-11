@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.xyat.entitycontrol.reset.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "entitycontrol.mixins.refmap.json",
+  "mixins": [
+    "LivingEntityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
