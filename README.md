@@ -20,12 +20,11 @@ The project is designed around in-game administration. Where a feature changes s
 - Advanced damage-testing dummy with equipment and attribute tools; Curios support is optional.
 - Optional Jade integration for entity/spawn information.
 
-### Requirements and Compatibility
+### Dependencies
 
 | Type | Dependency |
 |---|---|
-| Required | Minecraft 1.20.1 |
-| Required | Minecraft Forge 47+ |
+| Required | Forge 47.4.0+ |
 | Required | KineticCore 26.9.8+ |
 | Optional | Jade 11+ |
 | Optional | Curios 5.10+ |
@@ -461,12 +460,11 @@ Primary configuration/data paths:
 - 提供伤害测试假人、装备与属性编辑；Curios 为可选兼容。
 - 可选支持 Jade 实体与生成信息显示。
 
-### 运行环境与兼容
+### 依赖
 
 | 类型 | 依赖 |
 |---|---|
-| 必需 | Minecraft 1.20.1 |
-| 必需 | Minecraft Forge 47+ |
+| 必需 | Forge 47.4.0+ |
 | 必需 | KineticCore 26.9.8+ |
 | 可选 | Jade 11+ |
 | 可选 | Curios 5.10+ |
