@@ -432,16 +432,6 @@ Primary configuration/data paths:
 - `config/kineticcore/dummy_client.toml`
 - `config/kineticcore/dummy_server.toml`
 
-### Building from Source
-
-- Minecraft: `1.20.1`
-- Java: `17`
-- ForgeGradle: `6.0.24`
-- Gradle: the project is pinned to the `8.1.1` Wrapper; do not import it with Gradle 9 directly.
-- Local development JARs are controlled by `local_libs_dir` and can be overridden in `gradle.properties` or with a project property.
-- Typical build command: `gradlew.bat build` on Windows or `./gradlew build` on Linux/macOS.
-- Development and release artifacts use `entitycontrol` as the current project identifier.
-
 ## 简体中文
 
 ### 模组定位
@@ -956,13 +946,3 @@ config/kineticcore/dummy_client.toml
 
 - `config/kineticcore/dummy_client.toml`
 - `config/kineticcore/dummy_server.toml`
-
-### 从源码构建
-
-- Minecraft：`1.20.1`
-- Java：`17`
-- ForgeGradle：`6.0.24`
-- Gradle：项目固定使用 `8.1.1` Wrapper，请不要使用 Gradle 9 直接导入。
-- 默认本地依赖目录由 `local_libs_dir` 控制，可在 `gradle.properties` 或命令行参数中覆盖。
-- 常用构建命令：`gradlew.bat build`（Windows）或 `./gradlew build`（Linux/macOS）。
-- 生成的开发/发布文件以 `entitycontrol` 作为当前工程标识。
