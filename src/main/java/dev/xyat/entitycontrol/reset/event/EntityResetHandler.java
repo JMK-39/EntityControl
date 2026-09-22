@@ -2,6 +2,9 @@ package dev.xyat.entitycontrol.reset.event;
 
 import dev.xyat.entitycontrol.reset.ResetModule;
 import dev.xyat.entitycontrol.reset.config.EntityReseConfig;
+import dev.xyat.kineticcore.api.entity.event.KineticLivingEvents;
+import dev.xyat.kineticcore.api.event.KineticEventPriority;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.DoubleTag;
 import net.minecraft.nbt.FloatTag;
@@ -15,12 +18,6 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,7 +25,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Mod.EventBusSubscriber(modid = ResetModule.MODID)
 public final class EntityResetHandler {
     private static final String NBT_SNAPSHOT = "entitycontrol_snapshot";
     private static final String NBT_DEATH_COUNT = "entitycontrol_death_count";
@@ -37,6 +33,17 @@ public final class EntityResetHandler {
 
     private static final Map<UUID, Long> cooldowns = new ConcurrentHashMap<>();
     private static final Map<UUID, List<LivingEntity>> deathSnapshot = new ConcurrentHashMap<>();
+    private static boolean registered;
+
+    public static synchronized void register() {
+        if (registered) {
+            return;
+        }
+        KineticLivingEvents.onHurt(KineticEventPriority.NORMAL, EntityResetHandler::onLivingHurt);
+        KineticLivingEvents.onDeath(KineticEventPriority.HIGHEST, false, EntityResetHandler::onPlayerDeathPre);
+        KineticLivingEvents.onDeath(KineticEventPriority.LOWEST, true, EntityResetHandler::onPlayerDeathPost);
+        registered = true;
+    }
 
     private EntityResetHandler() {
     }
@@ -47,16 +54,15 @@ public final class EntityResetHandler {
         CANCELLED_DEATH
     }
 
-    @SubscribeEvent
-    public static void onLivingHurt(LivingHurtEvent event) {
+    public static void onLivingHurt(KineticLivingEvents.HurtContext event) {
         if (!EntityReseConfig.enableEntityReset) return;
-        if (event.getEntity().level().isClientSide) return;
-        if (event.getAmount() <= 0) return;
+        if (event.entity().level().isClientSide) return;
+        if (event.amount() <= 0) return;
 
-        LivingEntity target = event.getEntity();
-        ResourceLocation targetId = ForgeRegistries.ENTITY_TYPES.getKey(target.getType());
+        LivingEntity target = event.entity();
+        ResourceLocation targetId = KineticRegistries.entityTypes().id(target.getType());
         if (targetId == null || !EntityReseConfig.ENTITY_RULES_CACHE.containsKey(targetId.toString())) return;
-        if (!isPlayerOrMinion(event.getSource())) return;
+        if (isNotPlayerOrMinion(event.source())) return;
 
         CompoundTag data = target.getPersistentData();
         if (!data.contains(NBT_IS_TRACKING)) {
@@ -64,10 +70,9 @@ public final class EntityResetHandler {
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onPlayerDeathPre(LivingDeathEvent event) {
+    public static void onPlayerDeathPre(KineticLivingEvents.DeathContext event) {
         if (!EntityReseConfig.enableEntityReset) return;
-        if (!(event.getEntity() instanceof Player player)) return;
+        if (!(event.entity() instanceof Player player)) return;
         if (player.level().isClientSide) return;
 
         List<LivingEntity> trackedBosses = getNearbyTrackedBosses(player);
@@ -76,10 +81,9 @@ public final class EntityResetHandler {
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
-    public static void onPlayerDeathPost(LivingDeathEvent event) {
+    public static void onPlayerDeathPost(KineticLivingEvents.DeathContext event) {
         if (!EntityReseConfig.enableEntityReset) return;
-        if (!(event.getEntity() instanceof Player player)) return;
+        if (!(event.entity() instanceof Player player)) return;
         if (player.level().isClientSide) return;
 
         List<LivingEntity> bosses = deathSnapshot.remove(player.getUUID());
@@ -88,7 +92,7 @@ public final class EntityResetHandler {
         processDeathLogic(
                 player,
                 bosses,
-                event.isCanceled() ? DeathTrigger.CANCELLED_DEATH : DeathTrigger.REAL_DEATH
+                event.cancelled() ? DeathTrigger.CANCELLED_DEATH : DeathTrigger.REAL_DEATH
         );
     }
 
@@ -125,11 +129,11 @@ public final class EntityResetHandler {
         for (LivingEntity boss : bosses) {
             if (boss == null || !boss.isAlive() || boss.isDeadOrDying()) continue;
 
-            ResourceLocation bossId = ForgeRegistries.ENTITY_TYPES.getKey(boss.getType());
+            ResourceLocation bossId = KineticRegistries.entityTypes().id(boss.getType());
             if (bossId == null) continue;
 
             EntityReseConfig.EntityRule rule = EntityReseConfig.getRule(bossId.toString());
-            if (rule == null || !shouldCount(rule, trigger)) continue;
+            if (rule == null || shouldSkipCount(rule, trigger)) continue;
 
             CompoundTag data = boss.getPersistentData();
             int currentCount = data.getInt(NBT_DEATH_COUNT) + 1;
@@ -147,11 +151,11 @@ public final class EntityResetHandler {
         }
     }
 
-    private static boolean shouldCount(EntityReseConfig.EntityRule rule, DeathTrigger trigger) {
+    private static boolean shouldSkipCount(EntityReseConfig.EntityRule rule, DeathTrigger trigger) {
         return switch (trigger) {
-            case REAL_DEATH -> rule.countRealDeath;
-            case PREVENTED_DEATH -> rule.countPreventedDeath;
-            case CANCELLED_DEATH -> rule.countCancelledDeath;
+            case REAL_DEATH -> !rule.countRealDeath;
+            case PREVENTED_DEATH -> !rule.countPreventedDeath;
+            case CANCELLED_DEATH -> !rule.countCancelledDeath;
         };
     }
 
@@ -197,13 +201,13 @@ public final class EntityResetHandler {
         }
     }
 
-    private static boolean isPlayerOrMinion(DamageSource source) {
+    private static boolean isNotPlayerOrMinion(DamageSource source) {
         Entity attacker = source.getEntity();
-        if (attacker instanceof Player) return true;
+        if (attacker instanceof Player) return false;
         if (attacker instanceof OwnableEntity ownable) {
-            return ownable.getOwner() instanceof Player;
+            return !(ownable.getOwner() instanceof Player);
         }
-        return false;
+        return true;
     }
 
     private static ListTag createDoubleList(double... values) {

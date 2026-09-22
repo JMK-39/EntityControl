@@ -1,10 +1,10 @@
 package dev.xyat.entitycontrol.spawn.client.gui;
 
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.GridScrollController;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.NumericEditBox;
+import dev.xyat.kineticcore.api.client.theme.GuiTheme;
+import dev.xyat.kineticcore.api.client.widget.button.KineticButtons.StateButton;
+import dev.xyat.kineticcore.api.client.widget.input.KineticNumericFields.NumericEditBox;
+import dev.xyat.kineticcore.api.client.widget.scroll.KineticScroll.GridScrollController;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
@@ -13,7 +13,7 @@ import java.util.List;
 public class CategoryTabModule implements ITabModule {
     private final SpawnControlScreen s;
     private NumericEditBox boxCatCap, boxCatWeight, boxCatRate;
-    private Button btnReset;
+    private StateButton btnReset;
     private String selectedCategory = null;
     private boolean isUpdating = false;
 
@@ -31,11 +31,11 @@ public class CategoryTabModule implements ITabModule {
         int labelOffset = 40;
         int sectionWidth = s.rw / 3;
 
-        boxCatCap = s.addTabWidget(NumericEditBox.integer(
-                s.getFont(), s.rx + labelOffset, inputY, inputW, 20,
-                Component.empty(), false, 0, null
-        ));
-        boxCatCap.setTooltip(Tooltip.create(Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.cap")));
+        boxCatCap = s.addIntegerField(
+                s.rx + labelOffset, inputY, inputW, Component.empty(),
+                false, 0, null, null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.cap")
+        );
         boxCatCap.setResponder(v -> {
             if (isUpdating || selectedCategory == null || v.isEmpty()
                     || "-".equals(v) || ".".equals(v) || "-.".equals(v)) return;
@@ -45,11 +45,11 @@ public class CategoryTabModule implements ITabModule {
             }
         });
 
-        boxCatWeight = s.addTabWidget(NumericEditBox.integer(
-                s.getFont(), s.rx + sectionWidth + labelOffset, inputY, inputW, 20,
-                Component.empty(), false, 0, null
-        ));
-        boxCatWeight.setTooltip(Tooltip.create(Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.weight")));
+        boxCatWeight = s.addIntegerField(
+                s.rx + sectionWidth + labelOffset, inputY, inputW, Component.empty(),
+                false, 0, null, null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.weight")
+        );
         boxCatWeight.setResponder(v -> {
             if (isUpdating || selectedCategory == null || v.isEmpty()
                     || "-".equals(v) || ".".equals(v) || "-.".equals(v)) return;
@@ -59,11 +59,11 @@ public class CategoryTabModule implements ITabModule {
             }
         });
 
-        boxCatRate = s.addTabWidget(NumericEditBox.decimal(
-                s.getFont(), s.rx + sectionWidth * 2 + labelOffset, inputY, inputW, 20,
-                Component.empty(), false, 0D, null
-        ));
-        boxCatRate.setTooltip(Tooltip.create(Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.rate")));
+        boxCatRate = s.addDecimalField(
+                s.rx + sectionWidth * 2 + labelOffset, inputY, inputW, Component.empty(),
+                false, 0D, null, null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.rate")
+        );
         boxCatRate.setResponder(v -> {
             if (isUpdating || selectedCategory == null || v.isEmpty()
                     || "-".equals(v) || ".".equals(v) || "-.".equals(v)) return;
@@ -73,19 +73,24 @@ public class CategoryTabModule implements ITabModule {
             }
         });
 
-        btnReset = s.addTabWidget(Button.builder(Component.translatable("gui.entitycontrol.spawn.spawn.category.reset"), b -> {
-            if (selectedCategory != null) {
-                s.profile.category_weights.put(selectedCategory, getDefaultWeight(selectedCategory));
-                s.profile.category_spawn_rates.put(selectedCategory, 1.0);
-                for (net.minecraft.world.entity.MobCategory cat : net.minecraft.world.entity.MobCategory.values()) {
-                    if (cat.getName().equals(selectedCategory)) {
-                        s.profile.category_caps.put(selectedCategory, cat.getMaxInstancesPerChunk());
-                        break;
+        btnReset = s.addButton(
+                s.rx, 175, 100,
+                Component.translatable("gui.entitycontrol.spawn.spawn.category.reset"),
+                null,
+                () -> {
+                    if (selectedCategory != null) {
+                        s.profile.category_weights.put(selectedCategory, getDefaultWeight(selectedCategory));
+                        s.profile.category_spawn_rates.put(selectedCategory, 1.0);
+                        for (net.minecraft.world.entity.MobCategory cat : net.minecraft.world.entity.MobCategory.values()) {
+                            if (cat.getName().equals(selectedCategory)) {
+                                s.profile.category_caps.put(selectedCategory, cat.getMaxInstancesPerChunk());
+                                break;
+                            }
+                        }
+                        selectCategory(selectedCategory);
                     }
                 }
-                selectCategory(selectedCategory);
-            }
-        }).bounds(s.rx, 175, 100, 20).build());
+        );
     }
 
     private int getDefaultWeight(String cat) {
@@ -124,15 +129,14 @@ public class CategoryTabModule implements ITabModule {
     public void setVisible(boolean visible) {
         boolean active = visible && selectedCategory != null;
         if (boxCatCap != null) {
-            boxCatCap.visible = active; boxCatWeight.visible = active; boxCatRate.visible = active;
+            boxCatCap.setVisible(active); boxCatWeight.setVisible(active); boxCatRate.setVisible(active);
         }
-        if (btnReset != null) btnReset.visible = active;
+        if (btnReset != null) btnReset.setVisible(active);
     }
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
-        g.fill(s.rx, listY, s.rx + s.rw, listY + listH, 0xFF111111);
-        g.renderOutline(s.rx, listY, s.rw, listH, 0xFF333333);
+        GuiTheme.panelAlt(g, s.rx, listY, s.rw, listH);
 
         List<String> cList = new ArrayList<>(s.profile.category_caps.keySet());
         cList.sort(String::compareTo);
@@ -143,16 +147,20 @@ public class CategoryTabModule implements ITabModule {
         int shift = categoryScroll.visualShift(18);
         int cEnd = Math.min(cStart + visibleRows + 1, cList.size());
 
-        s.enableCanvasScissor(g, s.rx, listY, s.rx + s.rw, listY + listH);
+        s.enableUiScissor(g, s.rx, listY, s.rx + s.rw, listY + listH);
         for (int i = cStart; i < cEnd; i++) {
             String c = cList.get(i); int y = listY + (i - cStart) * 18 - shift;
-            g.fill(s.rx + 1, y, s.rx + s.rw - 1, y + 18, (i % 2 == 0) ? 0xFF2C2C2C : 0xFF181818);
-            if (c.equals(selectedCategory)) g.fill(s.rx + 1, y, s.rx + s.rw - 1, y + 18, 0xFF555555);
-            else if (mx >= s.rx && mx < s.rx + s.rw && my >= y && my < y + 18) g.fill(s.rx + 1, y, s.rx + s.rw - 1, y + 18, 0x33FFFFFF);
+            boolean selected = c.equals(selectedCategory);
+            boolean hovered = mx >= s.rx && mx < s.rx + s.rw && my >= y && my < y + 18;
+            GuiTheme.stateSurface(
+                    g, s.rx + 1, y, s.rw - 2, 18,
+                    i % 2 == 0 ? GuiTheme.Surface.PANEL_ALT : GuiTheme.Surface.PANEL,
+                    selected, hovered, false
+            );
             g.drawString(s.getFont(), s.getTranslatedCategoryName(c), s.rx + 5, y + 5, 0xFFAA00);
         }
 
-        g.disableScissor();
+        s.disableUiScissor(g);
         categoryScroll.render(
                 g, mx, my, s.rx + s.rw + 2, listY,
                 4, listH, 15

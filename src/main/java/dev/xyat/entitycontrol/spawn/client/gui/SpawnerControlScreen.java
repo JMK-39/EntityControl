@@ -1,26 +1,29 @@
 package dev.xyat.entitycontrol.spawn.client.gui;
 
 import net.minecraft.ChatFormatting;
+import dev.xyat.kineticcore.api.client.input.KineticMouseButtons;
 import dev.xyat.kineticcore.api.client.search.KineticSearch;
 import dev.xyat.kineticcore.api.client.theme.GuiTheme;
-import dev.xyat.kineticcore.api.client.overlay.GuiOverlay;
+import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
 import dev.xyat.kineticcore.api.client.screen.KineticScreen;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.EntityPreviewRenderer;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.EditedEntryTracker;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.GridScrollController;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.NumericEditBox;
+import dev.xyat.kineticcore.api.client.widget.KineticWidgets;
+import dev.xyat.kineticcore.api.client.widget.button.KineticButtons.StateButton;
+import dev.xyat.kineticcore.api.client.widget.input.KineticNumericFields;
+import dev.xyat.kineticcore.api.client.widget.input.KineticNumericFields.NumericEditBox;
+import dev.xyat.kineticcore.api.client.widget.input.KineticTextFields.KineticEditBox;
+import dev.xyat.kineticcore.api.client.widget.render.KineticEntityPreview.EntityPreviewRenderer;
+import dev.xyat.kineticcore.api.client.widget.scroll.KineticScroll.GridScrollController;
+import dev.xyat.kineticcore.api.client.widget.state.EditedEntryTracker;
 import dev.xyat.entitycontrol.spawn.Network.SpawnNetwork;
 import dev.xyat.entitycontrol.spawn.config.SpawnerConfig;
-import net.minecraft.client.Minecraft;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
-import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -45,8 +48,6 @@ public class SpawnerControlScreen extends KineticScreen {
     private static final int GRID_H = VISIBLE_ROWS * CELL_SIZE;
     private static final int RX = GRID_X + GRID_W + 12;
     private static final int RW = V_WIDTH - RX - 8;
-    private static final int CONTEXT_W = 116;
-    private static final int CONTEXT_H = 22;
 
     private final Screen parent;
     private final SpawnerConfig.SpawnerData data;
@@ -57,9 +58,9 @@ public class SpawnerControlScreen extends KineticScreen {
     private final Set<String> modifiedEntities = new HashSet<>();
     private final EditedEntryTracker<String> editedEntities = new EditedEntryTracker<>();
     private final GridScrollController gridScroll = new GridScrollController();
-    private final EntityPreviewRenderer entityPreviewRenderer = new EntityPreviewRenderer();
+    private final EntityPreviewRenderer entityPreviewRenderer = KineticWidgets.createEntityPreviewRenderer();
 
-    private EditBox searchBox;
+    private KineticEditBox searchBox;
     private String selectedId;
     private boolean tuningTab = true;
     private boolean globalMode;
@@ -70,14 +71,14 @@ public class SpawnerControlScreen extends KineticScreen {
     private long pendingSaveRequestId = -1L;
     private boolean closeAfterPendingSave;
 
-    private Button btnTabTuning;
-    private Button btnTabBreaker;
-    private Button btnScope;
-    private Button btnRestore;
-    private Button btnTuning;
-    private Button btnFixedDelay;
-    private Button btnBreaker;
-    private Button btnMode;
+    private StateButton btnTabTuning;
+    private StateButton btnTabBreaker;
+    private StateButton btnScope;
+    private StateButton btnRestore;
+    private StateButton btnTuning;
+    private StateButton btnFixedDelay;
+    private StateButton btnBreaker;
+    private StateButton btnMode;
 
     private NumericEditBox boxMinDelay;
     private NumericEditBox boxMaxDelay;
@@ -91,10 +92,6 @@ public class SpawnerControlScreen extends KineticScreen {
     private NumericEditBox boxThreshold;
     private NumericEditBox boxCooldown;
 
-    private boolean contextMenuOpen;
-    private int contextMenuX;
-    private int contextMenuY;
-    private String contextEntityId;
     private List<Component> deferredTooltip;
 
     public SpawnerControlScreen(SpawnerConfig.SpawnerEditorSnapshot snapshot) {
@@ -107,6 +104,7 @@ public class SpawnerControlScreen extends KineticScreen {
     ) {
         super(Component.translatable("gui.entitycontrol.spawn.spawner.title"));
         this.parent = parent;
+        setParentScreen(parent);
 
         SpawnerConfig.SpawnerEditorSnapshot safe = snapshot == null
                 ? new SpawnerConfig.SpawnerEditorSnapshot()
@@ -127,7 +125,7 @@ public class SpawnerControlScreen extends KineticScreen {
 
         allEntityIds = new ArrayList<>(safe.entityIds == null ? List.of() : safe.entityIds);
         if (allEntityIds.isEmpty()) {
-            ForgeRegistries.ENTITY_TYPES.getKeys().forEach(id -> allEntityIds.add(id.toString()));
+            KineticRegistries.entityTypes().ids().forEach(id -> allEntityIds.add(id.toString()));
         }
         allEntityIds.sort(String::compareToIgnoreCase);
 
@@ -148,8 +146,6 @@ public class SpawnerControlScreen extends KineticScreen {
 
         editedEntities.refresh(allEntityIds, modifiedEntities::contains);
         buildSearchIndex();
-        useCanvas(V_WIDTH, V_HEIGHT, 6);
-        scaleMultiplier = 1.0f;
         lastSavedJson = SpawnerConfig.GSON.toJson(data);
         configureStandaloneDraft(this::captureSpawnerSnapshot, this::restoreSpawnerSnapshot);
     }
@@ -222,144 +218,163 @@ public class SpawnerControlScreen extends KineticScreen {
 
     @Override
     protected void buildUi() {
-        searchBox = addRenderableWidget(new EditBox(
-                font,
+        searchBox = addTextField(
                 GRID_X,
                 15,
                 GRID_W,
-                20,
-                Component.empty()
-        ));
+                Component.empty(),
+                Component.translatable("gui.entitycontrol.spawn.spawner.search_hint"),
+                null,
+                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.search")
+        );
         searchBox.setResponder(this::updateSearch);
-        searchBox.setTooltip(Tooltip.create(Component.translatable(
-                "gui.entitycontrol.spawn.spawner.tooltip.search"
-        )));
 
         int topW = (RW - 15) / 4;
-        addRenderableWidget(Button.builder(
+        addButtonWithHandler(
+                RX,
+                15,
+                topW,
                 getMasterText(),
+                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.master"),
                 button -> {
                     data.enabled = !data.enabled;
-                    button.setMessage(getMasterText());
+                    button.setText(getMasterText());
                 }
-        ).bounds(RX, 15, topW, 20).tooltip(Tooltip.create(
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.master")
-        )).build());
+        );
 
-        addRenderableWidget(Button.builder(
+        addButtonWithHandler(
+                RX + topW + 5,
+                15,
+                topW,
                 getNotificationText(),
+                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.notification"),
                 button -> {
                     data.notification = !data.notification;
-                    button.setMessage(getNotificationText());
+                    button.setText(getNotificationText());
                 }
-        ).bounds(RX + topW + 5, 15, topW, 20).tooltip(Tooltip.create(
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.notification")
-        )).build());
+        );
 
-        addRenderableWidget(Button.builder(
+        addButton(
+                RX + (topW + 5) * 2,
+                15,
+                topW,
                 Component.translatable("gui.entitycontrol.spawn.spawner.save"),
-                button -> saveAndApply(true)
-        ).bounds(RX + (topW + 5) * 2, 15, topW, 20).tooltip(Tooltip.create(
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.save")
-        )).build());
+                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.save"),
+                () -> saveAndApply(true)
+        );
 
-        addRenderableWidget(Button.builder(
+        addButton(
+                RX + (topW + 5) * 3,
+                15,
+                topW,
                 Component.translatable("gui.entitycontrol.spawn.spawner.close"),
-                button -> onClose()
-        ).bounds(RX + (topW + 5) * 3, 15, topW, 20).tooltip(Tooltip.create(
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.close")
-        )).build());
+                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.close"),
+                this::navigateBack
+        );
 
         int tabW = (RW - 5) / 2;
-        btnTabTuning = addRenderableWidget(Button.builder(
+        btnTabTuning = addButton(
+                RX,
+                40,
+                tabW,
                 Component.translatable("gui.entitycontrol.spawn.spawner.tab.tuning"),
-                button -> switchTab(true)
-        ).bounds(RX, 40, tabW, 20).build());
+                null,
+                () -> switchTab(true)
+        );
 
-        btnTabBreaker = addRenderableWidget(Button.builder(
+        btnTabBreaker = addButton(
+                RX + tabW + 5,
+                40,
+                tabW,
                 Component.translatable("gui.entitycontrol.spawn.spawner.tab.breaker"),
-                button -> switchTab(false)
-        ).bounds(RX + tabW + 5, 40, tabW, 20).build());
+                null,
+                () -> switchTab(false)
+        );
 
         int actionW = (RW - 5) / 2;
-        btnScope = addRenderableWidget(Button.builder(
+        btnScope = addButton(
+                RX,
+                65,
+                actionW,
                 getScopeText(),
-                button -> {
+                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.scope"),
+                () -> {
                     globalMode = !globalMode;
-                    contextMenuOpen = false;
-                    contextEntityId = null;
+                    closeContextMenu();
                     updateControlValues();
                 }
-        ).bounds(RX, 65, actionW, 20).tooltip(Tooltip.create(
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.scope")
-        )).build());
+        );
 
-        btnRestore = addRenderableWidget(Button.builder(
+        btnRestore = addButton(
+                RX + actionW + 5,
+                65,
+                actionW,
                 Component.translatable("gui.entitycontrol.spawn.spawner.restore"),
-                button -> restoreSelected()
-        ).bounds(RX + actionW + 5, 65, actionW, 20).tooltip(Tooltip.create(
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.restore")
-        )).build());
+                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.restore"),
+                this::restoreSelected
+        );
 
-        btnTuning = addRenderableWidget(Button.builder(
+        btnTuning = addButton(
+                RX,
+                91,
+                tabW,
                 Component.empty(),
-                button -> {
+                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.tuning"),
+                () -> {
                     SpawnerConfig.SpawnerRule rule = getEditableRule();
-                    if (rule == null) {
-                        return;
-                    }
+                    if (rule == null) return;
                     rule.tuningEnabled = !rule.tuningEnabled;
                     afterRuleChanged();
                     updateControlValues();
                 }
-        ).bounds(RX, 91, tabW, 20).tooltip(Tooltip.create(
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.tuning")
-        )).build());
+        );
 
-        btnFixedDelay = addRenderableWidget(Button.builder(
+        btnFixedDelay = addButton(
+                RX + tabW + 5,
+                91,
+                tabW,
                 Component.empty(),
-                button -> {
+                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.fixed_toggle"),
+                () -> {
                     SpawnerConfig.SpawnerRule rule = getEditableRule();
-                    if (rule == null) {
-                        return;
-                    }
-                    rule.fixedSpawnDelaySeconds = rule.fixedSpawnDelaySeconds >= 0.0D ? -1.0D : rule.minSpawnDelaySeconds;
+                    if (rule == null) return;
+                    rule.fixedSpawnDelaySeconds = rule.fixedSpawnDelaySeconds >= 0.0D
+                            ? -1.0D
+                            : rule.minSpawnDelaySeconds;
                     afterRuleChanged();
                     updateControlValues();
                 }
-        ).bounds(RX + tabW + 5, 91, tabW, 20).tooltip(Tooltip.create(
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.fixed_toggle")
-        )).build());
+        );
 
-        btnBreaker = addRenderableWidget(Button.builder(
+        btnBreaker = addButton(
+                RX,
+                91,
+                tabW,
                 Component.empty(),
-                button -> {
+                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.breaker"),
+                () -> {
                     SpawnerConfig.SpawnerRule rule = getEditableRule();
-                    if (rule == null) {
-                        return;
-                    }
+                    if (rule == null) return;
                     rule.breakerEnabled = !rule.breakerEnabled;
                     afterRuleChanged();
                     updateControlValues();
                 }
-        ).bounds(RX, 91, tabW, 20).tooltip(Tooltip.create(
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.breaker")
-        )).build());
+        );
 
-        btnMode = addRenderableWidget(Button.builder(
+        btnMode = addButton(
+                RX + tabW + 5,
+                91,
+                tabW,
                 Component.empty(),
-                button -> {
+                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.mode"),
+                () -> {
                     SpawnerConfig.SpawnerRule rule = getEditableRule();
-                    if (rule == null) {
-                        return;
-                    }
+                    if (rule == null) return;
                     rule.mode = "BREAK".equalsIgnoreCase(rule.mode) ? "COOLDOWN" : "BREAK";
                     afterRuleChanged();
                     updateControlValues();
                 }
-        ).bounds(RX + tabW + 5, 91, tabW, 20).tooltip(Tooltip.create(
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.mode")
-        )).build());
+        );
 
         boxMinDelay = addDecimalBox(120, 0, 1638.35D, "gui.entitycontrol.spawn.spawner.tooltip.min_delay");
         boxMaxDelay = addDecimalBox(120, 1, 1638.35D, "gui.entitycontrol.spawn.spawner.tooltip.max_delay");
@@ -387,73 +402,42 @@ public class SpawnerControlScreen extends KineticScreen {
         boxCooldown.setResponder(value -> updateIntField(boxCooldown, Field.COOLDOWN));
 
         updateSearch("");
-        if (!displayList.isEmpty()) {
-            updateSelection(displayList.get(0));
-        }
+        if (!displayList.isEmpty()) updateSelection(displayList.get(0));
         switchTab(true);
     }
 
-    private NumericEditBox addIntegerBox(
-            int y,
-            int column,
-            int min,
-            int max,
-            String tooltipKey
-    ) {
+    private NumericEditBox addIntegerBox(int y, int column, int min, int max, String tooltipKey) {
         int columnW = (RW - 5) / 2;
         int x = RX + column * (columnW + 5);
-        NumericEditBox box = NumericEditBox.integer(
-                font,
-                x,
-                y + 11,
-                columnW,
-                18,
-                Component.empty(),
-                false,
-                min,
-                max
+        NumericEditBox box = addIntegerField(
+                x, y + 11, columnW, Component.empty(), false, min, max, null, Component.translatable(tooltipKey)
         );
         box.setMaxLength(7);
-        box.setTooltip(Tooltip.create(Component.translatable(tooltipKey)));
-        return addRenderableWidget(box);
+        return box;
     }
 
-    private NumericEditBox addDecimalBox(
-            int y,
-            int column,
-            Double max,
-            String tooltipKey
-    ) {
+    private NumericEditBox addDecimalBox(int y, int column, Double max, String tooltipKey) {
         int columnW = (RW - 5) / 2;
         int x = RX + column * (columnW + 5);
-        NumericEditBox box = NumericEditBox.decimal(
-                font,
-                x,
-                y + 11,
-                columnW,
-                18,
-                Component.empty(),
-                false,
-                null,
-                max
+        NumericEditBox box = addDecimalField(
+                x, y + 11, columnW, Component.empty(), false, null, max, null, Component.translatable(tooltipKey)
         );
         box.setMaxLength(8);
-        box.setTooltip(Tooltip.create(Component.translatable(tooltipKey)));
-        return addRenderableWidget(box);
+        return box;
     }
 
     private void switchTab(boolean showTuning) {
         tuningTab = showTuning;
-        btnTabTuning.active = !showTuning;
-        btnTabBreaker.active = showTuning;
+        btnTabTuning.setEnabled(!showTuning);
+        btnTabBreaker.setEnabled(showTuning);
         updateControlVisibility();
     }
 
     private void buildSearchIndex() {
         searchIndex.clear();
         for (String id : allEntityIds) {
-            ResourceLocation location = ResourceLocation.tryParse(id);
-            EntityType<?> type = location == null ? null : ForgeRegistries.ENTITY_TYPES.getValue(location);
+            ResourceLocation location = KineticResourceIds.tryParse(id);
+            EntityType<?> type = location == null ? null : KineticRegistries.entityTypes().get(location);
             String name = type == null ? id : type.getDescription().getString();
             String searchData = (
                     id + " "
@@ -473,7 +457,7 @@ public class SpawnerControlScreen extends KineticScreen {
         } else {
             for (String id : allEntityIds) {
                 if (lower.startsWith("@")) {
-                    ResourceLocation location = ResourceLocation.tryParse(id);
+                    ResourceLocation location = KineticResourceIds.tryParse(id);
                     if (location != null && location.getNamespace().contains(lower.substring(1))) {
                         displayList.add(id);
                     }
@@ -505,9 +489,9 @@ public class SpawnerControlScreen extends KineticScreen {
     private void updateSelection(String entityId) {
         selectedId = entityId;
         globalMode = false;
-        contextMenuOpen = false;
+        closeContextMenu();
         if (searchBox != null) {
-            searchBox.setFocused(false);
+            blurControl(searchBox);
         }
         updateControlValues();
     }
@@ -571,7 +555,7 @@ public class SpawnerControlScreen extends KineticScreen {
             current = null;
         }
 
-        boolean modified = !matchesBaseline(current, baseline);
+        boolean modified = differsFromBaseline(current, baseline);
         boolean changed = modified
                 ? modifiedEntities.add(entityId)
                 : modifiedEntities.remove(entityId);
@@ -593,11 +577,11 @@ public class SpawnerControlScreen extends KineticScreen {
         }
     }
 
-    private boolean matchesBaseline(SpawnerConfig.SpawnerRule current, LocalBaseline baseline) {
+    private boolean differsFromBaseline(SpawnerConfig.SpawnerRule current, LocalBaseline baseline) {
         if (!baseline.hadCustomRule) {
-            return current == null;
+            return current != null;
         }
-        return sameRule(current, baseline.rule);
+        return !sameRule(current, baseline.rule);
     }
 
     private boolean sameRule(SpawnerConfig.SpawnerRule left, SpawnerConfig.SpawnerRule right) {
@@ -648,7 +632,7 @@ public class SpawnerControlScreen extends KineticScreen {
         sortDisplayList();
         updateGridScrollRange();
         updateControlValues();
-        GuiOverlay.toast(Component.translatable("msg.entitycontrol.spawn.spawner.restored"));
+        KineticOverlays.toast(Component.translatable("msg.entitycontrol.spawn.spawner.restored"));
     }
 
     private void updateIntField(NumericEditBox box, Field field) {
@@ -669,7 +653,7 @@ public class SpawnerControlScreen extends KineticScreen {
 
         Integer value = box.getIntValue();
         if (value == null) {
-            GuiOverlay.toast(Component.translatable("msg.entitycontrol.spawn.invalid_number"));
+            KineticOverlays.toast(Component.translatable("msg.entitycontrol.spawn.invalid_number"));
             updateControlValues();
             return;
         }
@@ -720,7 +704,7 @@ public class SpawnerControlScreen extends KineticScreen {
 
         Double value = box.getDoubleValue();
         if (value == null) {
-            GuiOverlay.toast(Component.translatable("msg.entitycontrol.spawn.invalid_number"));
+            KineticOverlays.toast(Component.translatable("msg.entitycontrol.spawn.invalid_number"));
             updateControlValues();
             return;
         }
@@ -731,7 +715,7 @@ public class SpawnerControlScreen extends KineticScreen {
             return;
         }
         if (value < minimum || value > maximum) {
-            GuiOverlay.toast(Component.translatable("msg.entitycontrol.spawn.invalid_number"));
+            KineticOverlays.toast(Component.translatable("msg.entitycontrol.spawn.invalid_number"));
             updateControlValues();
             return;
         }
@@ -773,41 +757,41 @@ public class SpawnerControlScreen extends KineticScreen {
         }
 
         if (btnScope != null) {
-            btnScope.setMessage(getScopeText());
+            btnScope.setText(getScopeText());
         }
 
         SpawnerConfig.SpawnerRule rule = getDisplayRule();
         updating = true;
         if (rule != null) {
-            btnTuning.setMessage(Component.translatable(
+            btnTuning.setText(Component.translatable(
                     rule.tuningEnabled
                             ? "gui.entitycontrol.spawn.spawner.tuning.on"
                             : "gui.entitycontrol.spawn.spawner.tuning.off"
             ));
-            btnFixedDelay.setMessage(Component.translatable(
+            btnFixedDelay.setText(Component.translatable(
                     rule.fixedSpawnDelaySeconds >= 0.0D
                             ? "gui.entitycontrol.spawn.spawner.fixed.on"
                             : "gui.entitycontrol.spawn.spawner.fixed.off"
             ));
-            btnBreaker.setMessage(Component.translatable(
+            btnBreaker.setText(Component.translatable(
                     rule.breakerEnabled
                             ? "gui.entitycontrol.spawn.spawner.breaker.on"
                             : "gui.entitycontrol.spawn.spawner.breaker.off"
             ));
-            btnMode.setMessage(Component.translatable(
+            btnMode.setText(Component.translatable(
                     "BREAK".equalsIgnoreCase(rule.mode)
                             ? "gui.entitycontrol.spawn.spawner.mode.break"
                             : "gui.entitycontrol.spawn.spawner.mode.cooldown"
             ));
 
-            boxMinDelay.setValue(NumericEditBox.format(rule.minSpawnDelaySeconds));
-            boxMaxDelay.setValue(NumericEditBox.format(rule.maxSpawnDelaySeconds));
-            boxFixedDelay.setValue(NumericEditBox.format(
+            boxMinDelay.setValue(KineticNumericFields.formatDecimal(rule.minSpawnDelaySeconds));
+            boxMaxDelay.setValue(KineticNumericFields.formatDecimal(rule.maxSpawnDelaySeconds));
+            boxFixedDelay.setValue(KineticNumericFields.formatDecimal(
                     rule.fixedSpawnDelaySeconds >= 0.0D
                             ? rule.fixedSpawnDelaySeconds
                             : rule.minSpawnDelaySeconds
             ));
-            boxSpeed.setValue(NumericEditBox.format(rule.speedMultiplier));
+            boxSpeed.setValue(KineticNumericFields.formatDecimal(rule.speedMultiplier));
             boxMinSpawnCount.setIntValue(rule.minSpawnCount);
             boxMaxSpawnCount.setIntValue(rule.maxSpawnCount);
             if (rule.maxNearbyEntities < 0) {
@@ -827,9 +811,9 @@ public class SpawnerControlScreen extends KineticScreen {
 
     private void updateRestoreState() {
         if (btnRestore != null) {
-            btnRestore.active = !globalMode
+            btnRestore.setEnabled(!globalMode
                     && selectedId != null
-                    && modifiedEntities.contains(selectedId);
+                    && modifiedEntities.contains(selectedId));
         }
     }
 
@@ -839,11 +823,9 @@ public class SpawnerControlScreen extends KineticScreen {
         }
 
         if (searchBox != null) {
-            searchBox.visible = !globalMode;
-            searchBox.active = !globalMode;
-            if (globalMode) {
-                searchBox.setFocused(false);
-            }
+            searchBox.setVisible(!globalMode);
+            searchBox.setEnabled(!globalMode);
+            if (globalMode) blurControl(searchBox);
         }
 
         boolean selected = selectedId != null;
@@ -851,24 +833,24 @@ public class SpawnerControlScreen extends KineticScreen {
         SpawnerConfig.SpawnerRule rule = getDisplayRule();
         boolean fixedEnabled = rule != null && rule.fixedSpawnDelaySeconds >= 0.0D;
 
-        btnRestore.visible = selected && !globalMode;
-        btnRestore.active = selected && !globalMode && modifiedEntities.contains(selectedId);
-        btnTuning.visible = editable && tuningTab;
-        btnFixedDelay.visible = editable && tuningTab;
-        btnBreaker.visible = editable && !tuningTab;
-        btnMode.visible = editable && !tuningTab;
+        btnRestore.setVisible(selected && !globalMode);
+        btnRestore.setEnabled(selected && !globalMode && modifiedEntities.contains(selectedId));
+        btnTuning.setVisible(editable && tuningTab);
+        btnFixedDelay.setVisible(editable && tuningTab);
+        btnBreaker.setVisible(editable && !tuningTab);
+        btnMode.setVisible(editable && !tuningTab);
 
-        boxMinDelay.visible = editable && tuningTab;
-        boxMaxDelay.visible = editable && tuningTab;
-        boxFixedDelay.visible = editable && tuningTab && fixedEnabled;
-        boxSpeed.visible = editable && tuningTab;
-        boxMinSpawnCount.visible = editable && tuningTab;
-        boxMaxSpawnCount.visible = editable && tuningTab;
-        boxMaxNearby.visible = editable && tuningTab;
-        boxPlayerRange.visible = editable && tuningTab;
-        boxSpawnRange.visible = editable && tuningTab;
-        boxThreshold.visible = editable && !tuningTab;
-        boxCooldown.visible = editable && !tuningTab;
+        boxMinDelay.setVisible(editable && tuningTab);
+        boxMaxDelay.setVisible(editable && tuningTab);
+        boxFixedDelay.setVisible(editable && tuningTab && fixedEnabled);
+        boxSpeed.setVisible(editable && tuningTab);
+        boxMinSpawnCount.setVisible(editable && tuningTab);
+        boxMaxSpawnCount.setVisible(editable && tuningTab);
+        boxMaxNearby.setVisible(editable && tuningTab);
+        boxPlayerRange.setVisible(editable && tuningTab);
+        boxSpawnRange.setVisible(editable && tuningTab);
+        boxThreshold.setVisible(editable && !tuningTab);
+        boxCooldown.setVisible(editable && !tuningTab);
     }
 
     private Component getScopeText() {
@@ -896,8 +878,8 @@ public class SpawnerControlScreen extends KineticScreen {
     }
 
     private String getEntityName(String entityId) {
-        ResourceLocation id = ResourceLocation.tryParse(entityId);
-        EntityType<?> type = id == null ? null : ForgeRegistries.ENTITY_TYPES.getValue(id);
+        ResourceLocation id = KineticResourceIds.tryParse(entityId);
+        EntityType<?> type = id == null ? null : KineticRegistries.entityTypes().get(id);
         return type == null ? entityId : type.getDescription().getString();
     }
 
@@ -908,8 +890,8 @@ public class SpawnerControlScreen extends KineticScreen {
             int mouseY,
             float partialTick
     ) {
-        graphics.fill(0, 0, V_WIDTH, V_HEIGHT, 0xFA1E1E1E);
-        graphics.renderOutline(0, 0, V_WIDTH, V_HEIGHT, 0xFF444444);
+        GuiTheme.canvasBackground(graphics, V_WIDTH, V_HEIGHT);
+        GuiTheme.stateOutline(graphics, 0, 0, V_WIDTH, V_HEIGHT, false, false, false);
         GuiTheme.panelAlt(
                 graphics,
                 GRID_X - 2,
@@ -927,47 +909,14 @@ public class SpawnerControlScreen extends KineticScreen {
             float partialTick
     ) {
         deferredTooltip = null;
-        renderSearchPlaceholder(
-                graphics,
-                searchBox,
-                "gui.entitycontrol.spawn.spawner.search_hint"
-        );
-
         if (globalMode) {
             renderGlobalModePanel(graphics);
         } else {
             renderGrid(graphics, mouseX, mouseY);
-            renderContextMenu(graphics, mouseX, mouseY);
         }
 
         renderRightPanel(graphics);
 
-    }
-
-    private void renderSearchPlaceholder(
-            GuiGraphics graphics,
-            EditBox box,
-            String translationKey
-    ) {
-        if (box == null
-                || !box.visible
-                || !box.getValue().isEmpty()
-                || box.isFocused()) {
-            return;
-        }
-
-        String text = font.plainSubstrByWidth(
-                Component.translatable(translationKey).getString(),
-                Math.max(0, box.getWidth() - 10)
-        );
-        graphics.drawString(
-                font,
-                text,
-                box.getX() + 5,
-                box.getY() + (box.getHeight() - font.lineHeight) / 2,
-                0xFFAAAAAA,
-                false
-        );
     }
 
     private void renderGlobalModePanel(GuiGraphics graphics) {
@@ -999,13 +948,7 @@ public class SpawnerControlScreen extends KineticScreen {
                 0xFFFFAA00
         );
 
-        graphics.fill(
-                panelX,
-                panelY + 78,
-                panelX + panelW,
-                panelY + 79,
-                0xFF555555
-        );
+        GuiTheme.separator(graphics, panelX, panelY + 78, panelW);
 
         graphics.drawCenteredString(
                 font,
@@ -1022,7 +965,7 @@ public class SpawnerControlScreen extends KineticScreen {
         int startIndex = baseRow * COLS;
         int endIndex = Math.min(startIndex + (VISIBLE_ROWS + 2) * COLS, displayList.size());
 
-        enableCanvasScissor(graphics, GRID_X, GRID_Y, GRID_X + GRID_W, GRID_Y + GRID_H);
+        enableUiScissor(graphics, GRID_X, GRID_Y, GRID_X + GRID_W, GRID_Y + GRID_H);
         for (int i = startIndex; i < endIndex; i++) {
             int relative = i - startIndex;
             int x = GRID_X + relative % COLS * CELL_SIZE;
@@ -1041,23 +984,21 @@ public class SpawnerControlScreen extends KineticScreen {
                     CELL_SIZE - 2
             );
 
-            if (hover) {
-                renderThickOutline(graphics, x, y, 0xFF3399FF, 3);
-            } else if (selected) {
-                renderThickOutline(graphics, x, y, 0xFFFFD700, 3);
-            } else if (modified) {
-                renderThickOutline(graphics, x, y, 0xFF33DD66, 3);
-            } else {
-                graphics.renderOutline(
-                        x,
-                        y,
-                        CELL_SIZE,
-                        CELL_SIZE,
-                        0xFF555555
+            if (hover || selected) {
+                GuiTheme.stateOutline(
+                        graphics, x, y, CELL_SIZE, CELL_SIZE,
+                        selected, hover, false, 3
                 );
+            } else if (modified) {
+                GuiTheme.indicatorOutline(
+                        graphics, x, y, CELL_SIZE, CELL_SIZE,
+                        GuiTheme.Indicator.SUCCESS, 3
+                );
+            } else {
+                GuiTheme.stateOutline(graphics, x, y, CELL_SIZE, CELL_SIZE, false, false, false);
             }
 
-            boolean rendered = entityPreviewRenderer.render(
+            boolean rendered = entityPreviewRenderer.renderCanvas(
                     graphics,
                     entityId,
                     "spawner:" + entityId,
@@ -1065,9 +1006,6 @@ public class SpawnerControlScreen extends KineticScreen {
                     y + 3,
                     CELL_SIZE - 6,
                     CELL_SIZE - 6,
-                    canvasScale,
-                    canvasX,
-                    canvasY,
                     hover
             );
             if (!rendered) {
@@ -1081,10 +1019,10 @@ public class SpawnerControlScreen extends KineticScreen {
             }
 
             if (modified) {
-                graphics.fill(x + 4, y + 4, x + 8, y + 8, 0xFF33DD66);
+                GuiTheme.indicatorFill(graphics, x + 4, y + 4, 4, 4, GuiTheme.Indicator.SUCCESS);
             }
 
-            if (hover && !contextMenuOpen) {
+            if (hover) {
                 ArrayList<Component> tooltip = new ArrayList<>();
                 tooltip.add(Component.literal(getEntityName(entityId)));
                 tooltip.add(Component.translatable(
@@ -1104,7 +1042,7 @@ public class SpawnerControlScreen extends KineticScreen {
                 deferredTooltip = tooltip;
             }
         }
-        graphics.disableScissor();
+        disableUiScissor(graphics);
 
         GuiTheme.scrollbar(
                 gridScroll,
@@ -1178,75 +1116,6 @@ public class SpawnerControlScreen extends KineticScreen {
         graphics.drawString(font, Component.translatable(key), x, y, 0xAAAAAA);
     }
 
-    private void renderContextMenu(GuiGraphics graphics, int mouseX, int mouseY) {
-        if (!contextMenuOpen || contextEntityId == null) {
-            return;
-        }
-
-        graphics.pose().pushPose();
-        graphics.pose().translate(0.0F, 0.0F, 500.0F);
-        graphics.fill(
-                contextMenuX,
-                contextMenuY,
-                contextMenuX + CONTEXT_W,
-                contextMenuY + CONTEXT_H,
-                0xFF1C1C1C
-        );
-        graphics.renderOutline(
-                contextMenuX,
-                contextMenuY,
-                CONTEXT_W,
-                CONTEXT_H,
-                0xFFFFA500
-        );
-
-        boolean canRestore = modifiedEntities.contains(contextEntityId);
-        boolean hover = mouseX >= contextMenuX
-                && mouseX <= contextMenuX + CONTEXT_W
-                && mouseY >= contextMenuY
-                && mouseY <= contextMenuY + CONTEXT_H;
-        if (hover && canRestore) {
-            graphics.fill(
-                    contextMenuX + 1,
-                    contextMenuY + 1,
-                    contextMenuX + CONTEXT_W - 1,
-                    contextMenuY + CONTEXT_H - 1,
-                    0xFF555555
-            );
-        }
-
-        graphics.drawCenteredString(
-                font,
-                Component.translatable(
-                        canRestore
-                                ? "gui.entitycontrol.spawn.spawner.context.reset"
-                                : "gui.entitycontrol.spawn.spawner.context.no_reset"
-                ),
-                contextMenuX + CONTEXT_W / 2,
-                contextMenuY + 7,
-                canRestore ? 0xFFFFFF : 0xAAAAAA
-        );
-        graphics.pose().popPose();
-    }
-
-    private void renderThickOutline(
-            GuiGraphics graphics,
-            int x,
-            int y,
-            int color,
-            int thickness
-    ) {
-        for (int i = 0; i < thickness; i++) {
-            graphics.renderOutline(
-                    x + i,
-                    y + i,
-                    SpawnerControlScreen.CELL_SIZE - i * 2,
-                    SpawnerControlScreen.CELL_SIZE - i * 2,
-                    color
-            );
-        }
-    }
-
     @Override
     protected void renderTooltips(
             GuiGraphics graphics,
@@ -1255,46 +1124,32 @@ public class SpawnerControlScreen extends KineticScreen {
             int mouseX,
             int mouseY
     ) {
-        if (deferredTooltip != null && !deferredTooltip.isEmpty() && !contextMenuOpen) {
-            GuiOverlay.requestTooltip(deferredTooltip, mouseX, mouseY);
+        if (deferredTooltip != null && !deferredTooltip.isEmpty()) {
+            KineticOverlays.requestTooltip(deferredTooltip, mouseX, mouseY);
         }
     }
 
     @Override
     protected boolean canvasMouseClicked(double mouseX, double mouseY, int button) {
-        if (contextMenuOpen) {
-            boolean inside = mouseX >= contextMenuX
-                    && mouseX <= contextMenuX + CONTEXT_W
-                    && mouseY >= contextMenuY
-                    && mouseY <= contextMenuY + CONTEXT_H;
-            if (inside && button == 0 && contextEntityId != null && modifiedEntities.contains(contextEntityId)) {
-                updateSelection(contextEntityId);
-                restoreSelected();
-            }
-            contextMenuOpen = false;
-            contextEntityId = null;
-            return true;
-        }
-
         if (isGridArea(mouseX, mouseY)) {
             int index = getGridIndex(mouseX, mouseY);
             if (index >= 0 && index < displayList.size()) {
                 String entityId = displayList.get(index);
-                if (button == 1) {
+                if (KineticMouseButtons.isSecondary(button)) {
                     updateSelection(entityId);
-                    openContextMenu(mouseX, mouseY, entityId);
-                    setFocused(null);
+                    openEntityContextMenu(mouseX, mouseY, entityId);
+                    clearControlFocus();
                     return true;
                 }
-                if (button == 0) {
+                if (KineticMouseButtons.isPrimary(button)) {
                     updateSelection(entityId);
-                    setFocused(null);
+                    clearControlFocus();
                     return true;
                 }
             }
         }
 
-        if (button == 0 && gridScroll.beginDrag(
+        if (KineticMouseButtons.isPrimary(button) && gridScroll.beginDrag(
                 mouseX,
                 mouseY,
                 GRID_X + GRID_W + 4,
@@ -1310,11 +1165,20 @@ public class SpawnerControlScreen extends KineticScreen {
         return super.canvasMouseClicked(mouseX, mouseY, button);
     }
 
-    private void openContextMenu(double mouseX, double mouseY, String entityId) {
-        contextEntityId = entityId;
-        contextMenuX = Math.max(0, Math.min((int) mouseX, V_WIDTH - CONTEXT_W));
-        contextMenuY = Math.max(0, Math.min((int) mouseY, V_HEIGHT - CONTEXT_H));
-        contextMenuOpen = true;
+    private void openEntityContextMenu(double mouseX, double mouseY, String entityId) {
+        boolean canRestore = modifiedEntities.contains(entityId);
+        Component label = Component.translatable(
+                canRestore
+                        ? "gui.entitycontrol.spawn.spawner.context.reset"
+                        : "gui.entitycontrol.spawn.spawner.context.no_reset"
+        );
+        KineticOverlays.MenuItem item = canRestore
+                ? KineticOverlays.MenuItem.action(label, () -> {
+                    updateSelection(entityId);
+                    restoreSelected();
+                })
+                : KineticOverlays.MenuItem.disabled(label);
+        openContextMenu(mouseX, mouseY, List.of(item));
     }
 
     private boolean isGridArea(double mouseX, double mouseY) {
@@ -1356,7 +1220,7 @@ public class SpawnerControlScreen extends KineticScreen {
 
     @Override
     protected boolean canvasMouseScrolled(double mouseX, double mouseY, double delta) {
-        if (Screen.hasControlDown() && isGridArea(mouseX, mouseY)) {
+        if (KineticClientRuntime.controlModifierDown() && isGridArea(mouseX, mouseY)) {
             int index = getGridIndex(mouseX, mouseY);
             if (index >= 0 && index < displayList.size()) {
                 entityPreviewRenderer.adjustZoom(
@@ -1382,9 +1246,7 @@ public class SpawnerControlScreen extends KineticScreen {
         long requestId = ++nextSaveRequestId;
         pendingSaveJson = currentJson;
         pendingSaveRequestId = requestId;
-        SpawnNetwork.CHANNEL.sendToServer(
-                new SpawnNetwork.SpawnerSavePacket(currentJson, requestId)
-        );
+        SpawnNetwork.saveSpawner(currentJson, requestId);
     }
 
     public void handleSaveResult(long requestId, boolean success) {
@@ -1399,7 +1261,7 @@ public class SpawnerControlScreen extends KineticScreen {
         pendingSaveRequestId = -1L;
         if (success && closeAfterPendingSave) {
             closeAfterPendingSave = false;
-            returnToParent();
+            navigateBack();
         } else if (!success) {
             closeAfterPendingSave = false;
         }
@@ -1409,20 +1271,15 @@ public class SpawnerControlScreen extends KineticScreen {
         return !Objects.equals(SpawnerConfig.GSON.toJson(data), lastSavedJson);
     }
 
-    private void returnToParent() {
-        Minecraft.getInstance().setScreen(parent);
+    @Override
+    protected boolean handleCloseRequest() {
+        return false;
     }
 
     @Override
-    public void onClose() {
-        returnToParent();
-    }
-
-    @Override
-    public void removed() {
+    protected void screenRemoved() {
         entityPreviewRenderer.clear();
         editedEntities.clear();
-        super.removed();
     }
 
     private enum Field {
@@ -1437,6 +1294,10 @@ public class SpawnerControlScreen extends KineticScreen {
         SPAWN_RANGE,
         THRESHOLD,
         COOLDOWN
+    }
+
+    public Screen getParentScreen() {
+        return parent;
     }
 
     private record LocalBaseline(boolean hadCustomRule, SpawnerConfig.SpawnerRule rule) {

@@ -1,30 +1,31 @@
 package dev.xyat.entitycontrol.spawn.client.gui;
 
 import net.minecraft.ChatFormatting;
+import dev.xyat.kineticcore.api.client.input.KineticMouseButtons;
 import dev.xyat.kineticcore.api.client.search.KineticSearch;
-import dev.xyat.kineticcore.api.client.overlay.GuiOverlay;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.Scroll;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.GridScrollController;
+import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
+import dev.xyat.kineticcore.api.client.widget.KineticWidgets;
+import dev.xyat.kineticcore.api.client.widget.button.KineticButtons.StateButton;
+import dev.xyat.kineticcore.api.client.widget.input.KineticNumericFields.NumericEditBox;
+import dev.xyat.kineticcore.api.client.widget.input.KineticTextFields.KineticEditBox;
+import dev.xyat.kineticcore.api.client.widget.render.KineticEntityPreview.EntityPreviewRenderer;
+import dev.xyat.kineticcore.api.client.widget.scroll.KineticScroll.GridScrollController;
+import dev.xyat.kineticcore.api.client.widget.state.EditedEntryTracker;
 import dev.xyat.kineticcore.api.client.screen.KineticScreen;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.EntityPreviewRenderer;
 import dev.xyat.kineticcore.api.client.theme.GuiTheme;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.EditedEntryTracker;
 import dev.xyat.entitycontrol.spawn.Network.SpawnNetwork;
 import dev.xyat.entitycontrol.spawn.config.BiomeSpawnConfig;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import net.minecraft.Util;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
-import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.NotNull;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -46,21 +47,21 @@ public class SpawnControlScreen extends KineticScreen {
     private BiomeSpawnConfig.ConfigProfile backupProfile;
 
     public List<String> displayList;
-    public EditBox searchBox;
+    public KineticEditBox searchBox;
     public String selectedId;
 
-    private EditBox rotationSpeedBox;
+    private NumericEditBox rotationSpeedBox;
     private int rotationSpeedPercent = DEFAULT_ROTATION_SPEED_PERCENT;
     private boolean clockwiseRotation = true;
     private boolean updatingRotationSpeedBox;
 
-    private Button btnTabRules;
-    private Button btnTabBiomes;
-    private Button btnTabCategories;
-    private Button btnRestore;
-    private EditBox invalidEntityIdBox;
-    private Button btnRepairInvalidEntity;
-    private Button btnDeleteInvalidEntity;
+    private StateButton btnTabRules;
+    private StateButton btnTabBiomes;
+    private StateButton btnTabCategories;
+    private StateButton btnRestore;
+    private KineticEditBox invalidEntityIdBox;
+    private StateButton btnRepairInvalidEntity;
+    private StateButton btnDeleteInvalidEntity;
 
     private ITabModule tabRules;
     private ITabModule tabBiomes;
@@ -89,11 +90,14 @@ public class SpawnControlScreen extends KineticScreen {
     private boolean draggingGridScroll;
     private boolean showProfileMenu;
     private final GridScrollController profileScroll = new GridScrollController();
+    private StateButton profileDecreaseButton;
+    private StateButton profileIncreaseButton;
+    private final Map<Integer, StateButton> profileButtons = new HashMap<>();
     private int profileMenuMouseX;
     private int profileMenuMouseY;
 
     private final EntityPreviewRenderer entityPreviewRenderer =
-            new EntityPreviewRenderer();
+            KineticWidgets.createEntityPreviewRenderer();
     private final EditedEntryTracker<String> editedEntities =
             new EditedEntryTracker<>();
     private final Map<String, String> entityNameCache = new HashMap<>();
@@ -122,6 +126,7 @@ public class SpawnControlScreen extends KineticScreen {
         this.globals = globals;
         this.profile = profile;
         this.parent = parent;
+        setParentScreen(parent);
         this.backupProfile = new BiomeSpawnConfig.ConfigProfile();
         this.currentEditIndex = editIndex;
 
@@ -133,12 +138,6 @@ public class SpawnControlScreen extends KineticScreen {
 
         sortEntityList(this.displayList);
 
-        useCanvas(
-                V_WIDTH,
-                V_HEIGHT,
-                6
-        );
-        this.scaleMultiplier = 1f;
         configureStandaloneDraft(this::captureSpawnSnapshot, this::restoreSpawnSnapshot);
     }
 
@@ -197,10 +196,6 @@ public class SpawnControlScreen extends KineticScreen {
         return this.font;
     }
 
-    public <T extends AbstractWidget> T addTabWidget(T widget) {
-        return this.addRenderableWidget(widget);
-    }
-
     @Override
     protected void buildUi() {
         tabBtnW = (rw - 10) / 3;
@@ -210,350 +205,184 @@ public class SpawnControlScreen extends KineticScreen {
         int searchGap = 5;
         int searchW = gridW - saveButtonW - exitButtonW - searchGap * 2;
 
-        searchBox = new EditBox(
-                font,
+        searchBox = addTextField(
                 gridX,
                 15,
                 searchW,
-                20,
-                Component.empty()
+                Component.empty(),
+                Component.translatable("gui.entitycontrol.spawn.spawn.search_hint"),
+                null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.search")
         );
-
         searchBox.setResponder(this::updateSearch);
 
-        searchBox.setTooltip(
-                Tooltip.create(Component.translatable(
-                        "gui.entitycontrol.spawn.spawn.tooltip.search"
-                ))
+        addButton(
+                gridX + searchW + searchGap,
+                15,
+                saveButtonW,
+                Component.translatable("gui.entitycontrol.spawn.spawn.save"),
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.save"),
+                this::saveAndClose
         );
 
-        this.addRenderableWidget(searchBox);
-
-        this.addRenderableWidget(
-                Button.builder(
-                                Component.translatable(
-                                        "gui.entitycontrol.spawn.spawn.save"
-                                ),
-                                button -> this.saveAndClose()
-                        )
-                        .bounds(
-                                gridX + searchW + searchGap,
-                                15,
-                                saveButtonW,
-                                20
-                        )
-                        .tooltip(Tooltip.create(
-                                Component.translatable(
-                                        "gui.entitycontrol.spawn.spawn.tooltip.save"
-                                )
-                        ))
-                        .build()
+        addButton(
+                gridX + searchW + searchGap + saveButtonW + searchGap,
+                15,
+                exitButtonW,
+                Component.translatable("gui.entitycontrol.spawn.spawn.exit"),
+                null,
+                this::navigateBack
         );
 
-        this.addRenderableWidget(
-                Button.builder(
-                                Component.translatable(
-                                        "gui.entitycontrol.spawn.spawn.exit"
-                                ),
-                                button -> this.closeEditor()
-                        )
-                        .bounds(
-                                gridX + searchW + searchGap + saveButtonW + searchGap,
-                                15,
-                                exitButtonW,
-                                20
-                        )
-                        .build()
+        addButtonWithHandler(
+                rx,
+                15,
+                tabBtnW,
+                getRuleOverrideText(),
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.rule.override"),
+                button -> {
+                    globals.enable_rule_override = !globals.enable_rule_override;
+                    button.setText(getRuleOverrideText());
+                }
         );
 
-        this.addRenderableWidget(
-                Button.builder(
-                                getRuleOverrideText(),
-                                button -> {
-                                    globals.enable_rule_override =
-                                            !globals.enable_rule_override;
-
-                                    button.setMessage(
-                                            getRuleOverrideText()
-                                    );
-                                }
-                        )
-                        .bounds(
-                                rx,
-                                15,
-                                tabBtnW,
-                                20
-                        )
-                        .tooltip(Tooltip.create(
-                                Component.translatable(
-                                        "gui.entitycontrol.spawn.spawn.tooltip.rule.override"
-                                )
-                        ))
-                        .build()
+        addButtonWithHandler(
+                rx + tabBtnW + 5,
+                15,
+                tabBtnW,
+                getBiomeOverrideText(),
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.biome.override"),
+                button -> {
+                    globals.enable_biome_override = !globals.enable_biome_override;
+                    button.setText(getBiomeOverrideText());
+                }
         );
 
-        this.addRenderableWidget(
-                Button.builder(
-                                getBiomeOverrideText(),
-                                button -> {
-                                    globals.enable_biome_override =
-                                            !globals.enable_biome_override;
-
-                                    button.setMessage(
-                                            getBiomeOverrideText()
-                                    );
-                                }
-                        )
-                        .bounds(
-                                rx + tabBtnW + 5,
-                                15,
-                                tabBtnW,
-                                20
-                        )
-                        .tooltip(Tooltip.create(
-                                Component.translatable(
-                                        "gui.entitycontrol.spawn.spawn.tooltip.biome.override"
-                                )
-                        ))
-                        .build()
+        addButton(
+                rx + (tabBtnW + 5) * 2,
+                15,
+                tabBtnW,
+                Component.translatable("gui.entitycontrol.spawn.spawn.profile_btn").append(": " + currentEditIndex),
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.profile"),
+                () -> showProfileMenu = !showProfileMenu
         );
 
-        this.addRenderableWidget(
-                Button.builder(
-                                Component.translatable(
-                                                "gui.entitycontrol.spawn.spawn.profile_btn"
-                                        )
-                                        .append(": " + currentEditIndex),
-                                button ->
-                                        showProfileMenu =
-                                                !showProfileMenu
-                        )
-                        .bounds(
-                                rx + (tabBtnW + 5) * 2,
-                                15,
-                                tabBtnW,
-                                20
-                        )
-                        .tooltip(Tooltip.create(
-                                Component.translatable(
-                                        "gui.entitycontrol.spawn.spawn.tooltip.profile"
-                                )
-                        ))
-                        .build()
+        btnTabRules = addButton(
+                rx,
+                40,
+                tabBtnW,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tab.rules"),
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.tab.rules"),
+                () -> switchTab(tabRules)
         );
 
-        btnTabRules = Button.builder(
-                        Component.translatable(
-                                "gui.entitycontrol.spawn.spawn.tab.rules"
-                        ),
-                        button -> switchTab(tabRules)
-                )
-                .bounds(
-                        rx,
-                        40,
-                        tabBtnW,
-                        20
-                )
-                .tooltip(Tooltip.create(
-                        Component.translatable(
-                                "gui.entitycontrol.spawn.spawn.tooltip.tab.rules"
-                        )
-                ))
-                .build();
-
-        btnTabBiomes = Button.builder(
-                        Component.translatable(
-                                "gui.entitycontrol.spawn.spawn.tab.biomes"
-                        ),
-                        button -> switchTab(tabBiomes)
-                )
-                .bounds(
-                        rx + tabBtnW + 5,
-                        40,
-                        tabBtnW,
-                        20
-                )
-                .tooltip(Tooltip.create(
-                        Component.translatable(
-                                "gui.entitycontrol.spawn.spawn.tooltip.tab.biomes"
-                        )
-                ))
-                .build();
-
-        btnTabCategories = Button.builder(
-                        Component.translatable(
-                                "gui.entitycontrol.spawn.spawn.tab.categories"
-                        ),
-                        button -> switchTab(tabCategories)
-                )
-                .bounds(
-                        rx + (tabBtnW + 5) * 2,
-                        40,
-                        tabBtnW,
-                        20
-                )
-                .tooltip(Tooltip.create(
-                        Component.translatable(
-                                "gui.entitycontrol.spawn.spawn.tooltip.tab.cats"
-                        )
-                ))
-                .build();
-
-        this.addRenderableWidget(btnTabRules);
-        this.addRenderableWidget(btnTabBiomes);
-        this.addRenderableWidget(btnTabCategories);
-
-        this.addRenderableWidget(
-                Button.builder(
-                                getAutoScanText(),
-                                button -> {
-                                    globals.auto_scan =
-                                            !globals.auto_scan;
-
-                                    button.setMessage(
-                                            getAutoScanText()
-                                    );
-
-                                    if (globals.auto_scan) {
-                                        SpawnNetwork.CHANNEL.sendToServer(
-                                                new SpawnNetwork.RefreshSpawnBackupPacket(
-                                                        currentEditIndex
-                                                )
-                                        );
-                                    }
-                                }
-                        )
-                        .bounds(
-                                rx,
-                                65,
-                                tabBtnW,
-                                20
-                        )
-                        .tooltip(Tooltip.create(
-                                Component.translatable(
-                                        "gui.entitycontrol.spawn.spawn.tooltip.autoscan"
-                                )
-                        ))
-                        .build()
+        btnTabBiomes = addButton(
+                rx + tabBtnW + 5,
+                40,
+                tabBtnW,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tab.biomes"),
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.tab.biomes"),
+                () -> switchTab(tabBiomes)
         );
 
-        btnRestore = this.addRenderableWidget(
-                Button.builder(
-                                Component.translatable(
-                                        "gui.entitycontrol.spawn.spawn.restore"
-                                ),
-                                button -> restoreSelectedEntity()
-                        )
-                        .bounds(
-                                rx + tabBtnW + 5,
-                                65,
-                                tabBtnW,
-                                20
-                        )
-                        .tooltip(Tooltip.create(
-                                Component.translatable(
-                                        "gui.entitycontrol.spawn.spawn.tooltip.restore"
-                                )
-                        ))
-                        .build()
+        btnTabCategories = addButton(
+                rx + (tabBtnW + 5) * 2,
+                40,
+                tabBtnW,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tab.categories"),
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.tab.cats"),
+                () -> switchTab(tabCategories)
         );
-        btnRestore.active = false;
+
+        addButtonWithHandler(
+                rx,
+                65,
+                tabBtnW,
+                getAutoScanText(),
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.autoscan"),
+                button -> {
+                    globals.auto_scan = !globals.auto_scan;
+                    button.setText(getAutoScanText());
+                    if (globals.auto_scan) {
+                        SpawnNetwork.refreshSpawnBackup(currentEditIndex);
+                    }
+                }
+        );
+
+        btnRestore = addButton(
+                rx + tabBtnW + 5,
+                65,
+                tabBtnW,
+                Component.translatable("gui.entitycontrol.spawn.spawn.restore"),
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.restore"),
+                this::restoreSelectedEntity
+        );
+        btnRestore.setEnabled(false);
 
         int rotationControlX = rx + (tabBtnW + 5) * 2;
         int rotationLabelW = 70;
         int rotationInputW = Math.max(31, tabBtnW - rotationLabelW - 9);
 
-        this.addRenderableWidget(
-                Button.builder(
-                                getRotationDirectionText(),
-                                button -> {
-                                    clockwiseRotation = !clockwiseRotation;
-                                    entityPreviewRenderer.setClockwise(clockwiseRotation);
-                                    button.setMessage(getRotationDirectionText());
-                                }
-                        )
-                        .bounds(
-                                rotationControlX,
-                                65,
-                                rotationLabelW,
-                                20
-                        )
-                        .tooltip(Tooltip.create(
-                                Component.translatable(
-                                        "gui.entitycontrol.spawn.rotation.direction.tooltip"
-                                )
-                        ))
-                        .build()
+        addButtonWithHandler(
+                rotationControlX,
+                65,
+                rotationLabelW,
+                getRotationDirectionText(),
+                Component.translatable("gui.entitycontrol.spawn.rotation.direction.tooltip"),
+                button -> {
+                    clockwiseRotation = !clockwiseRotation;
+                    entityPreviewRenderer.setClockwise(clockwiseRotation);
+                    button.setText(getRotationDirectionText());
+                }
         );
 
-        rotationSpeedBox = new EditBox(
-                font,
+        rotationSpeedBox = addIntegerField(
                 rotationControlX + rotationLabelW + 4,
                 65,
                 rotationInputW,
-                20,
-                Component.translatable(
-                        "gui.entitycontrol.spawn.spawn.rotation_speed"
-                )
+                Component.translatable("gui.entitycontrol.spawn.spawn.rotation_speed"),
+                false,
+                MIN_ROTATION_SPEED_PERCENT,
+                MAX_ROTATION_SPEED_PERCENT,
+                null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.rotation_speed")
         );
-
         rotationSpeedBox.setMaxLength(3);
-        rotationSpeedBox.setFilter(this::isValidRotationSpeedInput);
-        rotationSpeedBox.setValue(
-                Integer.toString(rotationSpeedPercent)
-        );
-        rotationSpeedBox.setResponder(
-                value -> applyRotationSpeedFromBox(false)
-        );
-        rotationSpeedBox.setTooltip(
-                Tooltip.create(Component.translatable(
-                        "gui.entitycontrol.spawn.spawn.tooltip.rotation_speed"
-                ))
-        );
-
-        this.addRenderableWidget(rotationSpeedBox);
+        rotationSpeedBox.setValue(Integer.toString(rotationSpeedPercent));
+        rotationSpeedBox.setResponder(value -> applyRotationSpeedFromBox(false));
 
         int invalidActionWidth = (rw - 5) / 2;
-        invalidEntityIdBox = new EditBox(
-                font,
+        invalidEntityIdBox = addTextField(
                 rx,
                 116,
                 rw,
-                20,
-                Component.translatable("gui.entitycontrol.spawn.spawn.invalid_entity.id")
+                Component.translatable("gui.entitycontrol.spawn.spawn.invalid_entity.id"),
+                Component.translatable("gui.entitycontrol.spawn.spawn.invalid_entity.id_hint"),
+                null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.invalid_entity.id.tooltip")
         );
         invalidEntityIdBox.setMaxLength(256);
-        invalidEntityIdBox.setTooltip(Tooltip.create(Component.translatable(
-                "gui.entitycontrol.spawn.spawn.invalid_entity.id.tooltip"
-        )));
-        invalidEntityIdBox.visible = false;
-        this.addRenderableWidget(invalidEntityIdBox);
+        invalidEntityIdBox.setVisible(false);
 
-        btnRepairInvalidEntity = this.addRenderableWidget(
-                Button.builder(
-                                Component.translatable("gui.entitycontrol.spawn.spawn.invalid_entity.repair"),
-                                button -> repairSelectedInvalidEntity()
-                        )
-                        .bounds(rx, 141, invalidActionWidth, 20)
-                        .tooltip(Tooltip.create(Component.translatable(
-                                "gui.entitycontrol.spawn.spawn.invalid_entity.repair.tooltip"
-                        )))
-                        .build()
+        btnRepairInvalidEntity = addButton(
+                rx,
+                141,
+                invalidActionWidth,
+                Component.translatable("gui.entitycontrol.spawn.spawn.invalid_entity.repair"),
+                Component.translatable("gui.entitycontrol.spawn.spawn.invalid_entity.repair.tooltip"),
+                this::repairSelectedInvalidEntity
         );
-        btnRepairInvalidEntity.visible = false;
+        btnRepairInvalidEntity.setVisible(false);
 
-        btnDeleteInvalidEntity = this.addRenderableWidget(
-                Button.builder(
-                                Component.translatable("gui.entitycontrol.spawn.spawn.invalid_entity.delete"),
-                                button -> deleteSelectedInvalidEntity()
-                        )
-                        .bounds(rx + invalidActionWidth + 5, 141, invalidActionWidth, 20)
-                        .tooltip(Tooltip.create(Component.translatable(
-                                "gui.entitycontrol.spawn.spawn.invalid_entity.delete.tooltip"
-                        )))
-                        .build()
+        btnDeleteInvalidEntity = addButton(
+                rx + invalidActionWidth + 5,
+                141,
+                invalidActionWidth,
+                Component.translatable("gui.entitycontrol.spawn.spawn.invalid_entity.delete"),
+                Component.translatable("gui.entitycontrol.spawn.spawn.invalid_entity.delete.tooltip"),
+                this::deleteSelectedInvalidEntity
         );
-        btnDeleteInvalidEntity.visible = false;
+        btnDeleteInvalidEntity.setVisible(false);
 
         tabRules = new RuleTabModule(this);
         tabRules.init();
@@ -649,7 +478,7 @@ public class SpawnControlScreen extends KineticScreen {
     }
 
     private void showInvalidRotationSpeedToast() {
-        GuiOverlay.toast(
+        KineticOverlays.toast(
                 Component.translatable(
                         "msg.entitycontrol.spawn.spawn.rotation_speed.invalid"
                 )
@@ -664,21 +493,21 @@ public class SpawnControlScreen extends KineticScreen {
         boolean invalid = isSelectedEntityInvalid();
 
         if (invalidEntityIdBox != null) {
-            invalidEntityIdBox.visible = invalid;
-            invalidEntityIdBox.active = invalid;
-            if (invalid && !invalidEntityIdBox.isFocused()) {
+            invalidEntityIdBox.setVisible(invalid);
+            invalidEntityIdBox.setEnabled(invalid);
+            if (invalid && !isControlFocused(invalidEntityIdBox)) {
                 invalidEntityIdBox.setValue(selectedId);
             }
         }
 
         if (btnRepairInvalidEntity != null) {
-            btnRepairInvalidEntity.visible = invalid;
-            btnRepairInvalidEntity.active = invalid;
+            btnRepairInvalidEntity.setVisible(invalid);
+            btnRepairInvalidEntity.setEnabled(invalid);
         }
 
         if (btnDeleteInvalidEntity != null) {
-            btnDeleteInvalidEntity.visible = invalid;
-            btnDeleteInvalidEntity.active = invalid;
+            btnDeleteInvalidEntity.setVisible(invalid);
+            btnDeleteInvalidEntity.setEnabled(invalid);
         }
 
         if (currentTab != null) {
@@ -693,9 +522,9 @@ public class SpawnControlScreen extends KineticScreen {
 
         String oldId = selectedId;
         String rawTarget = invalidEntityIdBox.getValue().trim();
-        ResourceLocation targetLocation = ResourceLocation.tryParse(rawTarget);
+        ResourceLocation targetLocation = KineticResourceIds.tryParse(rawTarget);
         if (targetLocation == null || !BiomeSpawnConfig.isEntityIdValid(targetLocation.toString())) {
-            GuiOverlay.toast(Component.translatable(
+            KineticOverlays.toast(Component.translatable(
                     "msg.entitycontrol.spawn.spawn.invalid_entity.repair_invalid"
             ));
             return;
@@ -703,7 +532,7 @@ public class SpawnControlScreen extends KineticScreen {
 
         String targetId = targetLocation.toString();
         if (profile.entities.containsKey(targetId)) {
-            GuiOverlay.toast(Component.translatable(
+            KineticOverlays.toast(Component.translatable(
                     "msg.entitycontrol.spawn.spawn.invalid_entity.repair_duplicate",
                     targetId
             ));
@@ -729,7 +558,7 @@ public class SpawnControlScreen extends KineticScreen {
         }
         updateSelection(targetId);
 
-        GuiOverlay.toast(Component.translatable(
+        KineticOverlays.toast(Component.translatable(
                 "msg.entitycontrol.spawn.spawn.invalid_entity.repair_success",
                 targetId
         ));
@@ -758,7 +587,7 @@ public class SpawnControlScreen extends KineticScreen {
             updateRestoreButtonState();
         }
 
-        GuiOverlay.toast(Component.translatable(
+        KineticOverlays.toast(Component.translatable(
                 "msg.entitycontrol.spawn.spawn.invalid_entity.delete_success",
                 removedId
         ));
@@ -767,39 +596,22 @@ public class SpawnControlScreen extends KineticScreen {
     private void saveAndClose() {
         applyRotationSpeedFromBox(true);
         String profileJson = BiomeSpawnConfig.GSON.toJson(profile);
-        SpawnNetwork.CHANNEL.sendToServer(
-                new SpawnNetwork.SavePacket(
-                        globals.enable_rule_override,
-                        globals.enable_biome_override,
-                        globals.auto_scan,
-                        globals.config_amount,
-                        globals.current_index,
-                        profileJson,
-                        currentEditIndex
-                )
+        SpawnNetwork.saveSpawnSettings(
+                globals.enable_rule_override,
+                globals.enable_biome_override,
+                globals.auto_scan,
+                globals.config_amount,
+                globals.current_index,
+                profileJson,
+                currentEditIndex
         );
         commitDraft();
-        closeEditor();
-    }
-
-    private void closeEditor() {
-        if (this.minecraft != null) {
-            this.minecraft.setScreen(parent);
-        }
+        navigateBack();
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-            closeEditor();
-            return true;
-        }
-        return super.keyPressed(keyCode, scanCode, modifiers);
-    }
-
-    @Override
-    public void onClose() {
-        closeEditor();
+    protected boolean handleCloseRequest() {
+        return false;
     }
 
     private void switchTab(ITabModule tab) {
@@ -809,9 +621,9 @@ public class SpawnControlScreen extends KineticScreen {
 
         this.currentTab = tab;
 
-        btnTabRules.active = tab != tabRules;
-        btnTabBiomes.active = tab != tabBiomes;
-        btnTabCategories.active = tab != tabCategories;
+        btnTabRules.setEnabled(tab != tabRules);
+        btnTabBiomes.setEnabled(tab != tabBiomes);
+        btnTabCategories.setEnabled(tab != tabCategories);
 
         if (selectedId != null && !isSelectedEntityInvalid()) {
             tab.updateSelection();
@@ -877,7 +689,7 @@ public class SpawnControlScreen extends KineticScreen {
     }
 
     private boolean matchesEntitySearch(String id, String lower) {
-        ResourceLocation location = ResourceLocation.tryParse(id);
+        ResourceLocation location = KineticResourceIds.tryParse(id);
 
         if (lower.startsWith("@")) {
             return location != null
@@ -886,7 +698,7 @@ public class SpawnControlScreen extends KineticScreen {
 
         if (lower.startsWith("#")) {
             if (location == null) return false;
-            EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(location);
+            EntityType<?> type = KineticRegistries.entityTypes().get(location);
             return type != null
                     && type.builtInRegistryHolder()
                     .tags()
@@ -931,7 +743,7 @@ public class SpawnControlScreen extends KineticScreen {
 
         BiomeSpawnConfig.EntityNode backupNode = backupProfile.entities.get(selectedId);
         if (backupNode == null) {
-            GuiOverlay.toast(Component.translatable(
+            KineticOverlays.toast(Component.translatable(
                     "msg.entitycontrol.spawn.spawn.restore.missing",
                     Component.literal(getEntityName(selectedId)).withStyle(ChatFormatting.GOLD)
             ));
@@ -957,7 +769,7 @@ public class SpawnControlScreen extends KineticScreen {
 
         updateRestoreButtonState();
 
-        GuiOverlay.toast(Component.translatable(
+        KineticOverlays.toast(Component.translatable(
                 "msg.entitycontrol.spawn.spawn.restore.success",
                 Component.literal(getEntityName(selectedId)).withStyle(ChatFormatting.GOLD)
         ));
@@ -973,7 +785,7 @@ public class SpawnControlScreen extends KineticScreen {
                 && backupProfile.entities != null
                 && backupProfile.entities.containsKey(selectedId);
 
-        btnRestore.active = hasBackup && hasPersistentEntityCustomData(selectedId);
+        btnRestore.setEnabled(hasBackup && hasPersistentEntityCustomData(selectedId));
     }
 
     public void refreshSelectedEntitySearchData() {
@@ -1072,7 +884,7 @@ public class SpawnControlScreen extends KineticScreen {
     private void updateSelection(String id) {
         this.selectedId = id;
 
-        searchBox.setFocused(false);
+        blurControl(searchBox);
 
         if (currentTab != null && !isSelectedEntityInvalid()) {
             currentTab.updateSelection();
@@ -1084,12 +896,12 @@ public class SpawnControlScreen extends KineticScreen {
 
     public String getEntityName(String id) {
         return entityNameCache.computeIfAbsent(id, key -> {
-            ResourceLocation location = ResourceLocation.tryParse(key);
-            if (location == null || !ForgeRegistries.ENTITY_TYPES.containsKey(location)) {
+            ResourceLocation location = KineticResourceIds.tryParse(key);
+            if (location == null || !KineticRegistries.entityTypes().contains(location)) {
                 return key;
             }
 
-            EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(location);
+            EntityType<?> type = KineticRegistries.entityTypes().get(location);
             return type == null ? key : type.getDescription().getString();
         });
     }
@@ -1097,7 +909,7 @@ public class SpawnControlScreen extends KineticScreen {
     public String getTranslatedBiomeName(String id) {
         String key = Util.makeDescriptionId(
                 "biome",
-                new ResourceLocation(id)
+                KineticResourceIds.parse(id)
         );
 
         Component component =
@@ -1137,97 +949,65 @@ public class SpawnControlScreen extends KineticScreen {
     }
 
     @Override
-    public void render(
-            @NotNull GuiGraphics g,
-            int mx,
-            int my,
-            float pt
-    ) {
-        deferredTooltip = null;
-        profileMenuMouseX = (int) Math.floor(toVirtualX(mx));
-        profileMenuMouseY = (int) Math.floor(toVirtualY(my));
-
-        boolean intercept = false;
-
-        try {
-            double virtualMouseX =
-                    toVirtualX(mx);
-
-            double virtualMouseY =
-                    toVirtualY(my);
-
-            intercept =
-                    showProfileMenu
-                            || (
-                            currentTab != null
-                                    && currentTab.isMenuOpen(
-                                    virtualMouseX,
-                                    virtualMouseY
-                            )
-                    );
-        } catch (Throwable ignored) {
-        }
-
-        if (intercept) {
-            super.render(
-                    g,
-                    -1000,
-                    -1000,
-                    pt
-            );
-        } else {
-            super.render(
-                    g,
-                    mx,
-                    my,
-                    pt
-            );
-        }
-
-        if (deferredTooltip != null
-                && !deferredTooltip.isEmpty()) {
-            GuiOverlay.requestTooltip(deferredTooltip, mx, my);
-        }
-    }
-
-    @Override
     protected void renderCanvasBackground(
             @NotNull GuiGraphics g,
             int mx,
             int my,
             float pt
     ) {
-        g.fill(
-                0,
-                0,
-                V_WIDTH,
-                V_HEIGHT,
-                0xFA1E1E1E
-        );
+        GuiTheme.canvasBackground(g, V_WIDTH, V_HEIGHT);
+        GuiTheme.stateOutline(g, 0, 0, V_WIDTH, V_HEIGHT, false, false, false);
+        GuiTheme.panelAlt(g, gridX - 2, gridY - 2, gridW + 4, gridH + 4);
+    }
 
-        g.renderOutline(
-                0,
-                0,
-                V_WIDTH,
-                V_HEIGHT,
-                0xFF444444
-        );
+    private StateButton profileDecreaseButton(int x, int y, boolean enabled) {
+        if (profileDecreaseButton == null) {
+            profileDecreaseButton = KineticWidgets.createCompactButton(
+                    0, 0, 20,
+                    Component.translatable("gui.entitycontrol.spawn.spawn.profile_remove"),
+                    Component.translatable("gui.entitycontrol.spawn.spawn.profile_count.tooltip"),
+                    () -> updateProfileCount(globals.config_amount - 1)
+            );
+        }
+        profileDecreaseButton.setX(x);
+        profileDecreaseButton.setY(y);
+        profileDecreaseButton.setWidth(20);
+        profileDecreaseButton.setEnabled(enabled);
+        return profileDecreaseButton;
+    }
 
-        g.fill(
-                gridX - 2,
-                gridY - 2,
-                gridX + gridW + 2,
-                gridY + gridH + 2,
-                0x88000000
-        );
+    private StateButton profileIncreaseButton(int x, int y, boolean enabled) {
+        if (profileIncreaseButton == null) {
+            profileIncreaseButton = KineticWidgets.createCompactButton(
+                    0, 0, 20,
+                    Component.translatable("gui.entitycontrol.spawn.spawn.profile_add"),
+                    Component.translatable("gui.entitycontrol.spawn.spawn.profile_count.tooltip"),
+                    () -> updateProfileCount(globals.config_amount + 1)
+            );
+        }
+        profileIncreaseButton.setX(x);
+        profileIncreaseButton.setY(y);
+        profileIncreaseButton.setWidth(20);
+        profileIncreaseButton.setEnabled(enabled);
+        return profileIncreaseButton;
+    }
 
-        g.renderOutline(
-                gridX - 2,
-                gridY - 2,
-                gridW + 4,
-                gridH + 4,
-                0xFF555555
-        );
+    private StateButton profileButton(int profileId, int x, int y, int width, int clipTop, int clipBottom) {
+        StateButton button = profileButtons.computeIfAbsent(profileId, id -> KineticWidgets.createCompactButton(
+                0, 0, width,
+                Component.translatable("gui.entitycontrol.spawn.spawn.profile_btn_numbered", id),
+                null,
+                () -> {
+                    SpawnNetwork.switchProfile(id);
+                    showProfileMenu = false;
+                }
+        ));
+        button.setX(x);
+        button.setY(y);
+        button.setWidth(width);
+        button.setSelected(profileId == currentEditIndex);
+        button.setClipBounds(x, clipTop, x + width, clipBottom);
+        return button;
     }
 
     @Override
@@ -1237,11 +1017,9 @@ public class SpawnControlScreen extends KineticScreen {
             int my,
             float pt
     ) {
-        renderSearchPlaceholder(
-                g,
-                searchBox,
-                "gui.entitycontrol.spawn.spawn.search_hint"
-        );
+        deferredTooltip = null;
+        profileMenuMouseX = mx;
+        profileMenuMouseY = my;
 
         if (isSelectedEntityInvalid()) {
             g.drawString(
@@ -1252,12 +1030,6 @@ public class SpawnControlScreen extends KineticScreen {
                     0xFFFFFFFF,
                     false
             );
-            renderSearchPlaceholder(
-                    g,
-                    invalidEntityIdBox,
-                    "gui.entitycontrol.spawn.spawn.invalid_entity.id_hint"
-            );
-
             int textY = 170;
             for (var line : font.split(
                     Component.translatable("gui.entitycontrol.spawn.spawn.invalid_entity.desc"),
@@ -1278,7 +1050,7 @@ public class SpawnControlScreen extends KineticScreen {
                 displayList.size()
         );
 
-        enableCanvasScissor(g, gridX, gridY, gridX + gridW, gridY + gridH);
+        enableUiScissor(g, gridX, gridY, gridX + gridW, gridY + gridH);
         for (int i = startIndex; i < endIndex; i++) {
             int column = (i - startIndex) % COLS;
             int row = (i - startIndex) / COLS;
@@ -1314,45 +1086,17 @@ public class SpawnControlScreen extends KineticScreen {
                     !BiomeSpawnConfig.isEntityIdValid(id);
 
             if (invalidEntity) {
-                renderThickOutline(
-                        g,
-                        x,
-                        y,
-                        0xFFFF3333,
-                        3
+                GuiTheme.indicatorOutline(
+                        g, x, y, CELL_SIZE, CELL_SIZE, GuiTheme.Indicator.DANGER, 3
                 );
             } else if (hoveringCell) {
-                renderThickOutline(
-                        g,
-                        x,
-                        y,
-                        0xFF3399FF,
-                        3
-                );
+                GuiTheme.stateOutline(g, x, y, CELL_SIZE, CELL_SIZE, false, true, false, 3);
             } else if (selected) {
-                renderThickOutline(
-                        g,
-                        x,
-                        y,
-                        0xFFFFD700,
-                        3
-                );
+                GuiTheme.stateOutline(g, x, y, CELL_SIZE, CELL_SIZE, true, false, false, 3);
             } else if (modified) {
-                renderThickOutline(
-                        g,
-                        x,
-                        y,
-                        0xFF33DD66,
-                        3
-                );
+                GuiTheme.indicatorOutline(g, x, y, CELL_SIZE, CELL_SIZE, GuiTheme.Indicator.SUCCESS, 3);
             } else {
-                g.renderOutline(
-                        x,
-                        y,
-                        CELL_SIZE,
-                        CELL_SIZE,
-                        0xFF555555
-                );
+                GuiTheme.stateOutline(g, x, y, CELL_SIZE, CELL_SIZE, false, false, false);
             }
 
             renderAdaptiveEntity(
@@ -1366,20 +1110,12 @@ public class SpawnControlScreen extends KineticScreen {
                     hoveringCell
             );
 
-            int color =
-                    config.block_all
-                            ? 0xFFFF5555
-                            : config.enable_control
-                            ? 0xFF55FF55
-                            : 0xFF888888;
-
-            g.fill(
-                    x + 4,
-                    y + 4,
-                    x + 8,
-                    y + 8,
-                    color
-            );
+            GuiTheme.Indicator indicator = config.block_all
+                    ? GuiTheme.Indicator.DANGER
+                    : config.enable_control
+                    ? GuiTheme.Indicator.SUCCESS
+                    : GuiTheme.Indicator.MUTED;
+            GuiTheme.indicatorFill(g, x + 4, y + 4, 4, 4, indicator);
 
             if (hoveringCell) {
                 tooltip = new ArrayList<>();
@@ -1410,34 +1146,19 @@ public class SpawnControlScreen extends KineticScreen {
                 }
             }
         }
-        g.disableScissor();
+        disableUiScissor(g);
 
         if (maxScroll > 0) {
-            int barX =
-                    gridX
-                            + gridW
-                            + 4;
-
-            int thumbH =
-                    Scroll.calculateThumbHeight(
-                            gridH,
-                            visibleRows,
-                            maxScroll + visibleRows,
-                            20
-                    );
-
             GuiTheme.scrollbar(
+                    gridScroll,
                     g,
                     mx,
                     my,
-                    barX,
+                    gridX + gridW + 4,
                     gridY,
                     4,
                     gridH,
-                    thumbH,
-                    maxScroll,
-                    gridScroll.smoothOffset(),
-                    draggingGridScroll
+                    20
             );
         }
 
@@ -1460,13 +1181,7 @@ public class SpawnControlScreen extends KineticScreen {
                     500
             );
 
-            g.fill(
-                    0,
-                    0,
-                    V_WIDTH,
-                    V_HEIGHT,
-                    0xD0000000
-            );
+            GuiTheme.shadow(g, V_WIDTH, V_HEIGHT);
 
             int panelWidth = 220;
             int maxVisible = 6;
@@ -1484,24 +1199,7 @@ public class SpawnControlScreen extends KineticScreen {
             );
             boolean canRemove = globals.config_amount > minimumCount;
             boolean canAdd = globals.config_amount < BiomeSpawnConfig.MAX_PROFILE_COUNT;
-            boolean hoverMinus = menuMouseX >= minusX && menuMouseX <= minusX + 20 && menuMouseY >= countY && menuMouseY <= countY + 18;
-            boolean hoverPlus = menuMouseX >= plusX && menuMouseX <= plusX + 20 && menuMouseY >= countY && menuMouseY <= countY + 18;
-
-            g.fill(
-                    panelX,
-                    panelY,
-                    panelX + panelWidth,
-                    panelY + panelHeight,
-                    0xFF1C1C1C
-            );
-
-            g.renderOutline(
-                    panelX,
-                    panelY,
-                    panelWidth,
-                    panelHeight,
-                    0xFFAA00
-            );
+            GuiTheme.panelAlt(g, panelX, panelY, panelWidth, panelHeight);
 
             g.drawCenteredString(
                     font,
@@ -1513,37 +1211,10 @@ public class SpawnControlScreen extends KineticScreen {
                     0xFFFFFF
             );
 
-            g.fill(
-                    minusX,
-                    countY,
-                    minusX + 20,
-                    countY + 18,
-                    canRemove && hoverMinus ? 0xFF555555 : canRemove ? 0xFF333333 : 0xFF202020
-            );
-            g.renderOutline(minusX, countY, 20, 18, 0xFF000000);
-            g.drawCenteredString(
-                    font,
-                    Component.translatable("gui.entitycontrol.spawn.spawn.profile_remove"),
-                    minusX + 10,
-                    countY + 5,
-                    0xFFFFFF
-            );
-
-            g.fill(
-                    plusX,
-                    countY,
-                    plusX + 20,
-                    countY + 18,
-                    canAdd && hoverPlus ? 0xFF555555 : canAdd ? 0xFF333333 : 0xFF202020
-            );
-            g.renderOutline(plusX, countY, 20, 18, 0xFF000000);
-            g.drawCenteredString(
-                    font,
-                    Component.translatable("gui.entitycontrol.spawn.spawn.profile_add"),
-                    plusX + 10,
-                    countY + 5,
-                    0xFFFFFF
-            );
+            StateButton decreaseButton = profileDecreaseButton(minusX, countY + 1, canRemove);
+            StateButton increaseButton = profileIncreaseButton(plusX, countY + 1, canAdd);
+            KineticWidgets.renderControl(decreaseButton, g, menuMouseX, menuMouseY, pt);
+            KineticWidgets.renderControl(increaseButton, g, menuMouseX, menuMouseY, pt);
 
             g.drawCenteredString(
                     font,
@@ -1561,68 +1232,33 @@ public class SpawnControlScreen extends KineticScreen {
             int profileStart = Math.max(0, (int) Math.floor(profileVisual / 25D));
             int profileEnd = Math.min(profileStart + maxVisible + 1, globals.config_amount);
 
-            enableCanvasScissor(g, panelX + 10, listY, panelX + panelWidth - 10, listY + actualVisible * 25);
+            enableUiScissor(g, panelX + 10, listY, panelX + panelWidth - 10, listY + actualVisible * 25);
             for (int i = profileStart; i < profileEnd; i++) {
                 int profileId = i + 1;
                 int buttonY = listY + (int) Math.round(i * 25D - profileVisual);
-                boolean hover =
-                        menuMouseX >= panelX + 10
-                                && menuMouseX <= panelX + panelWidth - 10
-                                && menuMouseY >= buttonY
-                                && menuMouseY <= buttonY + 20;
-
-                int background = hover ? 0xFF555555 : 0xFF333333;
-                if (profileId == currentEditIndex) {
-                    background = 0xFF22AA22;
-                }
-
-                g.fill(
+                StateButton profileButton = profileButton(
+                        profileId,
                         panelX + 10,
-                        buttonY,
-                        panelX + panelWidth - 10,
-                        buttonY + 20,
-                        background
-                );
-
-                g.renderOutline(
-                        panelX + 10,
-                        buttonY,
+                        buttonY + 2,
                         panelWidth - 20,
-                        20,
-                        0xFF000000
+                        listY,
+                        listY + actualVisible * 25
                 );
-
-                g.drawCenteredString(
-                        font,
-                        Component.translatable(
-                                "gui.entitycontrol.spawn.spawn.profile_btn_numbered",
-                                profileId
-                        ),
-                        panelX + panelWidth / 2,
-                        buttonY + 6,
-                        0xFFFFFF
-                );
+                KineticWidgets.renderControl(profileButton, g, menuMouseX, menuMouseY, pt);
             }
-            g.disableScissor();
+            disableUiScissor(g);
 
             int profileMaxScroll = Math.max(0, globals.config_amount - maxVisible);
             if (profileMaxScroll > 0) {
-                int thumbH = Scroll.calculateThumbHeight(
-                        actualVisible * 25,
-                        maxVisible,
-                        globals.config_amount,
-                        15
-                );
-
                 GuiTheme.scrollbar(
                         profileScroll, g, menuMouseX, menuMouseY,
                         panelX + panelWidth + 2, listY, 4, actualVisible * 25, 15
                 );
             }
 
-            if (hoverMinus || hoverPlus
-                    || (menuMouseX >= minusX + 24 && menuMouseX <= plusX - 4 && menuMouseY >= countY && menuMouseY <= countY + 18)) {
-                GuiOverlay.requestTooltip(List.of(Component.translatable("gui.entitycontrol.spawn.spawn.profile_count.tooltip")), menuMouseX, menuMouseY);
+            if (menuMouseX >= minusX + 24 && menuMouseX <= plusX - 4
+                    && menuMouseY >= countY && menuMouseY <= countY + 18) {
+                KineticOverlays.requestTooltip(List.of(Component.translatable("gui.entitycontrol.spawn.spawn.profile_count.tooltip")), menuMouseX, menuMouseY);
             }
 
             g.pose().popPose();
@@ -1658,51 +1294,16 @@ public class SpawnControlScreen extends KineticScreen {
         }
     }
 
-    private void renderSearchPlaceholder(
+    @Override
+    protected void renderTooltips(
             GuiGraphics graphics,
-            EditBox box,
-            String translationKey
+            int virtualMouseX,
+            int virtualMouseY,
+            int screenMouseX,
+            int screenMouseY
     ) {
-        if (box == null
-                || !box.visible
-                || !box.getValue().isEmpty()
-                || box.isFocused()) {
-            return;
-        }
-
-        String text = font.plainSubstrByWidth(
-                Component.translatable(translationKey).getString(),
-                Math.max(0, box.getWidth() - 10)
-        );
-        graphics.drawString(
-                font,
-                text,
-                box.getX() + 5,
-                box.getY() + (box.getHeight() - font.lineHeight) / 2,
-                0xFFAAAAAA,
-                false
-        );
-    }
-
-    private static void renderThickOutline(
-            GuiGraphics g,
-            int x,
-            int y,
-            int color,
-            int thickness
-    ) {
-        int safeThickness = Math.max(1, thickness);
-        for (int i = 0; i < safeThickness; i++) {
-            int innerWidth = 72 - i * 2;
-            int innerHeight = 72 - i * 2;
-            if (innerWidth <= 0 || innerHeight <= 0) break;
-            g.renderOutline(
-                    x + i,
-                    y + i,
-                    innerWidth,
-                    innerHeight,
-                    color
-            );
+        if (deferredTooltip != null && !deferredTooltip.isEmpty()) {
+            KineticOverlays.requestTooltip(deferredTooltip, screenMouseX, screenMouseY);
         }
     }
 
@@ -1717,19 +1318,19 @@ public class SpawnControlScreen extends KineticScreen {
             boolean hovered
     ) {
         ResourceLocation location =
-                ResourceLocation.tryParse(
+                KineticResourceIds.tryParse(
                         id
                 );
 
         boolean registered =
                 location != null
-                        && ForgeRegistries.ENTITY_TYPES.containsKey(
+                        && KineticRegistries.entityTypes().contains(
                         location
                 );
 
         boolean rendered =
                 registered
-                        && entityPreviewRenderer.render(
+                        && entityPreviewRenderer.renderCanvas(
                         g,
                         id,
                         rotationKey,
@@ -1737,9 +1338,6 @@ public class SpawnControlScreen extends KineticScreen {
                         boxY,
                         boxW,
                         boxH,
-                        this.canvasScale,
-                        this.canvasX,
-                        this.canvasY,
                         hovered
                 );
 
@@ -1811,40 +1409,36 @@ public class SpawnControlScreen extends KineticScreen {
                 return true;
             }
 
-            if (btn == 0 && my >= countY && my <= countY + 18) {
-                int minimumCount = Math.max(
-                        BiomeSpawnConfig.MIN_PROFILE_COUNT,
-                        Math.max(globals.current_index, currentEditIndex)
-                );
-                if (mx >= minusX && mx <= minusX + 20 && globals.config_amount > minimumCount) {
-                    updateProfileCount(globals.config_amount - 1);
-                    return true;
-                }
-                if (mx >= plusX && mx <= plusX + 20
-                        && globals.config_amount < BiomeSpawnConfig.MAX_PROFILE_COUNT) {
-                    updateProfileCount(globals.config_amount + 1);
-                    return true;
-                }
-            }
+            int minimumCount = Math.max(
+                    BiomeSpawnConfig.MIN_PROFILE_COUNT,
+                    Math.max(globals.current_index, currentEditIndex)
+            );
+            StateButton decreaseButton = profileDecreaseButton(
+                    minusX, countY + 1, globals.config_amount > minimumCount
+            );
+            if (decreaseButton.mouseClicked(mx, my, btn)) return true;
+            StateButton increaseButton = profileIncreaseButton(
+                    plusX, countY + 1, globals.config_amount < BiomeSpawnConfig.MAX_PROFILE_COUNT
+            );
+            if (increaseButton.mouseClicked(mx, my, btn)) return true;
 
             profileScroll.update(globals.config_amount * 25, Math.min(globals.config_amount, maxVisible) * 25);
-            if (btn == 0
-                    && mx >= panelX + 10
-                    && mx <= panelX + panelWidth - 10
-                    && my >= listY
-                    && my < listY + Math.min(globals.config_amount, maxVisible) * 25) {
-                int i = (int) Math.floor((my - listY + profileScroll.smoothOffset()) / 25D);
-                if (i >= 0 && i < globals.config_amount) {
-                    SpawnNetwork.CHANNEL.sendToServer(new SpawnNetwork.SwitchProfilePacket(i + 1));
-                    showProfileMenu = false;
-                    return true;
-                }
+            int profileStart = Math.max(0, (int) Math.floor(profileScroll.smoothOffset() / 25D));
+            int profileEnd = Math.min(profileStart + maxVisible + 1, globals.config_amount);
+            for (int i = profileStart; i < profileEnd; i++) {
+                int profileId = i + 1;
+                int buttonY = listY + (int) Math.round(i * 25D - profileScroll.smoothOffset());
+                StateButton profileButton = profileButton(
+                        profileId, panelX + 10, buttonY + 2, panelWidth - 20,
+                        listY, listY + actualVisible * 25
+                );
+                if (profileButton.mouseClicked(mx, my, btn)) return true;
             }
 
             return true;
         }
 
-        if (btn == 0
+        if (KineticMouseButtons.isPrimary(btn)
                 && currentTab != null
                 && !isSelectedEntityInvalid()
                 && currentTab.mouseClicked(
@@ -1852,7 +1446,7 @@ public class SpawnControlScreen extends KineticScreen {
                 my,
                 btn
         )) {
-            this.setFocused(null);
+            clearControlFocus();
             return true;
         }
 
@@ -1863,7 +1457,7 @@ public class SpawnControlScreen extends KineticScreen {
                         btn
                 );
 
-        if (btn == 0) {
+        if (KineticMouseButtons.isPrimary(btn)) {
             if (maxScroll > 0
                     && mx >= gridX + gridW + 4
                     && mx <= gridX + gridW + 10
@@ -1889,7 +1483,7 @@ public class SpawnControlScreen extends KineticScreen {
                             )
                     );
 
-                    this.setFocused(null);
+                    clearControlFocus();
                     return true;
                 }
             }
@@ -1949,7 +1543,7 @@ public class SpawnControlScreen extends KineticScreen {
             double my,
             int btn
     ) {
-        if (btn == 0
+        if (KineticMouseButtons.isPrimary(btn)
                 && draggingGridScroll) {
             draggingGridScroll = false;
             gridScroll.release(btn);
@@ -1996,13 +1590,13 @@ public class SpawnControlScreen extends KineticScreen {
 
             if (profileMaxScroll > 0) {
                 profileScroll.update(globals.config_amount * 25, maxVisible * 25);
-                profileScroll.scroll(delta, 25 / 3.0D);
+                profileScroll.scroll(delta, 25D);
             }
 
             return true;
         }
 
-        if (net.minecraft.client.gui.screens.Screen.hasControlDown()) {
+        if (KineticClientRuntime.controlModifierDown()) {
             if (mx >= gridX
                     && mx < gridX + gridW
                     && my >= gridY
@@ -2047,12 +1641,11 @@ public class SpawnControlScreen extends KineticScreen {
     }
 
     @Override
-    public void removed() {
+    protected void screenRemoved() {
         entityPreviewRenderer.clear();
         editedEntities.clear();
         entityNameCache.clear();
         entitySearchDataCache.clear();
-        super.removed();
     }
 
 }

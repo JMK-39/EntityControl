@@ -1,43 +1,34 @@
 package dev.xyat.entitycontrol.dummy.client.gui;
 
+import javax.annotation.Nonnull;
+
 import com.mojang.blaze3d.systems.RenderSystem;
 import dev.xyat.kineticcore.api.client.screen.KineticContainerScreen;
 import dev.xyat.kineticcore.api.client.theme.GuiTheme;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.AutoCompleteBox;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.NumericEditBox;
+import dev.xyat.kineticcore.api.client.widget.input.KineticAutoComplete;
+import dev.xyat.kineticcore.api.client.widget.input.KineticAutoComplete.AutoCompleteBox;
+import dev.xyat.kineticcore.api.client.widget.input.KineticNumericFields.NumericEditBox;
+import dev.xyat.kineticcore.api.client.widget.button.KineticButtons.StateButton;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import dev.xyat.entitycontrol.dummy.DummyModule;
 import dev.xyat.entitycontrol.dummy.CuriosCompat;
 import dev.xyat.entitycontrol.dummy.DummyMenu;
 import dev.xyat.entitycontrol.dummy.Network.DummyNetwork;
 import dev.xyat.entitycontrol.dummy.client.NotifyManager;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.ai.attributes.Attribute;
-import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.ai.attributes.RangedAttribute;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 public class DummyScreen extends KineticContainerScreen<DummyMenu> {
-    private static final ResourceLocation TEXTURE = new ResourceLocation(DummyModule.MODID, "textures/gui/dummy_gui.png");
-    private static final ResourceLocation INVENTORY_TEXTURE = new ResourceLocation("minecraft", "textures/gui/container/generic_54.png");
-    private static final Set<Attribute> EDITABLE_ATTRIBUTES = Set.of(
-            Attributes.MAX_HEALTH,
-            Attributes.KNOCKBACK_RESISTANCE,
-            Attributes.MOVEMENT_SPEED,
-            Attributes.ARMOR,
-            Attributes.ARMOR_TOUGHNESS
-    );
-
+    private static final ResourceLocation TEXTURE = KineticResourceIds.of(DummyModule.MODID, "textures/gui/dummy_gui.png");
     private static int lastEntityId = -1;
     private static String tempAttribute = "";
     private static String tempValue = "0.0";
@@ -55,12 +46,10 @@ public class DummyScreen extends KineticContainerScreen<DummyMenu> {
         this.imageHeight = 200;
         this.inventoryLabelY = Integer.MIN_VALUE;
         this.titleLabelY = Integer.MIN_VALUE;
-        useResponsiveContainer(640f, 360f, 6);
     }
 
     @Override
-    protected void init() {
-        super.init();
+    protected void buildUi() {
 
         currentIFrames = this.menu.entity.hasIFrames();
         currentHealthDrop = this.menu.entity.isHealthDropEnabled();
@@ -72,108 +61,131 @@ public class DummyScreen extends KineticContainerScreen<DummyMenu> {
             lastEntityId = this.menu.entity.getId();
         }
 
-        this.attributeInput = new AutoCompleteBox(
-                this.font,
-                this.leftPos + 25,
-                this.topPos + 41,
+        this.attributeInput = addAutoCompleteField(
+                this.leftPos + 21,
+                this.topPos + 39,
                 100,
-                12,
                 Component.translatable("gui.entitycontrol.dummy.dummy.attribute"),
-                this::getDict
+                null,
+                this::getDict,
+                null
         );
-        this.attributeInput.setBordered(false);
-        this.attributeInput.setTextColor(0xFFFFFF);
+        // Keep the whole registry searchable while displaying only five rows at a time.
+        // The API's scrollbar remains visible for the remaining suggestions.
+        this.attributeInput.setMaxVisibleSuggestions(5);
+        this.attributeInput.setSuggestionPopupMaxWidth(300);
         this.attributeInput.setValue(tempAttribute);
         this.attributeInput.setResponder(text -> {
             tempAttribute = text;
             this.attributeInput.loadSuggestions();
-            ResourceLocation id = ResourceLocation.tryParse(AutoCompleteBox.normalizeValue(text));
+            ResourceLocation id = KineticResourceIds.tryParse(text);
             if (id == null) return;
 
-            Attribute attribute = ForgeRegistries.ATTRIBUTES.getValue(id);
+            Attribute attribute = KineticRegistries.attributes().get(id);
             if (attribute == null
-                    || !EDITABLE_ATTRIBUTES.contains(attribute)
-                    || this.menu.entity.getAttribute(attribute) == null) {
+                    || !id.equals(KineticRegistries.attributes().id(attribute))) {
                 return;
             }
 
-            double currentBaseValue = this.menu.entity.getAttributeBaseValue(attribute);
+            double currentBaseValue = this.menu.entity.getAttribute(attribute) != null
+                    ? this.menu.entity.getAttributeBaseValue(attribute) : attribute.getDefaultValue();
             if (this.valueInput != null) {
                 String newValue = String.format("%.1f", currentBaseValue);
                 this.valueInput.setValue(newValue);
                 tempValue = newValue;
             }
         });
-        this.addRenderableWidget(attributeInput);
 
-        this.valueInput = NumericEditBox.decimal(
-                font,
-                leftPos + 25,
-                topPos + 70,
+        this.valueInput = addDecimalField(
+                leftPos + 21,
+                topPos + 76,
                 60,
-                12,
                 Component.translatable("gui.entitycontrol.dummy.dummy.value"),
                 true,
                 null,
+                null,
                 null
         );
-        this.valueInput.setBordered(false);
         this.valueInput.setValue(tempValue);
-        this.valueInput.setTextColor(0xFFFFFF);
         this.valueInput.setResponder(text -> tempValue = text);
-        addRenderableWidget(valueInput);
 
         int rightX = this.leftPos + 133;
-        this.addRenderableWidget(Button.builder(Component.translatable("gui.entitycontrol.dummy.dummy.apply"), btn -> applyAttribute())
-                .pos(rightX, this.topPos + 8).size(50, 16).build());
+        addButton(
+                rightX, this.topPos + 8, 50,
+                Component.translatable("gui.entitycontrol.dummy.dummy.apply"),
+                null,
+                this::applyAttribute
+        );
 
-        Button curiosButton = Button.builder(Component.translatable("gui.entitycontrol.dummy.dummy.curios_ext"), btn -> {
-            if (this.minecraft != null) this.minecraft.setScreen(new CuriosScreen(this, this.menu));
-        }).pos(rightX, this.topPos + 26).size(50, 16).build();
-        curiosButton.active = CuriosCompat.isAvailable();
-        this.addRenderableWidget(curiosButton);
+        StateButton curiosButton = addButton(
+                rightX, this.topPos + 26, 50,
+                Component.translatable("gui.entitycontrol.dummy.dummy.curios_ext"),
+                null,
+                () -> KineticClientRuntime.openScreen(new CuriosScreen(this, this.menu))
+        );
+        curiosButton.setEnabled(CuriosCompat.isAvailable());
 
-        this.addRenderableWidget(Button.builder(getMobTypeName(this.menu.entity.getCustomMobTypeId()), btn -> {
-            int nextType = (this.menu.entity.getCustomMobTypeId() + 1) % 5;
-            this.menu.entity.setCustomMobType(nextType);
-            btn.setMessage(getMobTypeName(nextType));
-            sendUpdatePacket(new CompoundTag());
-        }).pos(rightX, this.topPos + 59).size(50, 16).build());
-
-        this.addRenderableWidget(Button.builder(getIFramesText(currentIFrames), btn -> {
-            currentIFrames = !currentIFrames;
-            btn.setMessage(getIFramesText(currentIFrames));
-            sendUpdatePacket(new CompoundTag());
-        }).pos(rightX, this.topPos + 77).size(50, 16).build());
-
-        this.addRenderableWidget(Button.builder(getEnvironmentDamageText(currentEnvironmentDamage), btn -> {
-                    currentEnvironmentDamage = !currentEnvironmentDamage;
-                    btn.setMessage(getEnvironmentDamageText(currentEnvironmentDamage));
+        addButtonWithHandler(
+                rightX, this.topPos + 59, 50,
+                getMobTypeName(this.menu.entity.getCustomMobTypeId()),
+                null,
+                btn -> {
+                    int nextType = (this.menu.entity.getCustomMobTypeId() + 1) % 5;
+                    this.menu.entity.setCustomMobType(nextType);
+                    btn.setText(getMobTypeName(nextType));
                     sendUpdatePacket(new CompoundTag());
-                }).pos(rightX - 52, this.topPos + 95).size(50, 16)
-                .tooltip(Tooltip.create(Component.translatable("tip.entitycontrol.dummy.dummy.environment_damage")))
-                .build());
+                }
+        );
 
-        this.addRenderableWidget(Button.builder(getHealthDropText(currentHealthDrop), btn -> {
-            currentHealthDrop = !currentHealthDrop;
-            btn.setMessage(getHealthDropText(currentHealthDrop));
-            sendUpdatePacket(new CompoundTag());
-        }).pos(rightX, this.topPos + 95).size(50, 16).build());
+        addButtonWithHandler(
+                rightX, this.topPos + 77, 50,
+                getIFramesText(currentIFrames),
+                null,
+                btn -> {
+                    currentIFrames = !currentIFrames;
+                    btn.setText(getIFramesText(currentIFrames));
+                    sendUpdatePacket(new CompoundTag());
+                }
+        );
+
+        addButtonWithHandler(
+                rightX - 52, this.topPos + 95, 50,
+                getEnvironmentDamageText(currentEnvironmentDamage),
+                Component.translatable("tip.entitycontrol.dummy.dummy.environment_damage"),
+                btn -> {
+                    currentEnvironmentDamage = !currentEnvironmentDamage;
+                    btn.setText(getEnvironmentDamageText(currentEnvironmentDamage));
+                    sendUpdatePacket(new CompoundTag());
+                }
+        );
+
+        addButtonWithHandler(
+                rightX, this.topPos + 95, 50,
+                getHealthDropText(currentHealthDrop),
+                null,
+                btn -> {
+                    currentHealthDrop = !currentHealthDrop;
+                    btn.setText(getHealthDropText(currentHealthDrop));
+                    sendUpdatePacket(new CompoundTag());
+                }
+        );
     }
 
-    private List<String> getDict() {
-        return ForgeRegistries.ATTRIBUTES.getEntries().stream()
-                .filter(entry -> EDITABLE_ATTRIBUTES.contains(entry.getValue()))
-                .map(e -> {
-                    String id = e.getKey().location().toString();
-                    String descId = e.getValue().getDescriptionId();
-                    String translated = Component.translatable(descId).getString();
-                    return translated.equals(descId) || translated.isEmpty() || translated.startsWith("attribute.")
-                            ? id
-                            : id + " - " + translated;
+    private List<KineticAutoComplete.Suggestion> getDict() {
+        return KineticRegistries.attributes().entries().entrySet().stream()
+                .filter(entry -> entry.getKey() != null && entry.getValue() != null)
+                .map(entry -> {
+                    String id = entry.getKey().toString();
+                    String descId = entry.getValue().getDescriptionId();
+                    Component translation = Component.translatable(descId);
+                    String translated = translation.getString();
+                    if (translated.equals(descId) || translated.isEmpty() || translated.startsWith("attribute.")) {
+                        translation = Component.empty();
+                    }
+                    return new KineticAutoComplete.Suggestion(id, translation);
                 })
-                .sorted()
-                .collect(Collectors.toList());
+                .sorted((left, right) -> left.value().compareTo(right.value()))
+                .toList();
     }
 
     private Component getIFramesText(boolean enabled) {
@@ -200,58 +212,21 @@ public class DummyScreen extends KineticContainerScreen<DummyMenu> {
         ));
     }
 
-    @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (this.attributeInput != null && this.attributeInput.handleKeyPressed(keyCode)) return true;
-        return super.keyPressed(keyCode, scanCode, modifiers);
-    }
-
-    @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (attributeInput != null
-                && attributeInput.handleMouseClick(toVirtualX(mouseX), toVirtualY(mouseY))) {
-            setFocused(null);
-            return true;
-        }
-        return super.mouseClicked(mouseX, mouseY, button);
-    }
-
-    @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (attributeInput != null && attributeInput.handleMouseReleased(button)) return true;
-        return super.mouseReleased(mouseX, mouseY, button);
-    }
-
-    @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (attributeInput != null
-                && attributeInput.handleMouseDragged(toVirtualX(mouseX), toVirtualY(mouseY))) {
-            return true;
-        }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
-    }
-
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (attributeInput != null && attributeInput.handleMouseScrolled(delta)) return true;
-        return super.mouseScrolled(mouseX, mouseY, delta);
-    }
-
     private Component getMobTypeName(int id) {
         return switch (id) {
-            case 1 -> Component.translatable("mob_type.entitycontrol.undead");
-            case 2 -> Component.translatable("mob_type.entitycontrol.arthropod");
-            case 3 -> Component.translatable("mob_type.entitycontrol.illager");
-            case 4 -> Component.translatable("mob_type.entitycontrol.water");
-            default -> Component.translatable("mob_type.entitycontrol.normal");
+            case 1 -> Component.translatable("mob_type.entitycontrol.dummy.undead");
+            case 2 -> Component.translatable("mob_type.entitycontrol.dummy.arthropod");
+            case 3 -> Component.translatable("mob_type.entitycontrol.dummy.illager");
+            case 4 -> Component.translatable("mob_type.entitycontrol.dummy.water");
+            default -> Component.translatable("mob_type.entitycontrol.dummy.normal");
         };
     }
 
     private void applyAttribute() {
         if (attributeInput == null || valueInput == null) return;
 
-        String attributeName = AutoCompleteBox.normalizeValue(attributeInput.getValue());
-        ResourceLocation id = ResourceLocation.tryParse(attributeName);
+        String attributeName = attributeInput.getValue();
+        ResourceLocation id = KineticResourceIds.tryParse(attributeName);
         Double value = valueInput.getDoubleValue();
 
         if (id == null || value == null) {
@@ -259,13 +234,10 @@ public class DummyScreen extends KineticContainerScreen<DummyMenu> {
             return;
         }
 
-        Attribute attribute = ForgeRegistries.ATTRIBUTES.getValue(id);
+        Attribute attribute = KineticRegistries.attributes().get(id);
         if (attribute == null
-                || !EDITABLE_ATTRIBUTES.contains(attribute)
+                || !id.equals(KineticRegistries.attributes().id(attribute))
                 || !Double.isFinite(value)
-                || !(attribute instanceof RangedAttribute range)
-                || value < range.getMinValue()
-                || value > range.getMaxValue()
                 || value != attribute.sanitizeValue(value)) {
             NotifyManager.notify(Component.translatable("msg.entitycontrol.dummy.invalid_number"));
             return;
@@ -280,11 +252,11 @@ public class DummyScreen extends KineticContainerScreen<DummyMenu> {
     }
 
     @Override
-    protected void renderBg(GuiGraphics gui, float partialTick, int mouseX, int mouseY) {
+    protected void renderBg(@Nonnull GuiGraphics gui, float partialTick, int mouseX, int mouseY) {
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-        gui.fill(this.leftPos, this.topPos, this.leftPos + this.imageWidth, this.topPos + this.imageHeight, 0xFFC6C6C6);
-        gui.blit(TEXTURE, this.leftPos, this.topPos, 0, 0, 200, 101, 200, 200);
-        gui.blit(INVENTORY_TEXTURE, this.leftPos + 14, this.topPos + 101, 0, 125, 176, 90, 256, 256);
+        // The dedicated texture already contains both equipment and player inventory.
+        // Rendering a narrower vanilla inventory over its bottom half splits the frame.
+        gui.blit(TEXTURE, this.leftPos, this.topPos, 0, 0, 200, 200, 200, 200);
 
         for (int i = 0; i < Math.min(6, this.menu.slots.size()); i++) {
             Slot slot = this.menu.slots.get(i);
@@ -296,12 +268,12 @@ public class DummyScreen extends KineticContainerScreen<DummyMenu> {
         for (int i = 0; i < 6; i++) {
             if (this.menu.slots.get(i).getItem().isEmpty()) {
                 ResourceLocation icon = switch (i) {
-                    case 0 -> new ResourceLocation("minecraft", "textures/item/empty_armor_slot_helmet.png");
-                    case 1 -> new ResourceLocation("minecraft", "textures/item/empty_armor_slot_chestplate.png");
-                    case 2 -> new ResourceLocation("minecraft", "textures/item/empty_armor_slot_leggings.png");
-                    case 3 -> new ResourceLocation("minecraft", "textures/item/empty_armor_slot_boots.png");
-                    case 4 -> new ResourceLocation("minecraft", "textures/item/empty_slot_sword.png");
-                    case 5 -> new ResourceLocation("minecraft", "textures/item/empty_armor_slot_shield.png");
+                    case 0 -> KineticResourceIds.of("minecraft", "textures/item/empty_armor_slot_helmet.png");
+                    case 1 -> KineticResourceIds.of("minecraft", "textures/item/empty_armor_slot_chestplate.png");
+                    case 2 -> KineticResourceIds.of("minecraft", "textures/item/empty_armor_slot_leggings.png");
+                    case 3 -> KineticResourceIds.of("minecraft", "textures/item/empty_armor_slot_boots.png");
+                    case 4 -> KineticResourceIds.of("minecraft", "textures/item/empty_slot_sword.png");
+                    case 5 -> KineticResourceIds.of("minecraft", "textures/item/empty_armor_slot_shield.png");
                     default -> null;
                 };
                 if (icon != null) {
@@ -313,15 +285,11 @@ public class DummyScreen extends KineticContainerScreen<DummyMenu> {
 
     @Override
     protected void renderUiForeground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        NotifyManager.renderAt(graphics, uiWidth() / 2, topPos + imageHeight + 15);
 
-        int color = 0x404040;
-        graphics.drawString(font, Component.translatable("gui.entitycontrol.dummy.dummy.attribute"), leftPos + 21, topPos + 27, color, false);
-        graphics.drawString(font, Component.translatable("gui.entitycontrol.dummy.dummy.value"), leftPos + 21, topPos + 56, color, false);
-        graphics.drawString(font, Component.translatable("gui.entitycontrol.dummy.dummy.inventory"), leftPos + 21, topPos + 100, color, false);
+        // Neutral tint: the language keys own these labels' colors.
+        graphics.drawString(font, Component.translatable("gui.entitycontrol.dummy.dummy.attribute"), leftPos + 25, topPos + 27, 0xFFFFFF, false);
+        graphics.drawString(font, Component.translatable("gui.entitycontrol.dummy.dummy.value"), leftPos + 25, topPos + 65, 0xFFFFFF, false);
+        graphics.drawString(font, Component.translatable("gui.entitycontrol.dummy.dummy.inventory"), leftPos + 25, topPos + 99, 0xFFFFFF, false);
 
-        if (attributeInput != null) {
-            attributeInput.renderSuggestions(graphics, mouseX, mouseY);
-        }
     }
 }

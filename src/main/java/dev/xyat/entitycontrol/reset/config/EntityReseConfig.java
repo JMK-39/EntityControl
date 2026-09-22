@@ -4,8 +4,9 @@ import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.core.io.WritingMode;
 import dev.xyat.entitycontrol.reset.ResetModule;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.fml.loading.FMLPaths;
-import net.minecraftforge.registries.ForgeRegistries;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.runtime.KineticPaths;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -15,7 +16,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class EntityReseConfig {
-    private static final Path CONFIG_PATH = FMLPaths.CONFIGDIR.get().resolve("kineticcore/entity_rese.toml");
+    private static final Path CONFIG_PATH = KineticPaths.configDirectory().resolve("kineticcore/entity_rese.toml");
     private static CommentedFileConfig configData;
 
     public static final class EntityRule {
@@ -138,8 +139,8 @@ public final class EntityReseConfig {
                 continue;
             }
 
-            ResourceLocation id = ResourceLocation.tryParse(parsed.entityId());
-            if (id == null || !ForgeRegistries.ENTITY_TYPES.containsKey(id)) {
+            ResourceLocation id = KineticResourceIds.tryParse(parsed.entityId());
+            if (id == null || KineticRegistries.entityTypes().get(id) == null) {
                 ResetModule.LOGGER.warn("Removed Entity Rule with unknown target: {}", parsed.entityId());
                 continue;
             }
@@ -167,8 +168,8 @@ public final class EntityReseConfig {
         for (String raw : values) {
             EntityRuleCodec.ParsedRule parsed = EntityRuleCodec.parse(raw);
             if (parsed == null) return false;
-            ResourceLocation id = ResourceLocation.tryParse(parsed.entityId());
-            if (id == null || !ForgeRegistries.ENTITY_TYPES.containsKey(id)) return false;
+            ResourceLocation id = KineticResourceIds.tryParse(parsed.entityId());
+            if (id == null || KineticRegistries.entityTypes().get(id) == null) return false;
         }
         return true;
     }
@@ -270,8 +271,8 @@ public final class EntityReseConfig {
         if (entityId == null || entityId.isBlank()) {
             throw new IllegalArgumentException("entity id is blank");
         }
-        ResourceLocation id = ResourceLocation.tryParse(entityId.trim());
-        if (id == null || !ForgeRegistries.ENTITY_TYPES.containsKey(id)) {
+        ResourceLocation id = KineticResourceIds.tryParse(entityId.trim());
+        if (id == null || KineticRegistries.entityTypes().get(id) == null) {
             throw new IllegalArgumentException("unknown entity id: " + entityId);
         }
         return id.toString();

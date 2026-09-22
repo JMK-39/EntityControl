@@ -2,7 +2,7 @@ package dev.xyat.entitycontrol.dummy.command;
 
 import dev.xyat.entitycontrol.dummy.util.ColorText;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import dev.xyat.kineticcore.command.CommandUtils;
+import dev.xyat.kineticcore.api.command.CommandText;
 import dev.xyat.entitycontrol.dummy.DummyInit;
 import dev.xyat.entitycontrol.dummy.entity.DummyEntityTest;
 import net.minecraft.ChatFormatting;
@@ -31,7 +31,7 @@ public class DummyCommand {
     }
 
     private static int sendHelp(CommandSourceStack source) {
-        MutableComponent msg = CommandUtils.createHeader("msg.entitycontrol.dummy.dummy.help.unified_header").append("\n");
+        MutableComponent msg = CommandText.header("msg.entitycontrol.dummy.dummy.help.unified_header").append("\n");
 
         msg.append(createCmd("/kt dummy spawn", "/kt dummy spawn", "cmd.entitycontrol.dummy.dummy.spawn.desc")).append("\n");
         msg.append(createCmd("/kt dummy clear", "/kt dummy clear", "cmd.entitycontrol.dummy.dummy.clear.desc"));

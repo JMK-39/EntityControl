@@ -2,10 +2,9 @@ package dev.xyat.entitycontrol.dummy;
 
 import dev.xyat.entitycontrol.dummy.config.DummyConfig;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.tags.TagKey;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import java.util.List;
 
 public class DummyUtils {
@@ -36,7 +35,7 @@ public class DummyUtils {
         List<? extends String> list = DummyConfig.equipmentBlacklist.get();
         if (list == null || list.isEmpty()) return false;
 
-        ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
+        ResourceLocation id = KineticRegistries.items().id(stack.getItem());
         if (id == null) return false;
 
         String idStr = id.toString();
@@ -49,9 +48,8 @@ public class DummyUtils {
             } else if (entry.startsWith("#")) {
                 // 匹配标签，例如 #minecraft:arrows
                 try {
-                    ResourceLocation tagLoc = new ResourceLocation(entry.substring(1));
-                    TagKey<Item> tag = TagKey.create(ForgeRegistries.ITEMS.getRegistryKey(), tagLoc);
-                    if (stack.is(tag)) return true;
+                    ResourceLocation tagLoc = KineticResourceIds.parse(entry.substring(1));
+                    if (KineticRegistries.items().isInTag(stack.getItem(), tagLoc)) return true;
                 } catch (Exception ignored) {}
             } else {
                 // 匹配具体ID，例如 minecraft:diamond_sword

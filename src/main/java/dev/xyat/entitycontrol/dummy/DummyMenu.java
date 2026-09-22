@@ -2,7 +2,6 @@ package dev.xyat.entitycontrol.dummy;
 
 import dev.xyat.entitycontrol.dummy.Network.DummyNetwork;
 import dev.xyat.entitycontrol.dummy.entity.DummyEntityTest;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -19,9 +18,7 @@ import javax.annotation.Nullable;
 public class DummyMenu extends AbstractContainerMenu {
     public final DummyEntityTest entity;
 
-    public DummyMenu(int id, Inventory playerInv, FriendlyByteBuf buf) {
-        this(id, playerInv, (DummyEntityTest) playerInv.player.level().getEntity(buf.readInt()));
-    }
+
 
     public DummyMenu(int id, Inventory playerInv, DummyEntityTest entity) {
         super(DummyInit.DUMMY_MENU.get(), id);

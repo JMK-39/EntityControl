@@ -1,36 +1,30 @@
 package dev.xyat.entitycontrol.dummy.Network;
 
-import dev.xyat.entitycontrol.dummy.DummyModule;
-import dev.xyat.kineticcore.api.KTNetworkProtocol;
 import dev.xyat.entitycontrol.dummy.CuriosCompat;
 import dev.xyat.entitycontrol.dummy.DummyMenu;
+import dev.xyat.entitycontrol.dummy.DummyModule;
 import dev.xyat.entitycontrol.dummy.DummyUtils;
 import dev.xyat.entitycontrol.dummy.entity.DummyEntityTest;
+import dev.xyat.kineticcore.api.network.NetworkBuffer;
+import dev.xyat.kineticcore.api.network.NetworkCodec;
+import dev.xyat.kineticcore.api.network.NetworkVersionPolicy;
+import dev.xyat.kineticcore.api.network.PacketChannel;
+import dev.xyat.kineticcore.api.network.PacketRegistrations;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.registry.KineticEntityAttributes;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.attributes.Attribute;
-import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.ai.attributes.RangedAttribute;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkDirection;
-import net.minecraftforge.network.NetworkEvent;
-import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.PacketDistributor;
-import net.minecraftforge.network.simple.SimpleChannel;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.function.Supplier;
 
 public class DummyNetwork {
     private static final String PROTOCOL_VERSION = "1";
@@ -41,28 +35,114 @@ public class DummyNetwork {
     private static final int ID_UPDATE_V2 = 4;
     private static final int ID_UPDATE_CURIO_V2 = 5;
 
-    private static final Set<Attribute> EDITABLE_ATTRIBUTES = Set.of(
-            Attributes.MAX_HEALTH,
-            Attributes.KNOCKBACK_RESISTANCE,
-            Attributes.MOVEMENT_SPEED,
-            Attributes.ARMOR,
-            Attributes.ARMOR_TOUGHNESS
+    private static final PacketChannel CHANNEL = PacketChannel.create(
+            KineticResourceIds.of(DummyModule.MODID, "dummy"),
+            PROTOCOL_VERSION,
+            NetworkVersionPolicy.ANY
     );
+    private static boolean syncRegistered;
+    private static boolean updateLegacyRegistered;
+    private static boolean syncNotifyRegistered;
+    private static boolean updateCurioLegacyRegistered;
+    private static boolean updateV2Registered;
+    private static boolean updateCurioV2Registered;
 
-    public static final SimpleChannel CHANNEL = NetworkRegistry.ChannelBuilder
-            .named(new ResourceLocation(DummyModule.MODID, "dummy"))
-            .networkProtocolVersion(() -> PROTOCOL_VERSION)
-            .clientAcceptedVersions(KTNetworkProtocol::acceptsAnyVersion)
-            .serverAcceptedVersions(KTNetworkProtocol::acceptsAnyVersion)
-            .simpleChannel();
-
-    public static void register() {
-        CHANNEL.messageBuilder(Sync.class, ID_SYNC, NetworkDirection.PLAY_TO_CLIENT).decoder(Sync::new).encoder(Sync::toBytes).consumerMainThread(Sync::handle).add();
-        CHANNEL.messageBuilder(Update.class, ID_UPDATE_LEGACY, NetworkDirection.PLAY_TO_SERVER).decoder(Update::new).encoder(Update::toBytes).consumerMainThread(Update::handle).add();
-        CHANNEL.messageBuilder(SyncNotify.class, ID_SYNC_NOTIFY, NetworkDirection.PLAY_TO_CLIENT).decoder(SyncNotify::new).encoder(SyncNotify::toBytes).consumerMainThread(SyncNotify::handle).add();
-        CHANNEL.messageBuilder(UpdateCurio.class, ID_UPDATE_CURIO_LEGACY, NetworkDirection.PLAY_TO_SERVER).decoder(UpdateCurio::new).encoder(UpdateCurio::toBytes).consumerMainThread(UpdateCurio::handle).add();
-        CHANNEL.messageBuilder(UpdateV2.class, ID_UPDATE_V2, NetworkDirection.PLAY_TO_SERVER).decoder(UpdateV2::new).encoder(UpdateV2::toBytes).consumerMainThread(UpdateV2::handle).add();
-        CHANNEL.messageBuilder(UpdateCurioV2.class, ID_UPDATE_CURIO_V2, NetworkDirection.PLAY_TO_SERVER).decoder(UpdateCurioV2::new).encoder(UpdateCurioV2::toBytes).consumerMainThread(UpdateCurioV2::handle).add();
+    public static synchronized void register() {
+        PacketRegistrations.runIndependent(
+                () -> {
+                    if (!syncRegistered) {
+                        CHANNEL.registerClientbound(
+                                ID_SYNC,
+                                Sync.class,
+                                NetworkCodec.of((buffer, message) -> message.toBytes(buffer), Sync::new),
+                                message -> DummyNetworkClient.handleSync(message)
+                        );
+                        syncRegistered = true;
+                    }
+                },
+                () -> {
+                    if (!updateLegacyRegistered) {
+                        CHANNEL.registerServerbound(
+                                ID_UPDATE_LEGACY,
+                                Update.class,
+                                NetworkCodec.of((buffer, message) -> message.toBytes(buffer), Update::new),
+                                (message, context) -> applyUpdate(
+                                        context.sender(),
+                                        -1,
+                                        message.entityId,
+                                        message.mobTypeId,
+                                        message.attributeData,
+                                        message.iFrames,
+                                        message.healthDrop,
+                                        message.environmentDamage
+                                )
+                        );
+                        updateLegacyRegistered = true;
+                    }
+                },
+                () -> {
+                    if (!syncNotifyRegistered) {
+                        CHANNEL.registerClientbound(
+                                ID_SYNC_NOTIFY,
+                                SyncNotify.class,
+                                NetworkCodec.of((buffer, message) -> message.toBytes(buffer), SyncNotify::new),
+                                message -> DummyNetworkClient.handleNotify(message)
+                        );
+                        syncNotifyRegistered = true;
+                    }
+                },
+                () -> {
+                    if (!updateCurioLegacyRegistered) {
+                        CHANNEL.registerServerbound(
+                                ID_UPDATE_CURIO_LEGACY,
+                                UpdateCurio.class,
+                                NetworkCodec.of((buffer, message) -> message.toBytes(buffer), UpdateCurio::new),
+                                (message, context) -> {
+                                    ItemStack template = message.stack.isEmpty()
+                                            ? ItemStack.EMPTY
+                                            : defaultStack(KineticRegistries.items().id(message.stack.getItem()));
+                                    applyCurioUpdate(context.sender(), -1, message.entityId, message.slotIndex, template);
+                                }
+                        );
+                        updateCurioLegacyRegistered = true;
+                    }
+                },
+                () -> {
+                    if (!updateV2Registered) {
+                        CHANNEL.registerServerbound(
+                                ID_UPDATE_V2,
+                                UpdateV2.class,
+                                NetworkCodec.of((buffer, message) -> message.toBytes(buffer), UpdateV2::new),
+                                (message, context) -> applyUpdate(
+                                        context.sender(),
+                                        message.containerId,
+                                        message.entityId,
+                                        message.mobTypeId,
+                                        message.attributeData,
+                                        message.iFrames,
+                                        message.healthDrop,
+                                        message.environmentDamage
+                                )
+                        );
+                        updateV2Registered = true;
+                    }
+                },
+                () -> {
+                    if (!updateCurioV2Registered) {
+                        CHANNEL.registerServerbound(
+                                ID_UPDATE_CURIO_V2,
+                                UpdateCurioV2.class,
+                                NetworkCodec.of((buffer, message) -> message.toBytes(buffer), UpdateCurioV2::new),
+                                (message, context) -> {
+                                    ServerPlayer player = context.sender();
+                                    ItemStack template = message.resolveTemplate(player);
+                                    applyCurioUpdate(player, message.containerId, message.entityId, message.slotIndex, template);
+                                }
+                        );
+                        updateCurioV2Registered = true;
+                    }
+                }
+        );
     }
 
     public static class Sync {
@@ -109,7 +189,7 @@ public class DummyNetwork {
             this.minionOwnerId = -1;
         }
 
-        public Sync(FriendlyByteBuf buf) {
+        public Sync(NetworkBuffer buf) {
             this.type = buf.readEnum(Type.class);
             this.name = buf.readComponent();
             this.total = buf.readFloat();
@@ -128,7 +208,7 @@ public class DummyNetwork {
             }
         }
 
-        public void toBytes(FriendlyByteBuf buf) {
+        public void toBytes(NetworkBuffer buf) {
             buf.writeEnum(type);
             buf.writeComponent(name);
             buf.writeFloat(total);
@@ -147,10 +227,6 @@ public class DummyNetwork {
             }
         }
 
-        public void handle(Supplier<NetworkEvent.Context> supplier) {
-            supplier.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> DummyNetworkClient.handleSync(this)));
-            supplier.get().setPacketHandled(true);
-        }
     }
 
     public static class Update {
@@ -171,7 +247,7 @@ public class DummyNetwork {
             this.environmentDamage = environmentDamage;
         }
 
-        public Update(FriendlyByteBuf buf) {
+        public Update(NetworkBuffer buf) {
             this.entityId = buf.readInt();
             this.mobTypeId = buf.readInt();
             this.attributeData = buf.readNbt();
@@ -180,7 +256,7 @@ public class DummyNetwork {
             this.environmentDamage = buf.readBoolean();
         }
 
-        public void toBytes(FriendlyByteBuf buf) {
+        public void toBytes(NetworkBuffer buf) {
             buf.writeInt(entityId);
             buf.writeInt(mobTypeId);
             buf.writeNbt(attributeData);
@@ -189,12 +265,6 @@ public class DummyNetwork {
             buf.writeBoolean(environmentDamage);
         }
 
-        public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
-            NetworkEvent.Context context = ctxSupplier.get();
-            context.enqueueWork(() -> applyUpdate(context.getSender(), -1, entityId, mobTypeId,
-                    attributeData, iFrames, healthDrop, environmentDamage));
-            context.setPacketHandled(true);
-        }
     }
 
     public static class UpdateV2 {
@@ -217,7 +287,7 @@ public class DummyNetwork {
             this.environmentDamage = environmentDamage;
         }
 
-        public UpdateV2(FriendlyByteBuf buf) {
+        public UpdateV2(NetworkBuffer buf) {
             this.containerId = buf.readVarInt();
             this.entityId = buf.readInt();
             this.mobTypeId = buf.readInt();
@@ -227,7 +297,7 @@ public class DummyNetwork {
             this.environmentDamage = buf.readBoolean();
         }
 
-        public void toBytes(FriendlyByteBuf buf) {
+        public void toBytes(NetworkBuffer buf) {
             buf.writeVarInt(containerId);
             buf.writeInt(entityId);
             buf.writeInt(mobTypeId);
@@ -237,12 +307,6 @@ public class DummyNetwork {
             buf.writeBoolean(environmentDamage);
         }
 
-        public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
-            NetworkEvent.Context context = ctxSupplier.get();
-            context.enqueueWork(() -> applyUpdate(context.getSender(), containerId, entityId, mobTypeId,
-                    attributeData, iFrames, healthDrop, environmentDamage));
-            context.setPacketHandled(true);
-        }
     }
 
     public static class UpdateCurio {
@@ -256,30 +320,18 @@ public class DummyNetwork {
             this.stack = stack;
         }
 
-        public UpdateCurio(FriendlyByteBuf buf) {
+        public UpdateCurio(NetworkBuffer buf) {
             this.entityId = buf.readInt();
             this.slotIndex = buf.readInt();
-            this.stack = buf.readItem();
+            this.stack = buf.readItemStack();
         }
 
-        public void toBytes(FriendlyByteBuf buf) {
+        public void toBytes(NetworkBuffer buf) {
             buf.writeInt(entityId);
             buf.writeInt(slotIndex);
-            buf.writeItem(stack);
+            buf.writeItemStack(stack);
         }
 
-        public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
-            NetworkEvent.Context context = ctxSupplier.get();
-            context.enqueueWork(() -> {
-                // Legacy peers sent a complete ItemStack. Keep the codec, but discard
-                // all client-controlled count/NBT and use only its registered item ID.
-                ItemStack template = stack.isEmpty()
-                        ? ItemStack.EMPTY
-                        : defaultStack(ForgeRegistries.ITEMS.getKey(stack.getItem()));
-                applyCurioUpdate(context.getSender(), -1, entityId, slotIndex, template);
-            });
-            context.setPacketHandled(true);
-        }
     }
 
     public static class UpdateCurioV2 {
@@ -290,7 +342,7 @@ public class DummyNetwork {
             DEFAULT_ITEM
         }
 
-        private static final ResourceLocation AIR_ID = new ResourceLocation("minecraft", "air");
+        private static final ResourceLocation AIR_ID = KineticResourceIds.of("minecraft", "air");
 
         private final int containerId;
         private final int entityId;
@@ -325,7 +377,7 @@ public class DummyNetwork {
             return new UpdateCurioV2(containerId, entityId, slotIndex, Source.DEFAULT_ITEM, -1, itemId);
         }
 
-        public UpdateCurioV2(FriendlyByteBuf buf) {
+        public UpdateCurioV2(NetworkBuffer buf) {
             this.containerId = buf.readVarInt();
             this.entityId = buf.readInt();
             this.slotIndex = buf.readVarInt();
@@ -334,7 +386,7 @@ public class DummyNetwork {
             this.itemId = buf.readResourceLocation();
         }
 
-        public void toBytes(FriendlyByteBuf buf) {
+        public void toBytes(NetworkBuffer buf) {
             buf.writeVarInt(containerId);
             buf.writeInt(entityId);
             buf.writeVarInt(slotIndex);
@@ -343,15 +395,6 @@ public class DummyNetwork {
             buf.writeResourceLocation(itemId);
         }
 
-        public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
-            NetworkEvent.Context context = ctxSupplier.get();
-            context.enqueueWork(() -> {
-                ServerPlayer player = context.getSender();
-                ItemStack template = resolveTemplate(player);
-                applyCurioUpdate(player, containerId, entityId, slotIndex, template);
-            });
-            context.setPacketHandled(true);
-        }
 
         private ItemStack resolveTemplate(ServerPlayer player) {
             if (player == null || !(player.containerMenu instanceof DummyMenu menu)) {
@@ -387,6 +430,7 @@ public class DummyNetwork {
         dummy.setHealthDrop(healthDrop);
         dummy.setEnvironmentDamage(environmentDamage);
         for (AttributeWrite write : writes) {
+            KineticEntityAttributes.ensureInstance(dummy, write.attribute());
             dummy.setAttributeBaseValue(write.attribute(), write.value());
         }
 
@@ -459,12 +503,11 @@ public class DummyNetwork {
             if (key.length() > 128 || !data.contains(key, Tag.TAG_ANY_NUMERIC)) {
                 return null;
             }
-            ResourceLocation id = ResourceLocation.tryParse(key);
-            Attribute attribute = id == null ? null : ForgeRegistries.ATTRIBUTES.getValue(id);
+            ResourceLocation id = KineticResourceIds.tryParse(key);
+            Attribute attribute = id == null ? null : KineticRegistries.attributes().get(id);
             double value = data.getDouble(key);
             if (attribute == null
-                    || !EDITABLE_ATTRIBUTES.contains(attribute)
-                    || dummy.getAttribute(attribute) == null
+                    || !id.equals(KineticRegistries.attributes().id(attribute))
                     || !isValidAttributeValue(attribute, value)) {
                 return null;
             }
@@ -478,9 +521,6 @@ public class DummyNetwork {
 
     private static boolean isValidAttributeValue(Attribute attribute, double value) {
         return Double.isFinite(value)
-                && attribute instanceof RangedAttribute ranged
-                && value >= ranged.getMinValue()
-                && value <= ranged.getMaxValue()
                 && value == attribute.sanitizeValue(value);
     }
 
@@ -492,8 +532,8 @@ public class DummyNetwork {
         if (id == null) {
             return null;
         }
-        Item item = ForgeRegistries.ITEMS.getValue(id);
-        ResourceLocation registeredId = item == null ? null : ForgeRegistries.ITEMS.getKey(item);
+        Item item = KineticRegistries.items().get(id);
+        ResourceLocation registeredId = item == null ? null : KineticRegistries.items().id(item);
         if (item == null || item == Items.AIR || !id.equals(registeredId)) {
             return null;
         }
@@ -505,25 +545,21 @@ public class DummyNetwork {
             this(Component.translatable("msg.entitycontrol.dummy.dummy.updated"));
         }
 
-        public SyncNotify(FriendlyByteBuf buf) {
+        public SyncNotify(NetworkBuffer buf) {
             this(buf.readComponent());
         }
 
-        public void toBytes(FriendlyByteBuf buf) {
+        public void toBytes(NetworkBuffer buf) {
             buf.writeComponent(this.msg);
         }
 
-        public void handle(Supplier<NetworkEvent.Context> supplier) {
-            supplier.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> DummyNetworkClient.handleNotify(this)));
-            supplier.get().setPacketHandled(true);
-        }
     }
 
     public static void sendToPlayer(Object msg, ServerPlayer player) {
-        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), msg);
+        CHANNEL.sendToPlayer(player, msg);
     }
 
     public static void sendToServer(Object msg) {
-        CHANNEL.send(PacketDistributor.SERVER.noArg(), msg);
+        CHANNEL.sendToServer(msg);
     }
 }

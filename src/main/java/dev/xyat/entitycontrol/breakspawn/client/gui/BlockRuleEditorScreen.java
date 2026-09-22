@@ -2,24 +2,31 @@ package dev.xyat.entitycontrol.breakspawn.client.gui;
 
 import dev.xyat.entitycontrol.breakspawn.config.BreakSpawnConfig;
 import dev.xyat.entitycontrol.breakspawn.network.BreakSpawnNetwork;
+import dev.xyat.kineticcore.api.client.input.KineticMouseButtons;
 import dev.xyat.kineticcore.api.client.search.KineticSearch;
 import dev.xyat.kineticcore.api.client.theme.GuiTheme;
-import dev.xyat.kineticcore.api.client.overlay.GuiOverlay;
-import dev.xyat.kineticcore.api.client.selector.ItemSelectorScreen;
+import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
+import dev.xyat.kineticcore.api.client.selector.KineticSelectors;
 import dev.xyat.kineticcore.api.client.screen.KineticScreen;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.GridScrollController;
-import net.minecraft.client.Minecraft;
+import dev.xyat.kineticcore.api.client.widget.KineticControl;
+import dev.xyat.kineticcore.api.client.widget.button.KineticButtons.StateButton;
+import dev.xyat.kineticcore.api.client.widget.input.KineticTextFields.KineticEditBox;
+import dev.xyat.kineticcore.api.client.widget.scroll.KineticScroll.GridScrollController;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
+
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
+
+
+
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
-import net.minecraftforge.registries.ForgeRegistries;
+
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -45,44 +52,44 @@ public final class BlockRuleEditorScreen extends KineticScreen {
     private final BreakSpawnConfig.ConfigRoot config;
     private final GridScrollController scroll = new GridScrollController();
     private final List<String> filteredBlocks = new ArrayList<>();
-    private final List<AbstractWidget> probabilityWidgets = new ArrayList<>();
-    private final List<AbstractWidget> spawnWidgets = new ArrayList<>();
-    private final List<AbstractWidget> conditionWidgets = new ArrayList<>();
+    private final List<KineticControl> probabilityWidgets = new ArrayList<>();
+    private final List<KineticControl> spawnWidgets = new ArrayList<>();
+    private final List<KineticControl> conditionWidgets = new ArrayList<>();
 
-    private EditBox searchBox;
-    private EditBox baseChanceBox;
-    private EditBox stackIncreaseBox;
-    private EditBox maxChanceBox;
-    private EditBox resetTicksBox;
-    private EditBox minCountBox;
-    private EditBox maxCountBox;
-    private EditBox minDistanceBox;
-    private EditBox radiusBox;
-    private EditBox verticalRadiusBox;
-    private EditBox attemptsBox;
-    private EditBox dimensionsBox;
-    private EditBox biomesBox;
-    private EditBox minYBox;
-    private EditBox maxYBox;
-    private EditBox minLightBox;
-    private EditBox maxLightBox;
-    private Button tabProbability;
-    private Button tabSpawn;
-    private Button tabConditions;
-    private Button enabledButton;
-    private Button stackingButton;
-    private Button resetTriggerButton;
-    private Button resetDifferentButton;
-    private Button poolButton;
-    private Button removeButton;
+    private KineticEditBox searchBox;
+    private KineticEditBox baseChanceBox;
+    private KineticEditBox stackIncreaseBox;
+    private KineticEditBox maxChanceBox;
+    private KineticEditBox resetTicksBox;
+    private KineticEditBox minCountBox;
+    private KineticEditBox maxCountBox;
+    private KineticEditBox minDistanceBox;
+    private KineticEditBox radiusBox;
+    private KineticEditBox verticalRadiusBox;
+    private KineticEditBox attemptsBox;
+    private KineticEditBox dimensionsBox;
+    private KineticEditBox biomesBox;
+    private KineticEditBox minYBox;
+    private KineticEditBox maxYBox;
+    private KineticEditBox minLightBox;
+    private KineticEditBox maxLightBox;
+    private StateButton tabProbability;
+    private StateButton tabSpawn;
+    private StateButton tabConditions;
+    private StateButton enabledButton;
+    private StateButton stackingButton;
+    private StateButton resetTriggerButton;
+    private StateButton resetDifferentButton;
+    private StateButton poolButton;
+    private StateButton removeButton;
     private String selectedBlockId;
     private int activeTab;
 
     public BlockRuleEditorScreen(Screen parent, BreakSpawnConfig.ConfigRoot config) {
         super(Component.translatable("gui.entitycontrol.breakspawn.blocks.title"));
         this.parent = parent;
+        setParentScreen(parent);
         this.config = config;
-        useCanvas(640f, 360f, 6);
         refreshBlocks("");
         if (!config.blocks.isEmpty()) {
             selectedBlockId = config.blocks.keySet().iterator().next();
@@ -95,60 +102,25 @@ public final class BlockRuleEditorScreen extends KineticScreen {
         spawnWidgets.clear();
         conditionWidgets.clear();
 
-        searchBox = addRenderableWidget(new EditBox(
-                font,
-                LEFT_X,
-                SEARCH_Y,
-                142,
-                20,
-                Component.translatable("gui.entitycontrol.breakspawn.search.blocks")
-        ));
+        searchBox = addTextField(
+                LEFT_X, SEARCH_Y, 142,
+                Component.translatable("gui.entitycontrol.breakspawn.search.blocks"),
+                Component.translatable("gui.entitycontrol.breakspawn.search.blocks.placeholder"),
+                null, null
+        );
         searchBox.setMaxLength(128);
         searchBox.setResponder(this::refreshBlocks);
 
-        addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.blocks.add"),
-                        ignored -> openBlockSelector())
-                .bounds(LEFT_X + 147, SEARCH_Y, 77, 20)
-                .build());
+        addButton(LEFT_X + 147, SEARCH_Y, 77, Component.translatable("gui.entitycontrol.breakspawn.blocks.add"), null, this::openBlockSelector);
+        addButton(325, 12, 72, Component.translatable("gui.entitycontrol.breakspawn.global.open"), null, this::openGlobalSettings);
+        removeButton = addButton(402, 12, 72, Component.translatable("gui.entitycontrol.breakspawn.blocks.remove"), null, this::removeSelectedBlock);
+        addButton(479, 12, 72, Component.translatable("gui.entitycontrol.breakspawn.save"), null, this::saveConfig);
+        addButton(556, 12, 72, Component.translatable("gui.entitycontrol.breakspawn.back"), null, this::onClose);
 
-        addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.global.open"),
-                        ignored -> openGlobalSettings())
-                .bounds(325, 12, 72, 20)
-                .build());
-        removeButton = addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.blocks.remove"),
-                        ignored -> removeSelectedBlock())
-                .bounds(402, 12, 72, 20)
-                .build());
-        addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.save"),
-                        ignored -> saveConfig())
-                .bounds(479, 12, 72, 20)
-                .build());
-        addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.back"),
-                        ignored -> onClose())
-                .bounds(556, 12, 72, 20)
-                .build());
-
-        tabProbability = addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.blocks.tab.probability"),
-                        ignored -> setActiveTab(0))
-                .bounds(RIGHT_X, 40, 92, 20).build());
-        tabSpawn = addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.blocks.tab.spawn"),
-                        ignored -> setActiveTab(1))
-                .bounds(RIGHT_X + 97, 40, 92, 20).build());
-        tabConditions = addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.blocks.tab.conditions"),
-                        ignored -> setActiveTab(2))
-                .bounds(RIGHT_X + 194, 40, 92, 20).build());
-        poolButton = addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.blocks.pool"),
-                        ignored -> openPoolEditor())
-                .bounds(RIGHT_X + 291, 40, 92, 20).build());
+        tabProbability = addButton(RIGHT_X, 40, 92, Component.translatable("gui.entitycontrol.breakspawn.blocks.tab.probability"), null, () -> setActiveTab(0));
+        tabSpawn = addButton(RIGHT_X + 97, 40, 92, Component.translatable("gui.entitycontrol.breakspawn.blocks.tab.spawn"), null, () -> setActiveTab(1));
+        tabConditions = addButton(RIGHT_X + 194, 40, 92, Component.translatable("gui.entitycontrol.breakspawn.blocks.tab.conditions"), null, () -> setActiveTab(2));
+        poolButton = addButton(RIGHT_X + 291, 40, 92, Component.translatable("gui.entitycontrol.breakspawn.blocks.pool"), null, this::openPoolEditor);
 
         buildProbabilityWidgets();
         buildSpawnWidgets();
@@ -213,8 +185,8 @@ public final class BlockRuleEditorScreen extends KineticScreen {
         maxLightBox = numberBox(548, 184, 70, conditionWidgets, value -> selectedRule().maxLight = clampInt((int) value, 0, 15));
     }
 
-    private EditBox numberBox(int x, int y, int width, List<AbstractWidget> group, java.util.function.DoubleConsumer consumer) {
-        EditBox box = new EditBox(font, x, y, width, 20, Component.empty());
+    private KineticEditBox numberBox(int x, int y, int width, List<KineticControl> group, java.util.function.DoubleConsumer consumer) {
+        KineticEditBox box = addTextField(x, y, width, Component.empty());
         box.setMaxLength(32);
         box.setResponder(text -> {
             BreakSpawnConfig.BlockRule rule = selectedRule();
@@ -226,46 +198,43 @@ public final class BlockRuleEditorScreen extends KineticScreen {
             } catch (Exception ignored) {
             }
         });
-        addRenderableWidget(box);
         group.add(box);
         return box;
     }
 
-    private EditBox textBox(int x, int y, int width, List<AbstractWidget> group, java.util.function.Consumer<String> consumer) {
-        EditBox box = new EditBox(font, x, y, width, 20, Component.empty());
+    private KineticEditBox textBox(int x, int y, int width, List<KineticControl> group, java.util.function.Consumer<String> consumer) {
+        KineticEditBox box = addTextField(x, y, width, Component.empty());
         box.setMaxLength(4096);
         box.setResponder(text -> {
             if (selectedRule() != null) {
                 consumer.accept(text);
             }
         });
-        addRenderableWidget(box);
         group.add(box);
         return box;
     }
 
-    private Button actionButton(int x, int y, int width, List<AbstractWidget> group, Runnable action) {
-        Button button = addRenderableWidget(Button.builder(Component.empty(), ignored -> action.run())
-                .bounds(x, y, width, 20).build());
+    private StateButton actionButton(int x, int y, int width, List<KineticControl> group, Runnable action) {
+        StateButton button = addButton(x, y, width, Component.empty(), null, action);
         group.add(button);
         return button;
     }
 
     private void openGlobalSettings() {
-        Minecraft.getInstance().setScreen(new GlobalSettingsScreen(this, config));
+        KineticClientRuntime.openScreen(new GlobalSettingsScreen(this, config));
     }
 
     private void saveConfig() {
-        BreakSpawnNetwork.CHANNEL.sendToServer(new BreakSpawnNetwork.SaveConfigPacket(BreakSpawnConfig.GSON.toJson(config)));
+        BreakSpawnNetwork.saveConfig(BreakSpawnConfig.GSON.toJson(config));
     }
 
     private void openBlockSelector() {
-        Minecraft.getInstance().setScreen(new ItemSelectorScreen(this, selection -> {
+        KineticSelectors.openItemSelector(this, selection -> {
             if (!selection.isItem() || !(selection.stack().getItem() instanceof BlockItem blockItem)) {
-                GuiOverlay.toast(Component.translatable("msg.entitycontrol.breakspawn.select_block_only"));
+                KineticOverlays.toast(Component.translatable("msg.entitycontrol.breakspawn.select_block_only"));
                 return;
             }
-            ResourceLocation id = ForgeRegistries.BLOCKS.getKey(blockItem.getBlock());
+            ResourceLocation id = KineticRegistries.blocks().id(blockItem.getBlock());
             if (id == null) {
                 return;
             }
@@ -273,7 +242,7 @@ public final class BlockRuleEditorScreen extends KineticScreen {
             config.blocks.computeIfAbsent(selectedBlockId, ignored -> BreakSpawnConfig.createBlockRuleFromDefaults(config.global));
             refreshBlocks(searchBox == null ? "" : searchBox.getValue());
             refreshSelectedFields();
-        }));
+        });
     }
 
     private void openPoolEditor() {
@@ -281,7 +250,7 @@ public final class BlockRuleEditorScreen extends KineticScreen {
         if (rule == null || selectedBlockId == null) {
             return;
         }
-        Minecraft.getInstance().setScreen(new BlockEntityPoolScreen(this, config, selectedBlockId, rule));
+        KineticClientRuntime.openScreen(new BlockEntityPoolScreen(this, config, selectedBlockId, rule));
     }
 
     private void removeSelectedBlock() {
@@ -320,27 +289,27 @@ public final class BlockRuleEditorScreen extends KineticScreen {
     }
 
     private Block blockById(String id) {
-        ResourceLocation location = ResourceLocation.tryParse(id);
-        return location == null ? null : ForgeRegistries.BLOCKS.getValue(location);
+        ResourceLocation location = KineticResourceIds.tryParse(id);
+        return location == null ? null : KineticRegistries.blocks().get(location);
     }
 
     private void refreshSelectedFields() {
         BreakSpawnConfig.BlockRule rule = selectedRule();
         boolean hasRule = rule != null;
-        for (AbstractWidget widget : probabilityWidgets) {
-            widget.active = hasRule;
+        for (KineticControl widget : probabilityWidgets) {
+            widget.setEnabled(hasRule);
         }
-        for (AbstractWidget widget : spawnWidgets) {
-            widget.active = hasRule;
+        for (KineticControl widget : spawnWidgets) {
+            widget.setEnabled(hasRule);
         }
-        for (AbstractWidget widget : conditionWidgets) {
-            widget.active = hasRule;
+        for (KineticControl widget : conditionWidgets) {
+            widget.setEnabled(hasRule);
         }
-        tabProbability.active = hasRule && activeTab != 0;
-        tabSpawn.active = hasRule && activeTab != 1;
-        tabConditions.active = hasRule && activeTab != 2;
-        poolButton.active = hasRule;
-        removeButton.active = hasRule;
+        tabProbability.setEnabled(hasRule && activeTab != 0);
+        tabSpawn.setEnabled(hasRule && activeTab != 1);
+        tabConditions.setEnabled(hasRule && activeTab != 2);
+        poolButton.setEnabled(hasRule);
+        removeButton.setEnabled(hasRule);
         if (!hasRule) {
             return;
         }
@@ -376,10 +345,10 @@ public final class BlockRuleEditorScreen extends KineticScreen {
         if (rule == null) {
             return;
         }
-        enabledButton.setMessage(toggle("gui.entitycontrol.breakspawn.blocks.enabled", rule.enabled));
-        stackingButton.setMessage(toggle("gui.entitycontrol.breakspawn.blocks.stacking", rule.stackingEnabled));
-        resetTriggerButton.setMessage(toggle("gui.entitycontrol.breakspawn.blocks.reset_trigger", rule.resetOnTrigger));
-        resetDifferentButton.setMessage(toggle("gui.entitycontrol.breakspawn.blocks.reset_different", rule.resetOnDifferentBlock));
+        enabledButton.setText(toggle("gui.entitycontrol.breakspawn.blocks.enabled", rule.enabled));
+        stackingButton.setText(toggle("gui.entitycontrol.breakspawn.blocks.stacking", rule.stackingEnabled));
+        resetTriggerButton.setText(toggle("gui.entitycontrol.breakspawn.blocks.reset_trigger", rule.resetOnTrigger));
+        resetDifferentButton.setText(toggle("gui.entitycontrol.breakspawn.blocks.reset_different", rule.resetOnDifferentBlock));
     }
 
     private Component toggle(String key, boolean value) {
@@ -391,26 +360,25 @@ public final class BlockRuleEditorScreen extends KineticScreen {
     private void setActiveTab(int tab) {
         activeTab = clampInt(tab, 0, 2);
         boolean hasRule = selectedRule() != null;
-        tabProbability.active = hasRule && activeTab != 0;
-        tabSpawn.active = hasRule && activeTab != 1;
-        tabConditions.active = hasRule && activeTab != 2;
+        tabProbability.setEnabled(hasRule && activeTab != 0);
+        tabSpawn.setEnabled(hasRule && activeTab != 1);
+        tabConditions.setEnabled(hasRule && activeTab != 2);
         setVisible(probabilityWidgets, hasRule && activeTab == 0);
         setVisible(spawnWidgets, hasRule && activeTab == 1);
         setVisible(conditionWidgets, hasRule && activeTab == 2);
     }
 
-    private void setVisible(List<AbstractWidget> widgets, boolean visible) {
-        for (AbstractWidget widget : widgets) {
-            widget.visible = visible;
+    private void setVisible(List<KineticControl> widgets, boolean visible) {
+        for (KineticControl widget : widgets) {
+            widget.setVisible(visible);
         }
     }
 
     @Override
     protected void renderCanvasBackground(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, canvasWidth, canvasHeight, 0xD9000000);
-        GuiTheme.panel(graphics, 6, 6, 628, 348, 0xD91A1E26, 0xFF506070);
-        GuiTheme.panel(graphics, LEFT_X, LIST_Y, LEFT_W, LIST_H, 0xB010141A, 0xFF43515F);
-        GuiTheme.panel(graphics, RIGHT_X, LIST_Y, RIGHT_W, LIST_H, 0xB010141A, 0xFF43515F);
+        GuiTheme.panel(graphics, 6, 6, 628, 348);
+        GuiTheme.panelAlt(graphics, LEFT_X, LIST_Y, LEFT_W, LIST_H);
+        GuiTheme.panelAlt(graphics, RIGHT_X, LIST_Y, RIGHT_W, LIST_H);
         graphics.drawString(font, title, 14, 16, 0xFFFFFFFF, false);
         graphics.drawString(font, Component.translatable("gui.entitycontrol.breakspawn.blocks.step_block"), 12, 30, 0xFFFFFFFF, false);
         if (selectedRule() != null) {
@@ -427,7 +395,7 @@ public final class BlockRuleEditorScreen extends KineticScreen {
         }
         int start = scroll.smoothIndexOffset();
         int shift = scroll.visualShift(ROW_H + ROW_GAP);
-                enableCanvasScissor(graphics, LEFT_X + 2, LIST_Y + 2, LEFT_X + LEFT_W - 10, LIST_Y + LIST_H - 2);
+                enableUiScissor(graphics, LEFT_X + 2, LIST_Y + 2, LEFT_X + LEFT_W - 10, LIST_Y + LIST_H - 2);
         try {
 for (int row = 0; row <= VISIBLE_ROWS; row++) {
             int index = start + row;
@@ -439,8 +407,13 @@ for (int row = 0; row <= VISIBLE_ROWS; row++) {
             int y = LIST_Y + 2 + row * (ROW_H + ROW_GAP) - shift;
             boolean hover = isInside(mouseX, mouseY, LEFT_X + 2, y, LEFT_W - 12, ROW_H);
             boolean selected = id.equals(selectedBlockId);
-            int border = hover ? 0xFFAAAAAA : rule != null && rule.enabled ? 0xFF42D66B : selected ? 0xFFE5B94A : 0xFF43515F;
-            GuiTheme.panel(graphics, LEFT_X + 2, y, LEFT_W - 12, ROW_H, 0xC0182028, border);
+            GuiTheme.stateSurface(
+                    graphics, LEFT_X + 2, y, LEFT_W - 12, ROW_H,
+                    GuiTheme.Surface.PANEL_ALT,
+                    selected || (rule != null && rule.enabled),
+                    hover,
+                    false
+            );
             Block block = blockById(id);
             if (block != null) {
                 ItemStack stack = new ItemStack(block.asItem());
@@ -452,7 +425,7 @@ for (int row = 0; row <= VISIBLE_ROWS; row++) {
             graphics.drawString(font, id, LEFT_X + 30, y + 19, 0xFFB8C8D8, false);
         }
         } finally {
-            graphics.disableScissor();
+            disableUiScissor(graphics);
         }
         GuiTheme.scrollbar(scroll, graphics, mouseX, mouseY, SCROLL_X, LIST_Y + 2, SCROLL_W, LIST_H - 4, 20);
     }
@@ -492,25 +465,14 @@ for (int row = 0; row <= VISIBLE_ROWS; row++) {
     }
 
     @Override
-    protected void renderCanvasForeground(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        if (searchBox != null && searchBox.getValue().isEmpty() && !searchBox.isFocused()) {
-            String placeholder = font.plainSubstrByWidth(
-                    Component.translatable("gui.entitycontrol.breakspawn.search.blocks.placeholder").getString(),
-                    Math.max(0, searchBox.getWidth() - 10)
-            );
-            graphics.drawString(font, placeholder, searchBox.getX() + 5, searchBox.getY() + 6, 0xFFB8C8D8, false);
-        }
-    }
-
-    @Override
     protected boolean canvasMouseClicked(double mouseX, double mouseY, int button) {
         if (super.canvasMouseClicked(mouseX, mouseY, button)) {
             return true;
         }
-        if (button == 0 && scroll.beginDrag(mouseX, mouseY, SCROLL_X, LIST_Y + 2, SCROLL_W, LIST_H - 4, 20, 2)) {
+        if (KineticMouseButtons.isPrimary(button) && scroll.beginDrag(mouseX, mouseY, SCROLL_X, LIST_Y + 2, SCROLL_W, LIST_H - 4, 20, 2)) {
             return true;
         }
-        if (button == 0) {
+        if (KineticMouseButtons.isPrimary(button)) {
             int row = rowAt(mouseX, mouseY);
             int index = scroll.smoothIndexOffset() + row;
             if (row >= 0 && index >= 0 && index < filteredBlocks.size()) {
@@ -568,7 +530,7 @@ for (int row = 0; row <= VISIBLE_ROWS; row++) {
     }
 
     @Override
-    public void onClose() {
-        Minecraft.getInstance().setScreen(parent);
+    protected boolean handleCloseRequest() {
+        return false;
     }
 }

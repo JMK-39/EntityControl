@@ -5,6 +5,9 @@ import com.electronwill.nightconfig.core.io.WritingMode;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import dev.xyat.entitycontrol.spawn.SpawnModule;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.runtime.KineticPaths;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
@@ -21,8 +24,6 @@ import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.MobSpawnSettings;
-import net.minecraftforge.fml.loading.FMLPaths;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.io.Reader;
 import java.io.Writer;
@@ -47,7 +48,7 @@ public class BiomeSpawnConfig {
     public static final int MAX_PROFILE_COUNT = 64;
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    private static final Path BASE_DIR = FMLPaths.CONFIGDIR.get().resolve("kineticcore").resolve("spawn_control");
+    private static final Path BASE_DIR = KineticPaths.configDirectory().resolve("kineticcore").resolve("spawn_control");
     private static final Path GLOBALS_PATH = BASE_DIR.resolve("globals.toml");
     private static final Path BACKUP_PATH = BASE_DIR.resolve("spawn_backup.json");
     private static final String PROFILE_PREFIX = "profile_";
@@ -659,10 +660,10 @@ public class BiomeSpawnConfig {
     private static void buildRegisteredEntityCache(MinecraftServer server) {
         if (entityRegistryCacheBuilt) return;
         REGISTERED_LIVING_ENTITIES.clear();
-        Set<Map.Entry<ResourceKey<EntityType<?>>, EntityType<?>>> entries = ForgeRegistries.ENTITY_TYPES.getEntries();
-        for (Map.Entry<ResourceKey<EntityType<?>>, EntityType<?>> entry : entries) {
+        Map<ResourceLocation, EntityType<?>> entries = KineticRegistries.entityTypes().entries();
+        for (Map.Entry<ResourceLocation, EntityType<?>> entry : entries.entrySet()) {
             EntityType<?> type = entry.getValue();
-            ResourceLocation id = entry.getKey().location();
+            ResourceLocation id = entry.getKey();
             if (type == null) continue;
             if (!shouldScanEntityType(id, type, server)) continue;
             REGISTERED_LIVING_ENTITIES.put(id.toString(), type.getCategory().getName());
@@ -714,10 +715,10 @@ public class BiomeSpawnConfig {
 
     public static boolean isEntityIdValid(String entityId) {
         if (entityId == null || entityId.isBlank()) return false;
-        ResourceLocation id = ResourceLocation.tryParse(entityId);
+        ResourceLocation id = KineticResourceIds.tryParse(entityId);
         return id != null
-                && ForgeRegistries.ENTITY_TYPES.containsKey(id)
-                && ForgeRegistries.ENTITY_TYPES.getValue(id) != null;
+                && KineticRegistries.entityTypes().contains(id)
+                && KineticRegistries.entityTypes().get(id) != null;
     }
 
     public static boolean cleanupMissingEntities(ConfigProfile profile) {
@@ -764,7 +765,7 @@ public class BiomeSpawnConfig {
                 }
 
                 for (MobSpawnSettings.SpawnerData data : list.unwrap()) {
-                    ResourceLocation id = ForgeRegistries.ENTITY_TYPES.getKey(data.type);
+                    ResourceLocation id = KineticRegistries.entityTypes().id(data.type);
                     if (id == null) continue;
 
                     String entityId = id.toString();
@@ -878,10 +879,10 @@ public class BiomeSpawnConfig {
             normalizeNode(node);
             if (node.biomes.isEmpty()) continue;
 
-            ResourceLocation entityLocation = ResourceLocation.tryParse(entityId);
+            ResourceLocation entityLocation = KineticResourceIds.tryParse(entityId);
             if (entityLocation == null) continue;
 
-            EntityType<?> entityType = ForgeRegistries.ENTITY_TYPES.getValue(entityLocation);
+            EntityType<?> entityType = KineticRegistries.entityTypes().get(entityLocation);
             if (entityType == null) continue;
 
             processEntityCount++;
@@ -934,10 +935,10 @@ public class BiomeSpawnConfig {
             if (node == null || !node.enable_control) continue;
             normalizeNode(node);
 
-            ResourceLocation entityId = ResourceLocation.tryParse(entry.getKey());
+            ResourceLocation entityId = KineticResourceIds.tryParse(entry.getKey());
             if (entityId == null) continue;
 
-            EntityType<?> entityType = ForgeRegistries.ENTITY_TYPES.getValue(entityId);
+            EntityType<?> entityType = KineticRegistries.entityTypes().get(entityId);
             if (entityType == null) continue;
 
             int minDistance = Math.max(0, node.min_spawn_distance);
@@ -984,7 +985,7 @@ public class BiomeSpawnConfig {
 
         Set<ResourceLocation> parsed = new HashSet<>();
         for (String value : values) {
-            ResourceLocation id = ResourceLocation.tryParse(value);
+            ResourceLocation id = KineticResourceIds.tryParse(value);
             if (id != null) parsed.add(id);
         }
         return parsed.isEmpty() ? Set.of() : Set.copyOf(parsed);

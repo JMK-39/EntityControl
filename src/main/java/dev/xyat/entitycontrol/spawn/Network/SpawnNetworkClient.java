@@ -3,17 +3,18 @@ package dev.xyat.entitycontrol.spawn.Network;
 import dev.xyat.entitycontrol.spawn.client.gui.SpawnControlScreen;
 import dev.xyat.entitycontrol.spawn.client.gui.SpawnerControlScreen;
 import dev.xyat.entitycontrol.spawn.config.BiomeSpawnConfig;
-import dev.xyat.entitycontrol.spawn.config.SpawnerConfig;
-import dev.xyat.kineticcore.api.client.overlay.GuiOverlay;
-import dev.xyat.kineticcore.config.client.KTConfigApi;
 import dev.xyat.entitycontrol.spawn.config.SpawnConfigGui;
-import net.minecraft.client.Minecraft;
+import dev.xyat.entitycontrol.spawn.config.SpawnerConfig;
+import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
+import dev.xyat.kineticcore.api.config.client.KTConfigApi;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 
-public class SpawnNetworkClient {
-    @OnlyIn(Dist.CLIENT)
+public final class SpawnNetworkClient {
+    private SpawnNetworkClient() {
+    }
+
     public static void handleSync(SpawnNetwork.SyncPacket packet) {
         BiomeSpawnConfig.GlobalSettings globals = new BiomeSpawnConfig.GlobalSettings();
         globals.enable_rule_override = packet.ruleOverride();
@@ -30,11 +31,11 @@ public class SpawnNetworkClient {
             profile = new BiomeSpawnConfig.ConfigProfile();
         }
 
-        Minecraft minecraft = Minecraft.getInstance();
-        net.minecraft.client.gui.screens.Screen parent = minecraft.screen instanceof SpawnControlScreen current
-                ? current.getParentScreen()
-                : minecraft.screen;
-        minecraft.setScreen(new SpawnControlScreen(
+        Screen current = KineticClientRuntime.currentScreen();
+        Screen parent = current instanceof SpawnControlScreen currentSpawn
+                ? currentSpawn.getParentScreen()
+                : current;
+        KineticClientRuntime.openScreen(new SpawnControlScreen(
                 globals,
                 profile,
                 packet.editIndex(),
@@ -42,10 +43,8 @@ public class SpawnNetworkClient {
         ));
     }
 
-    @OnlyIn(Dist.CLIENT)
     public static void handleSpawnBackupSync(SpawnNetwork.SpawnBackupSyncPacket packet) {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (!(minecraft.screen instanceof SpawnControlScreen screen)
+        if (!(KineticClientRuntime.currentScreen() instanceof SpawnControlScreen screen)
                 || screen.currentEditIndex != packet.editIndex()) {
             return;
         }
@@ -61,7 +60,6 @@ public class SpawnNetworkClient {
         screen.updateBackupProfile(backupProfile);
     }
 
-    @OnlyIn(Dist.CLIENT)
     public static void handleSpawnerSync(SpawnNetwork.SpawnerSyncPacket packet) {
         SpawnerConfig.SpawnerEditorSnapshot snapshot = SpawnerConfig.GSON.fromJson(
                 packet.snapshotJson(),
@@ -70,23 +68,23 @@ public class SpawnNetworkClient {
         if (snapshot == null) {
             snapshot = new SpawnerConfig.SpawnerEditorSnapshot();
         }
-        Minecraft minecraft = Minecraft.getInstance();
-        minecraft.setScreen(new SpawnerControlScreen(minecraft.screen, snapshot));
+        Screen current = KineticClientRuntime.currentScreen();
+        Screen parent = current instanceof SpawnerControlScreen currentSpawner
+                ? currentSpawner.getParentScreen()
+                : current;
+        KineticClientRuntime.openScreen(new SpawnerControlScreen(parent, snapshot));
     }
 
-    @OnlyIn(Dist.CLIENT)
     public static void handleSpawnSaveResult(SpawnNetwork.SpawnSaveResultPacket packet) {
         if (packet.success()) {
             KTConfigApi.notifySaved(SpawnConfigGui.PAGE_ID);
         } else {
-            GuiOverlay.toast(Component.translatable("gui.kineticcore.config.save_failed"));
+            KineticOverlays.toast(Component.translatable("gui.kineticcore.config.save_failed"));
         }
     }
 
-    @OnlyIn(Dist.CLIENT)
     public static void handleSpawnerSaveResult(SpawnNetwork.SpawnerSaveResultPacket packet) {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.screen instanceof SpawnerControlScreen screen) {
+        if (KineticClientRuntime.currentScreen() instanceof SpawnerControlScreen screen) {
             screen.handleSaveResult(packet.requestId(), packet.success());
         }
         if (packet.success()) {

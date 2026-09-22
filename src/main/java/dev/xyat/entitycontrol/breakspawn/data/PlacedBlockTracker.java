@@ -1,5 +1,7 @@
 package dev.xyat.entitycontrol.breakspawn.data;
 
+import javax.annotation.Nonnull;
+
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -42,7 +44,7 @@ public final class PlacedBlockTracker extends SavedData {
     }
 
     @Override
-    public CompoundTag save(CompoundTag tag) {
+    public CompoundTag save(@Nonnull CompoundTag tag) {
         long[] values = new long[positions.size()];
         int index = 0;
         for (Long value : positions) {

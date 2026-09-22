@@ -1,11 +1,17 @@
 package dev.xyat.entitycontrol.dummy.entity;
 
+import dev.xyat.kineticcore.api.menu.KineticMenus;
+import dev.xyat.kineticcore.api.registry.KineticEntityAttributes;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import dev.xyat.entitycontrol.dummy.DummyMenu;
 import dev.xyat.entitycontrol.dummy.CuriosCompat;
 import dev.xyat.entitycontrol.dummy.config.DummyConfig;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -28,7 +34,6 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.network.NetworkHooks;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -37,6 +42,7 @@ import java.util.UUID;
 public class DummyEntityTest extends Mob implements MenuProvider {
 
     private final SimpleContainer inventory = new SimpleContainer(6);
+    private CompoundTag attributeOverrides = new CompoundTag();
     private static final EntityDataAccessor<Integer> DATA_MOB_TYPE_ID = SynchedEntityData.defineId(DummyEntityTest.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> DATA_IFRAMES = SynchedEntityData.defineId(DummyEntityTest.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> DATA_HEALTH_DROP = SynchedEntityData.defineId(DummyEntityTest.class, EntityDataSerializers.BOOLEAN);
@@ -130,6 +136,7 @@ public class DummyEntityTest extends Mob implements MenuProvider {
             AttributeInstance toughness = this.getAttribute(Attributes.ARMOR_TOUGHNESS);
             if (toughness != null) attrs.putDouble("ArmorToughness", toughness.getBaseValue());
             preset.put("Attributes", attrs);
+            preset.put("AttributeOverrides", this.attributeOverrides.copy());
 
             CompoundTag entityData = new CompoundTag();
             this.saveWithoutId(entityData);
@@ -165,6 +172,9 @@ public class DummyEntityTest extends Mob implements MenuProvider {
             if (attrs.contains("MaxHealth")) this.setAttributeBaseValue(Attributes.MAX_HEALTH, attrs.getDouble("MaxHealth"));
             if (attrs.contains("Armor")) this.setAttributeBaseValue(Attributes.ARMOR, attrs.getDouble("Armor"));
             if (attrs.contains("ArmorToughness")) this.setAttributeBaseValue(Attributes.ARMOR_TOUGHNESS, attrs.getDouble("ArmorToughness"));
+        }
+        if (preset.contains("AttributeOverrides", Tag.TAG_COMPOUND)) {
+            restoreAttributeOverrides(preset.getCompound("AttributeOverrides"));
         }
 
         if (preset.contains("ForgeCaps")) {
@@ -284,10 +294,25 @@ public class DummyEntityTest extends Mob implements MenuProvider {
     }
 
     public void setAttributeBaseValue(Attribute attribute, double value) {
-        AttributeInstance instance = this.getAttribute(attribute);
-        if (instance != null) {
-            instance.setBaseValue(value);
-            if (attribute == Attributes.MAX_HEALTH) this.setHealth(this.getMaxHealth());
+        if (attribute == null || !Double.isFinite(value) || value != attribute.sanitizeValue(value)) return;
+        ResourceLocation id = KineticRegistries.attributes().id(attribute);
+        if (id == null || KineticRegistries.attributes().get(id) != attribute) return;
+        AttributeInstance instance = KineticEntityAttributes.ensureInstance(this, attribute);
+        instance.setBaseValue(value);
+        this.attributeOverrides.putDouble(id.toString(), value);
+        if (attribute == Attributes.MAX_HEALTH) this.setHealth(this.getMaxHealth());
+    }
+
+    private void restoreAttributeOverrides(CompoundTag saved) {
+        if (saved == null || saved.getAllKeys().size() > 512) return;
+        for (String name : saved.getAllKeys()) {
+            if (!saved.contains(name, Tag.TAG_ANY_NUMERIC)) continue;
+            ResourceLocation id = KineticResourceIds.tryParse(name);
+            if (id == null || !name.equals(id.toString())) continue;
+            Attribute attribute = KineticRegistries.attributes().get(id);
+            if (attribute != null && id.equals(KineticRegistries.attributes().id(attribute))) {
+                setAttributeBaseValue(attribute, saved.getDouble(name));
+            }
         }
     }
 
@@ -314,7 +339,7 @@ public class DummyEntityTest extends Mob implements MenuProvider {
     @Override
     public @NotNull InteractionResult interactAt(@NotNull Player player, @NotNull Vec3 pos, @NotNull InteractionHand hand) {
         if (!this.level().isClientSide && hand == InteractionHand.MAIN_HAND && player.isCrouching() && player.getMainHandItem().isEmpty()) {
-            NetworkHooks.openScreen((ServerPlayer) player, this, buf -> buf.writeInt(this.getId()));
+            KineticMenus.open((ServerPlayer) player, getDisplayName(), (containerId, inventory, owner) -> new DummyMenu(containerId, inventory, this), data -> data.writeInt(getId()));
             return InteractionResult.SUCCESS;
         }
         return super.interactAt(player, pos, hand);
@@ -325,6 +350,7 @@ public class DummyEntityTest extends Mob implements MenuProvider {
     @Override
     public void addAdditionalSaveData(@NotNull CompoundTag tag) {
         super.addAdditionalSaveData(tag);
+        tag.put("DummyAttributeOverrides", this.attributeOverrides.copy());
         ListTag list = new ListTag();
         for (int i = 0; i < this.inventory.getContainerSize(); i++) {
             ItemStack stack = this.inventory.getItem(i);
@@ -349,6 +375,10 @@ public class DummyEntityTest extends Mob implements MenuProvider {
     @Override
     public void readAdditionalSaveData(@NotNull CompoundTag tag) {
         super.readAdditionalSaveData(tag);
+        this.attributeOverrides = new CompoundTag();
+        if (tag.contains("DummyAttributeOverrides", Tag.TAG_COMPOUND)) {
+            restoreAttributeOverrides(tag.getCompound("DummyAttributeOverrides"));
+        }
         this.inventory.clearContent();
         if (tag.contains("DummyInventory", 9)) {
             ListTag list = tag.getList("DummyInventory", 10);

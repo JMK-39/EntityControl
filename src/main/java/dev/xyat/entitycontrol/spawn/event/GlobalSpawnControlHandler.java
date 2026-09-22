@@ -1,45 +1,52 @@
 package dev.xyat.entitycontrol.spawn.event;
 
-import dev.xyat.entitycontrol.spawn.SpawnModule;
 import dev.xyat.entitycontrol.spawn.config.BiomeSpawnConfig;
+import dev.xyat.kineticcore.api.event.KineticEventPriority;
+import dev.xyat.kineticcore.api.server.event.KineticServerEvents;
+import dev.xyat.kineticcore.api.world.event.KineticWorldEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.event.entity.living.MobSpawnEvent;
-import net.minecraftforge.event.server.ServerAboutToStartEvent;
-import net.minecraftforge.eventbus.api.Event;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
 import java.util.EnumSet;
 import java.util.Set;
 
-@Mod.EventBusSubscriber(modid = SpawnModule.MODID)
-public class GlobalSpawnControlHandler {
-
+public final class GlobalSpawnControlHandler {
     private static final Set<MobSpawnType> NATURAL_TYPES = EnumSet.of(
             MobSpawnType.NATURAL,
             MobSpawnType.CHUNK_GENERATION,
             MobSpawnType.STRUCTURE,
             MobSpawnType.PATROL
     );
+    private static boolean registered;
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onServerAboutToStart(ServerAboutToStartEvent event) {
-        BiomeSpawnConfig.onServerStart(event.getServer());
+    private GlobalSpawnControlHandler() {
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onSpawnPlacementCheck(MobSpawnEvent.SpawnPlacementCheck event) {
+    public static synchronized void register() {
+        if (registered) return;
+        registered = true;
+
+        KineticServerEvents.onAboutToStart(KineticEventPriority.LOWEST, BiomeSpawnConfig::onServerStart);
+        KineticWorldEvents.onMobSpawnPlacementCheck(
+                KineticEventPriority.LOWEST,
+                GlobalSpawnControlHandler::onSpawnPlacementCheck
+        );
+        KineticWorldEvents.onMobFinalizeSpawn(
+                KineticEventPriority.HIGHEST,
+                GlobalSpawnControlHandler::onFinalizeSpawn
+        );
+    }
+
+    private static void onSpawnPlacementCheck(KineticWorldEvents.MobSpawnPlacementContext event) {
         if (!BiomeSpawnConfig.globals.enable_rule_override) return;
 
-        ServerLevel level = event.getLevel().getLevel();
-        EntityType<?> entityType = event.getEntityType();
-        MobSpawnType spawnType = event.getSpawnType();
-        BlockPos pos = event.getPos();
+        ServerLevel level = event.level();
+        EntityType<?> entityType = event.entityType();
+        MobSpawnType spawnType = event.spawnType();
+        BlockPos pos = event.pos();
 
         BiomeSpawnConfig.SpawnDecision decision = BiomeSpawnConfig.getSpawnDecision(
                 entityType,
@@ -51,77 +58,62 @@ public class GlobalSpawnControlHandler {
         if (decision == BiomeSpawnConfig.SpawnDecision.VANILLA) return;
 
         if (decision == BiomeSpawnConfig.SpawnDecision.DENY) {
-            event.setResult(Event.Result.DENY);
+            event.result(KineticWorldEvents.SpawnPlacementResult.DENY);
             return;
         }
 
         if (NATURAL_TYPES.contains(spawnType)
-                && !BiomeSpawnConfig.isSpawnLightAllowed(
-                level,
-                entityType,
-                pos,
-                spawnType
-        )) {
-            event.setResult(Event.Result.DENY);
+                && !BiomeSpawnConfig.isSpawnLightAllowed(level, entityType, pos, spawnType)) {
+            event.result(KineticWorldEvents.SpawnPlacementResult.DENY);
             return;
         }
 
         if (NATURAL_TYPES.contains(spawnType)
                 && spawnType != MobSpawnType.NATURAL
                 && BiomeSpawnConfig.hasCustomSpawnDistance(entityType)
-                && !isDistanceAllowed(level, pos, entityType)) {
-            event.setResult(Event.Result.DENY);
+                && isDistanceDisallowed(level, pos, entityType)) {
+            event.result(KineticWorldEvents.SpawnPlacementResult.DENY);
             return;
         }
 
-        if (event.getResult() != Event.Result.DENY) {
-            event.setResult(Event.Result.ALLOW);
+        if (event.result() != KineticWorldEvents.SpawnPlacementResult.DENY) {
+            event.result(KineticWorldEvents.SpawnPlacementResult.ALLOW);
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onFinalizeSpawn(MobSpawnEvent.FinalizeSpawn event) {
+    private static void onFinalizeSpawn(KineticWorldEvents.MobFinalizeSpawnContext event) {
         if (!BiomeSpawnConfig.globals.enable_rule_override) return;
 
-        ServerLevel level = event.getLevel().getLevel();
+        ServerLevel level = event.serverLevel();
         BiomeSpawnConfig.SpawnDecision decision = BiomeSpawnConfig.getSpawnDecision(
-                event.getEntity().getType(),
-                event.getSpawnType(),
+                event.entity().getType(),
+                event.spawnType(),
                 level.dimension().location(),
-                event.getEntity().blockPosition().getY()
+                event.entity().blockPosition().getY()
         );
 
         if (decision == BiomeSpawnConfig.SpawnDecision.DENY) {
-            event.setSpawnCancelled(true);
+            event.cancelSpawn();
             return;
         }
 
-        if (NATURAL_TYPES.contains(event.getSpawnType())) {
-            BlockPos pos = event.getEntity().blockPosition();
-            EntityType<?> entityType = event.getEntity().getType();
+        if (NATURAL_TYPES.contains(event.spawnType())) {
+            BlockPos pos = event.entity().blockPosition();
+            EntityType<?> entityType = event.entity().getType();
 
-            if (!BiomeSpawnConfig.isSpawnLightAllowed(
-                    level,
-                    entityType,
-                    pos,
-                    event.getSpawnType()
-            )) {
-                event.setSpawnCancelled(true);
+            if (!BiomeSpawnConfig.isSpawnLightAllowed(level, entityType, pos, event.spawnType())) {
+                event.cancelSpawn();
                 return;
             }
 
             if (BiomeSpawnConfig.hasCustomSpawnDistance(entityType)
-                    && !isDistanceAllowed(level, pos, entityType)) {
-                event.setSpawnCancelled(true);
+                    && isDistanceDisallowed(level, pos, entityType)) {
+                event.cancelSpawn();
             }
         }
     }
 
-    private static boolean isDistanceAllowed(
-            ServerLevel level,
-            BlockPos pos,
-            EntityType<?> entityType
-    ) {
+    private static boolean isDistanceDisallowed(ServerLevel level, BlockPos pos, EntityType<?> entityType) {
         Player nearestPlayer = level.getNearestPlayer(
                 pos.getX() + 0.5D,
                 pos.getY() + 0.5D,
@@ -129,13 +121,13 @@ public class GlobalSpawnControlHandler {
                 -1.0D,
                 false
         );
-        if (nearestPlayer == null) return true;
+        if (nearestPlayer == null) return false;
 
         double squaredDistance = nearestPlayer.distanceToSqr(
                 pos.getX() + 0.5D,
                 pos.getY() + 0.5D,
                 pos.getZ() + 0.5D
         );
-        return BiomeSpawnConfig.isSpawnDistanceAllowed(entityType, squaredDistance);
+        return !BiomeSpawnConfig.isSpawnDistanceAllowed(entityType, squaredDistance);
     }
 }

@@ -4,6 +4,10 @@ import dev.xyat.entitycontrol.dummy.DummyModule;
 import dev.xyat.entitycontrol.dummy.Network.DummyNetwork;
 import dev.xyat.entitycontrol.dummy.config.DummyConfig;
 import dev.xyat.entitycontrol.dummy.entity.DummyEntityTest;
+import dev.xyat.kineticcore.api.entity.event.KineticLivingEvents;
+import dev.xyat.kineticcore.api.event.KineticEventPriority;
+import dev.xyat.kineticcore.api.server.event.KineticServerEvents;
+import dev.xyat.kineticcore.api.world.event.KineticWorldEvents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
@@ -12,17 +16,6 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.EntityJoinLevelEvent;
-import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.event.entity.living.LivingDropsEvent;
-import net.minecraftforge.event.entity.living.LivingExperienceDropEvent;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -32,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-@Mod.EventBusSubscriber(modid = DummyModule.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class GlobalDamageHandler {
 
     private static final Map<ServerPlayer, CombatSession> sessions = new WeakHashMap<>();
@@ -40,6 +32,22 @@ public class GlobalDamageHandler {
     private static final Map<DummySyncKey, PendingDummySync> pendingDummySyncs = new HashMap<>();
     private static final Map<DirectSyncKey, PendingDirectSync> pendingDirectSyncs = new HashMap<>();
     private static int ticksSinceSyncFlush;
+    private static boolean registered;
+
+    public static synchronized void register() {
+        if (registered) {
+            return;
+        }
+        KineticLivingEvents.onDamage(KineticEventPriority.LOWEST, GlobalDamageHandler::onLivingDamage);
+        KineticServerEvents.onTick(KineticEventPriority.NORMAL, KineticServerEvents.TickPhase.END, server -> onServerTick());
+        KineticServerEvents.onStopped(KineticEventPriority.NORMAL, server -> onServerStopped());
+        KineticLivingEvents.onDeath(KineticEventPriority.NORMAL, false, GlobalDamageHandler::onLivingDeathSummary);
+        KineticLivingEvents.onDrops(KineticEventPriority.HIGHEST, GlobalDamageHandler::onLivingDrops);
+        KineticLivingEvents.onExperienceDrop(KineticEventPriority.HIGHEST, GlobalDamageHandler::onLivingExperienceDrop);
+        KineticWorldEvents.onEntityJoin(KineticEventPriority.HIGHEST, GlobalDamageHandler::onEntityJoinLevel);
+        KineticWorldEvents.onEntityLeave(KineticEventPriority.NORMAL, GlobalDamageHandler::onEntityLeaveLevel);
+        registered = true;
+    }
 
     private static class CombatSession {
         int targetId;
@@ -220,14 +228,13 @@ public class GlobalDamageHandler {
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(LivingDamageEvent event) {
+    public static void onLivingDamage(KineticLivingEvents.DamageContext event) {
         try {
-            if (event.getEntity().level().isClientSide) return;
+            if (event.entity().level().isClientSide) return;
 
-            LivingEntity target = event.getEntity();
-            DamageSource source = event.getSource();
-            float originalAmount = event.getAmount();
+            LivingEntity target = event.entity();
+            DamageSource source = event.source();
+            float originalAmount = event.amount();
             if (originalAmount <= 0f) return;
 
             Entity attacker = source.getEntity();
@@ -257,10 +264,7 @@ public class GlobalDamageHandler {
         }
     }
 
-    @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
-
+    public static void onServerTick() {
         try {
             int interval = Math.max(1, DummyConfig.dummySyncIntervalTicks.get());
             if (++ticksSinceSyncFlush < interval) {
@@ -275,8 +279,7 @@ public class GlobalDamageHandler {
         }
     }
 
-    @SubscribeEvent
-    public static void onServerStopped(ServerStoppedEvent event) {
+    public static void onServerStopped() {
         sessions.clear();
         dummyStats.clear();
         pendingDummySyncs.clear();
@@ -422,12 +425,11 @@ public class GlobalDamageHandler {
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.NORMAL)
-    public static void onLivingDeathSummary(LivingDeathEvent event) {
+    public static void onLivingDeathSummary(KineticLivingEvents.DeathContext event) {
         try {
-            if (event.getEntity().level().isClientSide || event.isCanceled()) return;
+            if (event.entity().level().isClientSide || event.cancelled()) return;
 
-            LivingEntity target = event.getEntity();
+            LivingEntity target = event.entity();
             long now = target.level().getGameTime();
 
             for (Map.Entry<ServerPlayer, CombatSession> entry : sessions.entrySet()) {
@@ -448,39 +450,35 @@ public class GlobalDamageHandler {
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDrops(LivingDropsEvent event) {
-        if (event.getEntity() instanceof DummyEntityTest) {
-            event.setCanceled(true);
-            event.getDrops().clear();
+    public static void onLivingDrops(KineticLivingEvents.DropsContext event) {
+        if (event.entity() instanceof DummyEntityTest) {
+            event.cancel();
+            event.drops().clear();
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingExperienceDrop(LivingExperienceDropEvent event) {
-        if (event.getEntity() instanceof DummyEntityTest) {
-            event.setCanceled(true);
-            event.setDroppedExperience(0);
+    public static void onLivingExperienceDrop(KineticLivingEvents.ExperienceDropContext event) {
+        if (event.entity() instanceof DummyEntityTest) {
+            event.cancel();
+            event.droppedExperience(0);
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
-        if (event.getLevel().isClientSide()) return;
+    public static void onEntityJoinLevel(KineticWorldEvents.EntityJoinContext event) {
+        if (event.level().isClientSide()) return;
 
-        if (event.getEntity() instanceof ItemEntity itemEntity) {
+        if (event.entity() instanceof ItemEntity itemEntity) {
             ItemStack droppedStack = itemEntity.getItem();
             if (!droppedStack.isEmpty() && droppedStack.hasTag() && droppedStack.getTag() != null && droppedStack.getTag().getBoolean("KTDummyItem")) {
-                event.setCanceled(true);
+                event.cancel();
                 itemEntity.discard();
             }
         }
     }
 
-    @SubscribeEvent
-    public static void onEntityLeaveLevel(EntityLeaveLevelEvent event) {
-        if (!event.getLevel().isClientSide() && event.getEntity() instanceof DummyEntityTest) {
-            int entityId = event.getEntity().getId();
+    public static void onEntityLeaveLevel(Entity entity, net.minecraft.world.level.LevelAccessor level) {
+        if (!level.isClientSide() && entity instanceof DummyEntityTest) {
+            int entityId = entity.getId();
             dummyStats.remove(entityId);
             pendingDummySyncs.entrySet().removeIf(entry -> entry.getKey().dummyId() == entityId);
         }

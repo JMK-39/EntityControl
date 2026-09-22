@@ -1,20 +1,23 @@
 package dev.xyat.entitycontrol.spawn.client.gui;
 
 import net.minecraft.ChatFormatting;
-import dev.xyat.kineticcore.api.client.overlay.GuiOverlay;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.GridScrollController;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.NumericEditBox;
+import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
+import dev.xyat.kineticcore.api.client.theme.GuiTheme;
+import dev.xyat.kineticcore.api.client.widget.KineticWidgets;
+import dev.xyat.kineticcore.api.client.widget.button.KineticButtons.StateButton;
+import dev.xyat.kineticcore.api.client.widget.input.KineticNumericFields.NumericEditBox;
+import dev.xyat.kineticcore.api.client.widget.input.KineticTextFields.KineticEditBox;
+import dev.xyat.kineticcore.api.client.widget.scroll.KineticScroll.GridScrollController;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import dev.xyat.entitycontrol.spawn.config.BiomeSpawnConfig;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -33,6 +36,8 @@ public class RuleTabModule implements ITabModule {
     private final SpawnControlScreen s;
     private final List<String> knownDimensions = new ArrayList<>();
     private final GridScrollController dimensionScroll = new GridScrollController();
+    private final Map<String, StateButton> whitelistButtons = new HashMap<>();
+    private final Map<String, StateButton> blacklistButtons = new HashMap<>();
 
     private NumericEditBox boxMinDist;
     private NumericEditBox boxMaxDist;
@@ -40,26 +45,23 @@ public class RuleTabModule implements ITabModule {
     private NumericEditBox boxMaxHeight;
     private NumericEditBox boxMinLight;
     private NumericEditBox boxMaxLight;
-    private EditBox boxRules;
-    private Button btnEnableControl;
-    private Button btnBlockAll;
-    private Button btnInvertRules;
-    private Button btnCategory;
+    private KineticEditBox boxRules;
+    private StateButton btnEnableControl;
+    private StateButton btnBlockAll;
+    private StateButton btnInvertRules;
+    private StateButton btnCategory;
 
     private boolean isUpdating;
-    private boolean showCategoryMenu;
 
     private final int listY = 215;
     private final int listH = SpawnControlScreen.V_HEIGHT - 225;
 
     public RuleTabModule(SpawnControlScreen s) {
         this.s = s;
-        if (Minecraft.getInstance().getConnection() != null) {
-            Minecraft.getInstance().getConnection().levels().forEach(
-                    key -> knownDimensions.add(key.location().toString())
-            );
-            knownDimensions.sort(String::compareTo);
-        }
+        KineticClientRuntime.knownLevels().forEach(
+                key -> knownDimensions.add(key.location().toString())
+        );
+        knownDimensions.sort(String::compareTo);
     }
 
     @Override
@@ -70,116 +72,104 @@ public class RuleTabModule implements ITabModule {
         int row3Y = 141;
         int row4Y = 166;
 
-        boxMinDist = s.addTabWidget(NumericEditBox.integer(
-                s.getFont(), s.rx + 47, row1Y, 50, 20,
-                Component.empty(), false, 0, 128
-        ));
+        boxMinDist = s.addIntegerField(
+                s.rx + 47, row1Y, 50, Component.empty(),
+                false, 0, 128, null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.min_dist")
+        );
         boxMinDist.setMaxLength(3);
-        boxMinDist.setTooltip(Tooltip.create(Component.translatable(
-                "gui.entitycontrol.spawn.spawn.tooltip.min_dist"
-        )));
         boxMinDist.setResponder(this::updateMinDistance);
 
-        boxMaxDist = s.addTabWidget(NumericEditBox.integer(
-                s.getFont(), s.rx + sectionWidth + 47, row1Y, 50, 20,
-                Component.empty(), false, 0, 128
-        ));
+        boxMaxDist = s.addIntegerField(
+                s.rx + sectionWidth + 47, row1Y, 50, Component.empty(),
+                false, 0, 128, null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.max_dist")
+        );
         boxMaxDist.setMaxLength(3);
-        boxMaxDist.setTooltip(Tooltip.create(Component.translatable(
-                "gui.entitycontrol.spawn.spawn.tooltip.max_dist"
-        )));
         boxMaxDist.setResponder(this::updateMaxDistance);
 
         int rulesX = s.rx + sectionWidth * 2 + 42;
-        boxRules = s.addTabWidget(new EditBox(
-                s.getFont(), rulesX, row1Y,
-                Math.max(45, s.rx + s.rw - rulesX), 20,
-                Component.empty()
-        ));
+        boxRules = s.addTextField(
+                rulesX, row1Y, Math.max(45, s.rx + s.rw - rulesX), Component.empty(),
+                null, null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.rules")
+        );
         boxRules.setMaxLength(20);
-        boxRules.setTooltip(Tooltip.create(Component.translatable(
-                "gui.entitycontrol.spawn.spawn.tooltip.rules"
-        )));
         boxRules.setResponder(this::updateRules);
 
-        boxMinHeight = s.addTabWidget(NumericEditBox.integer(
-                s.getFont(), s.rx + 47, row2Y, 50, 20,
-                Component.empty(), true, null, null
-        ));
+        boxMinHeight = s.addIntegerField(
+                s.rx + 47, row2Y, 50, Component.empty(),
+                true, null, null, null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.min_height")
+        );
         boxMinHeight.setMaxLength(11);
-        boxMinHeight.setTooltip(Tooltip.create(Component.translatable(
-                "gui.entitycontrol.spawn.spawn.tooltip.min_height"
-        )));
         boxMinHeight.setResponder(value -> updateHeight(value, true));
 
-        boxMaxHeight = s.addTabWidget(NumericEditBox.integer(
-                s.getFont(), s.rx + sectionWidth + 47, row2Y, 50, 20,
-                Component.empty(), true, null, null
-        ));
+        boxMaxHeight = s.addIntegerField(
+                s.rx + sectionWidth + 47, row2Y, 50, Component.empty(),
+                true, null, null, null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.max_height")
+        );
         boxMaxHeight.setMaxLength(11);
-        boxMaxHeight.setTooltip(Tooltip.create(Component.translatable(
-                "gui.entitycontrol.spawn.spawn.tooltip.max_height"
-        )));
         boxMaxHeight.setResponder(value -> updateHeight(value, false));
 
-        btnCategory = s.addTabWidget(Button.builder(
-                        Component.empty(),
-                        button -> showCategoryMenu = !showCategoryMenu
-                )
-                .bounds(
-                        s.rx + (sectionWidth + 5) * 2,
-                        row2Y,
-                        sectionWidth,
-                        20
-                )
-                .tooltip(Tooltip.create(Component.translatable(
-                        "gui.entitycontrol.spawn.spawn.tooltip.category"
-                )))
-                .build());
+        btnCategory = s.addButton(
+                s.rx + (sectionWidth + 5) * 2,
+                row2Y,
+                sectionWidth,
+                Component.empty(),
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.category"),
+                this::openCategoryMenu
+        );
 
-        boxMinLight = s.addTabWidget(NumericEditBox.integer(
-                s.getFont(), s.rx + 47, row3Y, 50, 20,
-                Component.empty(), true, 0, 15
-        ));
+        boxMinLight = s.addIntegerField(
+                s.rx + 47, row3Y, 50, Component.empty(),
+                false, 0, 15, null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.min_light")
+        );
         boxMinLight.setMaxLength(2);
-        boxMinLight.setTooltip(Tooltip.create(Component.translatable(
-                "gui.entitycontrol.spawn.spawn.tooltip.min_light"
-        )));
         boxMinLight.setResponder(value -> updateLight(value, true));
 
-        boxMaxLight = s.addTabWidget(NumericEditBox.integer(
-                s.getFont(), s.rx + sectionWidth + 47, row3Y, 50, 20,
-                Component.empty(), true, 0, 15
-        ));
+        boxMaxLight = s.addIntegerField(
+                s.rx + sectionWidth + 47, row3Y, 50, Component.empty(),
+                false, 0, 15, null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.max_light")
+        );
         boxMaxLight.setMaxLength(2);
-        boxMaxLight.setTooltip(Tooltip.create(Component.translatable(
-                "gui.entitycontrol.spawn.spawn.tooltip.max_light"
-        )));
         boxMaxLight.setResponder(value -> updateLight(value, false));
 
-        btnEnableControl = s.addTabWidget(Button.builder(Component.empty(), button -> {
-            BiomeSpawnConfig.EntityNode node = selectedNode();
-            if (node == null) return;
-            node.enable_control = !node.enable_control;
-            s.markSelectedEntityEdited();
-            updateBtnState(node);
-        }).bounds(s.rx, row4Y, sectionWidth, 20).build());
+        btnEnableControl = s.addButton(
+                s.rx, row4Y, sectionWidth, Component.empty(), null,
+                () -> {
+                    BiomeSpawnConfig.EntityNode node = selectedNode();
+                    if (node == null) return;
+                    node.enable_control = !node.enable_control;
+                    s.markSelectedEntityEdited();
+                    updateBtnState(node);
+                }
+        );
 
-        btnBlockAll = s.addTabWidget(Button.builder(Component.empty(), button -> {
-            BiomeSpawnConfig.EntityNode node = selectedNode();
-            if (node == null) return;
-            node.block_all = !node.block_all;
-            s.markSelectedEntityEdited();
-            updateBtnState(node);
-        }).bounds(s.rx + sectionWidth + 5, row4Y, sectionWidth, 20).build());
+        btnBlockAll = s.addButton(
+                s.rx + sectionWidth + 5, row4Y, sectionWidth, Component.empty(), null,
+                () -> {
+                    BiomeSpawnConfig.EntityNode node = selectedNode();
+                    if (node == null) return;
+                    node.block_all = !node.block_all;
+                    s.markSelectedEntityEdited();
+                    updateBtnState(node);
+                }
+        );
 
-        btnInvertRules = s.addTabWidget(Button.builder(Component.empty(), button -> {
-            BiomeSpawnConfig.EntityNode node = selectedNode();
-            if (node == null) return;
-            node.invert_rules = !node.invert_rules;
-            s.markSelectedEntityEdited();
-            updateBtnState(node);
-        }).bounds(s.rx + (sectionWidth + 5) * 2, row4Y, sectionWidth, 20).build());
+        btnInvertRules = s.addButton(
+                s.rx + (sectionWidth + 5) * 2, row4Y, sectionWidth, Component.empty(), null,
+                () -> {
+                    BiomeSpawnConfig.EntityNode node = selectedNode();
+                    if (node == null) return;
+                    node.invert_rules = !node.invert_rules;
+                    s.markSelectedEntityEdited();
+                    updateBtnState(node);
+                }
+        );
     }
 
     private BiomeSpawnConfig.EntityNode selectedNode() {
@@ -371,7 +361,7 @@ public class RuleTabModule implements ITabModule {
     }
 
     private void showInvalidNumber() {
-        GuiOverlay.toast(Component.translatable(
+        KineticOverlays.toast(Component.translatable(
                 "msg.entitycontrol.spawn.invalid_number"
         ));
     }
@@ -384,45 +374,45 @@ public class RuleTabModule implements ITabModule {
                         ? "gui.entitycontrol.spawn.spawn.status.active.colored"
                         : "gui.entitycontrol.spawn.spawn.status.ignored.colored"
         ).withStyle(node.enable_control ? ChatFormatting.GREEN : ChatFormatting.RED);
-        btnEnableControl.setMessage(
+        btnEnableControl.setText(
                 Component.translatable("gui.entitycontrol.spawn.spawn.enabled.short")
                         .append(": ")
                         .append(enabledText)
         );
-        btnEnableControl.setTooltip(Tooltip.create(Component.translatable(
+        s.registerWidgetTooltip(btnEnableControl, Component.translatable(
                 "gui.entitycontrol.spawn.spawn.tooltip.enable",
                 enabledText
-        )));
+        ));
 
         Component blockText = Component.translatable(
                 node.block_all
                         ? "gui.entitycontrol.spawn.spawn.status.yes.colored"
                         : "gui.entitycontrol.spawn.spawn.status.no.colored"
         ).withStyle(node.block_all ? ChatFormatting.RED : ChatFormatting.GREEN);
-        btnBlockAll.setMessage(
+        btnBlockAll.setText(
                 Component.translatable("gui.entitycontrol.spawn.spawn.block.short")
                         .append(": ")
                         .append(blockText)
         );
-        btnBlockAll.setTooltip(Tooltip.create(Component.translatable(
+        s.registerWidgetTooltip(btnBlockAll, Component.translatable(
                 "gui.entitycontrol.spawn.spawn.tooltip.block",
                 blockText
-        )));
+        ));
 
         Component invertText = Component.translatable(
                 node.invert_rules
                         ? "gui.entitycontrol.spawn.spawn.status.blacklist.colored"
                         : "gui.entitycontrol.spawn.spawn.status.whitelist.colored"
         ).withStyle(node.invert_rules ? ChatFormatting.RED : ChatFormatting.GREEN);
-        btnInvertRules.setMessage(
+        btnInvertRules.setText(
                 Component.translatable("gui.entitycontrol.spawn.spawn.invert.short")
                         .append(": ")
                         .append(invertText)
         );
-        btnInvertRules.setTooltip(Tooltip.create(Component.translatable(
+        s.registerWidgetTooltip(btnInvertRules, Component.translatable(
                 "gui.entitycontrol.spawn.spawn.tooltip.invert",
                 invertText
-        )));
+        ));
     }
 
     @Override
@@ -446,7 +436,7 @@ public class RuleTabModule implements ITabModule {
         boxMaxLight.setValue(node.max_spawn_light == null
                 ? ""
                 : Integer.toString(node.max_spawn_light));
-        btnCategory.setMessage(
+        btnCategory.setText(
                 Component.translatable("gui.entitycontrol.spawn.spawn.category.cycle")
                         .append(": ")
                         .append(s.getTranslatedCategoryName(node.category))
@@ -459,30 +449,90 @@ public class RuleTabModule implements ITabModule {
     @Override
     public void setVisible(boolean visible) {
         boolean active = visible && s.selectedId != null;
-        boxMinDist.visible = active;
-        boxMaxDist.visible = active;
-        boxMinHeight.visible = active;
-        boxMaxHeight.visible = active;
-        boxMinLight.visible = active;
-        boxMaxLight.visible = active;
-        boxRules.visible = active;
-        btnCategory.visible = active;
-        btnEnableControl.visible = active;
-        btnBlockAll.visible = active;
-        btnInvertRules.visible = active;
+        boxMinDist.setVisible(active);
+        boxMaxDist.setVisible(active);
+        boxMinHeight.setVisible(active);
+        boxMaxHeight.setVisible(active);
+        boxMinLight.setVisible(active);
+        boxMaxLight.setVisible(active);
+        boxRules.setVisible(active);
+        btnCategory.setVisible(active);
+        btnEnableControl.setVisible(active);
+        btnBlockAll.setVisible(active);
+        btnInvertRules.setVisible(active);
     }
 
-    @Override
-    public boolean isMenuOpen(double mx, double my) {
-        if (!showCategoryMenu) return false;
-        int panelWidth = 120;
-        int panelHeight = CATEGORIES.length * 20;
-        int panelX = btnCategory.getX() + (btnCategory.getWidth() - panelWidth) / 2;
-        int panelY = btnCategory.getY() + 22;
-        return mx >= panelX
-                && mx <= panelX + panelWidth
-                && my >= panelY
-                && my <= panelY + panelHeight;
+    private void openCategoryMenu() {
+        BiomeSpawnConfig.EntityNode node = selectedNode();
+        if (node == null) return;
+        List<KineticOverlays.MenuItem> items = new ArrayList<>();
+        for (String category : CATEGORIES) {
+            items.add(KineticOverlays.MenuItem.toggle(
+                    Component.translatable("gui.entitycontrol.spawn.spawn.category." + category),
+                    Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.category"),
+                    category.equals(node.category),
+                    () -> selectCategory(category)
+            ));
+        }
+        s.openContextMenu(
+                btnCategory.getX(),
+                btnCategory.getY() + btnCategory.getHeight(),
+                items
+        );
+    }
+
+    private void selectCategory(String category) {
+        BiomeSpawnConfig.EntityNode node = selectedNode();
+        if (node == null || category.equals(node.category)) return;
+        node.category = category;
+        s.markSelectedEntityEdited();
+        s.refreshSelectedEntitySearchData();
+        btnCategory.setText(
+                Component.translatable("gui.entitycontrol.spawn.spawn.category.cycle")
+                        .append(": ")
+                        .append(s.getTranslatedCategoryName(category))
+        );
+    }
+
+    private StateButton dimensionButton(String dimension, boolean whitelist, int x, int y) {
+        Map<String, StateButton> buttons = whitelist ? whitelistButtons : blacklistButtons;
+        StateButton button = buttons.computeIfAbsent(dimension, id -> KineticWidgets.createCompactButton(
+                0,
+                0,
+                18,
+                Component.translatable(whitelist
+                        ? "gui.entitycontrol.spawn.spawn.dim_whitelist_mark"
+                        : "gui.entitycontrol.spawn.spawn.dim_blacklist_mark"),
+                Component.translatable(whitelist
+                        ? "gui.entitycontrol.spawn.spawn.tooltip.dim_w"
+                        : "gui.entitycontrol.spawn.spawn.tooltip.dim_b"),
+                () -> toggleDimension(id, whitelist)
+        ));
+        button.setX(x);
+        button.setY(y);
+        button.setWidth(18);
+        button.setClipBounds(s.rx, listY, s.rx + s.rw, listY + listH);
+        BiomeSpawnConfig.EntityNode node = selectedNode();
+        boolean active = node != null && (whitelist
+                ? node.dim_whitelist.contains(dimension)
+                : node.dim_blacklist.contains(dimension));
+        button.setSelected(whitelist && active);
+        button.setError(!whitelist && active);
+        return button;
+    }
+
+    private void toggleDimension(String dimension, boolean whitelist) {
+        BiomeSpawnConfig.EntityNode node = selectedNode();
+        if (node == null) return;
+        List<String> target = whitelist ? node.dim_whitelist : node.dim_blacklist;
+        List<String> opposite = whitelist ? node.dim_blacklist : node.dim_whitelist;
+        if (target.contains(dimension)) {
+            target.remove(dimension);
+        } else {
+            target.add(dimension);
+            opposite.remove(dimension);
+        }
+        s.markSelectedEntityEdited();
     }
 
     @Override
@@ -549,8 +599,7 @@ public class RuleTabModule implements ITabModule {
                 0xAAAAAA
         );
 
-        g.fill(s.rx, listY, s.rx + s.rw, listY + listH, 0xFF111111);
-        g.renderOutline(s.rx, listY, s.rw, listH, 0xFF333333);
+        GuiTheme.panelAlt(g, s.rx, listY, s.rw, listH);
 
         int visibleRows = listH / 18;
         dimensionScroll.update(knownDimensions.size(), visibleRows);
@@ -558,54 +607,38 @@ public class RuleTabModule implements ITabModule {
         int shift = dimensionScroll.visualShift(18);
         int end = Math.min(start + visibleRows + 1, knownDimensions.size());
 
-        s.enableCanvasScissor(g, s.rx, listY, s.rx + s.rw, listY + listH);
+        s.enableUiScissor(g, s.rx, listY, s.rx + s.rw, listY + listH);
         for (int i = start; i < end; i++) {
             String dimension = knownDimensions.get(i);
             int rowY = listY + (i - start) * 18 - shift;
-            boolean inWhitelist = node.dim_whitelist.contains(dimension);
-            boolean inBlacklist = node.dim_blacklist.contains(dimension);
-
-            g.fill(
-                    s.rx + 1,
-                    rowY,
-                    s.rx + s.rw - 1,
-                    rowY + 18,
-                    (i % 2 == 0) ? 0xFF2C2C2C : 0xFF181818
-            );
-            if (mx >= s.rx
+            boolean hovered = mx >= s.rx
                     && mx < s.rx + s.rw
                     && my >= rowY
-                    && my < rowY + 18) {
-                g.fill(s.rx + 1, rowY, s.rx + s.rw - 1, rowY + 18, 0x33FFFFFF);
-            }
+                    && my < rowY + 18;
+            GuiTheme.stateSurface(
+                    g,
+                    s.rx + 1,
+                    rowY,
+                    s.rw - 2,
+                    18,
+                    i % 2 == 0 ? GuiTheme.Surface.PANEL_ALT : GuiTheme.Surface.PANEL,
+                    false,
+                    hovered,
+                    false
+            );
 
             g.drawString(s.getFont(), dimension, s.rx + 5, rowY + 5, 0xFFAA00);
 
             int whitelistX = s.rx + s.rw - 45;
             int blacklistX = s.rx + s.rw - 20;
 
-            g.fill(
-                    whitelistX,
-                    rowY + 2,
-                    whitelistX + 18,
-                    rowY + 16,
-                    inWhitelist ? 0xFF00AA00 : 0xFF444444
-            );
-            g.renderOutline(whitelistX, rowY + 2, 18, 14, 0xFF222222);
-            g.drawCenteredString(s.getFont(), "W", whitelistX + 9, rowY + 5, 0xFFFFFF);
-
-            g.fill(
-                    blacklistX,
-                    rowY + 2,
-                    blacklistX + 18,
-                    rowY + 16,
-                    inBlacklist ? 0xFFAA0000 : 0xFF444444
-            );
-            g.renderOutline(blacklistX, rowY + 2, 18, 14, 0xFF222222);
-            g.drawCenteredString(s.getFont(), "B", blacklistX + 9, rowY + 5, 0xFFFFFF);
+            StateButton whitelistButton = dimensionButton(dimension, true, whitelistX, rowY + 1);
+            StateButton blacklistButton = dimensionButton(dimension, false, blacklistX, rowY + 1);
+            KineticWidgets.renderControl(whitelistButton, g, mx, my, pt);
+            KineticWidgets.renderControl(blacklistButton, g, mx, my, pt);
         }
 
-        g.disableScissor();
+        s.disableUiScissor(g);
         dimensionScroll.render(
                 g,
                 mx,
@@ -616,55 +649,11 @@ public class RuleTabModule implements ITabModule {
                 listH,
                 15
         );
-
-        if (showCategoryMenu) {
-            g.pose().pushPose();
-            g.pose().translate(0, 0, 500);
-
-            int panelWidth = 120;
-            int panelHeight = CATEGORIES.length * 20;
-            int panelX = btnCategory.getX() + (btnCategory.getWidth() - panelWidth) / 2;
-            int panelY = btnCategory.getY() + 22;
-
-            g.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, 0xFF1C1C1C);
-            g.renderOutline(panelX, panelY, panelWidth, panelHeight, 0xFFAA00);
-
-            for (int i = 0; i < CATEGORIES.length; i++) {
-                String category = CATEGORIES[i];
-                int itemY = panelY + i * 20;
-                boolean hover = mx >= panelX
-                        && mx <= panelX + panelWidth
-                        && my >= itemY
-                        && my < itemY + 20;
-                int background = hover ? 0xFF555555 : 0xFF1C1C1C;
-                if (category.equals(node.category)) {
-                    background = 0xFF22AA22;
-                }
-
-                g.fill(
-                        panelX + 1,
-                        itemY + 1,
-                        panelX + panelWidth - 1,
-                        itemY + 19,
-                        background
-                );
-                g.drawCenteredString(
-                        s.getFont(),
-                        s.getTranslatedCategoryName(category),
-                        panelX + panelWidth / 2,
-                        itemY + 6,
-                        0xFFFFFF
-                );
-            }
-
-            g.pose().popPose();
-        }
     }
 
     @Override
     public List<Component> getTooltip(int vMx, int vMy) {
         if (s.selectedId == null) return null;
-        if (isMenuOpen(vMx, vMy)) return Collections.emptyList();
 
         if (vMx >= s.rx
                 && vMx < s.rx + s.rw
@@ -704,56 +693,6 @@ public class RuleTabModule implements ITabModule {
     public boolean mouseClicked(double mx, double my, int btn) {
         if (s.selectedId == null) return false;
 
-        if (showCategoryMenu) {
-            int panelWidth = 120;
-            int panelHeight = CATEGORIES.length * 20;
-            int panelX = btnCategory.getX() + (btnCategory.getWidth() - panelWidth) / 2;
-            int panelY = btnCategory.getY() + 22;
-
-            if (mx >= btnCategory.getX()
-                    && mx <= btnCategory.getX() + btnCategory.getWidth()
-                    && my >= btnCategory.getY()
-                    && my <= btnCategory.getY() + btnCategory.getHeight()) {
-                return false;
-            }
-
-            if (mx < panelX
-                    || mx > panelX + panelWidth
-                    || my < panelY
-                    || my > panelY + panelHeight) {
-                showCategoryMenu = false;
-                return true;
-            }
-
-            for (int i = 0; i < CATEGORIES.length; i++) {
-                int itemY = panelY + i * 20;
-                if (mx >= panelX
-                        && mx <= panelX + panelWidth
-                        && my >= itemY
-                        && my < itemY + 20) {
-                    BiomeSpawnConfig.EntityNode node = selectedNode();
-                    if (node == null) return true;
-
-                    String category = CATEGORIES[i];
-                    if (!category.equals(node.category)) {
-                        node.category = category;
-                        s.markSelectedEntityEdited();
-                        s.refreshSelectedEntitySearchData();
-                    }
-
-                    btnCategory.setMessage(
-                            Component.translatable("gui.entitycontrol.spawn.spawn.category.cycle")
-                                    .append(": ")
-                                    .append(s.getTranslatedCategoryName(category))
-                    );
-                    showCategoryMenu = false;
-                    return true;
-                }
-            }
-
-            return true;
-        }
-
         if (mx >= s.rx
                 && mx < s.rx + s.rw
                 && my >= listY
@@ -767,33 +706,15 @@ public class RuleTabModule implements ITabModule {
                 BiomeSpawnConfig.EntityNode node = selectedNode();
                 if (node == null) return false;
 
-                double rowY = listY + clickedRow * 18 - shift;
-                double relativeY = my - rowY;
-                if (relativeY >= 2 && relativeY <= 16) {
-                    if (mx >= s.rx + s.rw - 45
-                            && mx <= s.rx + s.rw - 27) {
-                        if (node.dim_whitelist.contains(dimension)) {
-                            node.dim_whitelist.remove(dimension);
-                        } else {
-                            node.dim_whitelist.add(dimension);
-                            node.dim_blacklist.remove(dimension);
-                        }
-                        s.markSelectedEntityEdited();
-                        return true;
-                    }
-
-                    if (mx >= s.rx + s.rw - 20
-                            && mx <= s.rx + s.rw - 2) {
-                        if (node.dim_blacklist.contains(dimension)) {
-                            node.dim_blacklist.remove(dimension);
-                        } else {
-                            node.dim_blacklist.add(dimension);
-                            node.dim_whitelist.remove(dimension);
-                        }
-                        s.markSelectedEntityEdited();
-                        return true;
-                    }
-                }
+                int rowY = listY + clickedRow * 18 - shift;
+                StateButton whitelistButton = dimensionButton(
+                        dimension, true, s.rx + s.rw - 45, rowY + 1
+                );
+                if (whitelistButton.mouseClicked(mx, my, btn)) return true;
+                StateButton blacklistButton = dimensionButton(
+                        dimension, false, s.rx + s.rw - 20, rowY + 1
+                );
+                if (blacklistButton.mouseClicked(mx, my, btn)) return true;
             }
         }
 

@@ -1,13 +1,20 @@
 package dev.xyat.entitycontrol.modifier.client.gui;
 
 import net.minecraft.ChatFormatting;
+import dev.xyat.kineticcore.api.client.input.KineticMouseButtons;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import dev.xyat.kineticcore.api.client.search.KineticSearch;
 import dev.xyat.kineticcore.api.client.theme.GuiTheme;
-import dev.xyat.kineticcore.api.client.overlay.GuiOverlay;
+import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
 import dev.xyat.kineticcore.api.client.screen.KineticScreen;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.EntityPreviewRenderer;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.EditedEntryTracker;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.GridScrollController;
+import dev.xyat.kineticcore.api.client.widget.KineticWidgets;
+import dev.xyat.kineticcore.api.client.widget.button.KineticButtons.StateButton;
+import dev.xyat.kineticcore.api.client.widget.input.KineticTextFields.KineticEditBox;
+import dev.xyat.kineticcore.api.client.widget.render.KineticEntityPreview.EntityPreviewRenderer;
+import dev.xyat.kineticcore.api.client.widget.scroll.KineticScroll.GridScrollController;
+import dev.xyat.kineticcore.api.client.widget.state.EditedEntryTracker;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import dev.xyat.entitycontrol.modifier.client.gui.panel.AttributePanel;
 import dev.xyat.entitycontrol.modifier.client.gui.panel.BuffPanel;
 import dev.xyat.entitycontrol.modifier.client.gui.panel.IModifierPanel;
@@ -15,14 +22,11 @@ import dev.xyat.entitycontrol.modifier.config.EntityModifierConfig;
 import dev.xyat.entitycontrol.modifier.network.EntityModifierNetwork;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
-import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -57,10 +61,11 @@ public class EntityModifierScreen extends KineticScreen {
             new GridScrollController();
 
     private final EntityPreviewRenderer entityPreviewRenderer =
-            new EntityPreviewRenderer();
+            KineticWidgets.createEntityPreviewRenderer();
 
     private EntityGuiInfo selectedEntity;
-    private EditBox searchBox;
+    private KineticEditBox searchBox;
+    private List<Component> deferredEntityTooltip;
 
     private int gridCols;
     private int gridRowsVisible;
@@ -74,15 +79,26 @@ public class EntityModifierScreen extends KineticScreen {
     private IModifierPanel currentPanel;
     private int savedActiveIdx;
 
-    private Button saveBtn;
-    private Button resetBtn;
-    private Button attrTabBtn;
-    private Button buffTabBtn;
+    private StateButton saveBtn;
+    private StateButton resetBtn;
+    private StateButton attrTabBtn;
+    private StateButton buffTabBtn;
+    private StateButton globalExpandButton;
+    private boolean globalMode;
+    private String entityQuery = "";
+    private String selectedGlobalAttribute;
+    private String selectedIndividualAttribute;
+    private int individualPanelIdx;
 
     public EntityModifierScreen(String serverSnapshotJson) {
+        this(null, serverSnapshotJson);
+    }
+
+    public EntityModifierScreen(Screen parent, String serverSnapshotJson) {
         super(Component.translatable(
                 "gui.entitycontrol.modifier.modifier.title"
         ));
+        setParentScreen(parent);
 
         Map<String, EntityModifierConfig.EntityEditData> snapshot =
                 EntityModifierConfig.GSON.fromJson(
@@ -162,7 +178,7 @@ public class EntityModifierScreen extends KineticScreen {
         editedEntities.refresh(allEntities, this::isTrulyModified);
         entityModel.refresh(searchBox == null ? "" : searchBox.getValue());
         updateGridScrollRange();
-        if (minecraft != null) rebuildWidgets();
+        rebuildUi();
     }
 
     public Map<String, EntityModifierConfig.EntityEditData> getLocalData() {
@@ -173,9 +189,6 @@ public class EntityModifierScreen extends KineticScreen {
         return font;
     }
 
-    public <T extends AbstractWidget> void addPanelWidget(T widget) {
-        addRenderableWidget(widget);
-    }
 
     private String buildSearchData(EntityGuiInfo info) {
         return info.id().toLowerCase()
@@ -195,18 +208,16 @@ public class EntityModifierScreen extends KineticScreen {
         EntityModifierConfig.EntityEditData data =
                 localData.get(info.id());
 
-        if (!data.buffs.isEmpty()) {
+        if (!data.buffs.isEmpty() || !data.attributeRules.isEmpty()) {
             return true;
         }
 
         for (Map.Entry<String, Double> entry
                 : data.attributes.entrySet()) {
-            Attribute attribute =
-                    ForgeRegistries.ATTRIBUTES.getValue(
-                            new ResourceLocation(
-                                    entry.getKey()
-                            )
-                    );
+            ResourceLocation attributeId = KineticResourceIds.tryParse(entry.getKey());
+            Attribute attribute = attributeId == null
+                    ? null
+                    : KineticRegistries.attributes().get(attributeId);
 
             if (attribute == null) {
                 continue;
@@ -270,49 +281,49 @@ public class EntityModifierScreen extends KineticScreen {
         for (IModifierPanel panel : panels) {
             panel.setVisible(
                     panel == currentPanel
-                            && selectedEntity != null
+                            && (selectedEntity != null || globalMode)
             );
         }
 
         if (resetBtn != null) {
-            resetBtn.active =
-                    selectedEntity != null;
+            resetBtn.setEnabled(selectedEntity != null || globalMode);
         }
     }
 
     @Override
     protected void buildUi() {
-        startX = (canvasWidth - PANEL_W) / 2;
-        startY = (canvasHeight - PANEL_H) / 2;
+        editedEntities.refresh(allEntities, this::isTrulyModified);
+        startX = (canvasWidth() - PANEL_W) / 2;
+        startY = (canvasHeight() - PANEL_H) / 2;
 
         gridCols = 5;
-        gridActualWidth =
-                gridCols * CELL_SIZE;
-
+        gridActualWidth = gridCols * CELL_SIZE;
         gridRowsVisible = 6;
 
-        int rightX =
-                startX + gridActualWidth + 30;
+        int rightX = startX + gridActualWidth + 30;
+        int rightWidth = PANEL_W - (rightX - startX) - 15;
 
-        int rightWidth =
-                PANEL_W
-                        - (rightX - startX)
-                        - 15;
-
-        searchBox = new EditBox(
-                font,
+        searchBox = addTextField(
                 startX + 17,
                 startY + 5,
                 gridActualWidth - 4,
-                18,
-                Component.empty()
+                Component.empty(),
+                Component.translatable("gui.entitycontrol.modifier.modifier.search_entity"),
+                null,
+                null
         );
-
-        searchBox.setResponder(
-                this::updateSearch
-        );
-
-        addRenderableWidget(searchBox);
+        searchBox.setResponder(this::updateSearch);
+        if (!entityQuery.isEmpty()) searchBox.setValue(entityQuery);
+        // The global editor expands inside this screen; the individual selection is retained
+        // so collapsing it restores exactly the entity that was being edited.
+        globalExpandButton = addButton(
+                startX + 17, startY + PANEL_H - 29, gridActualWidth - 5,
+                Component.translatable(globalMode
+                        ? "gui.entitycontrol.modifier.global.collapse"
+                        : "gui.entitycontrol.modifier.global.expand"),
+                Component.translatable("gui.entitycontrol.modifier.global.expand_tooltip"),
+                () -> setGlobalExpanded(!globalMode, globalExpandButton));
+        globalExpandButton.setSelected(globalMode);
 
         panels.clear();
         panels.add(new AttributePanel());
@@ -328,147 +339,85 @@ public class EntityModifierScreen extends KineticScreen {
             );
         }
 
-        currentPanel = panels.get(
-                Math.min(
-                        savedActiveIdx,
-                        panels.size() - 1
-                )
-        );
+        currentPanel = panels.get(Math.min(savedActiveIdx, panels.size() - 1));
 
-        if (selectedEntity != null) {
+        if (selectedEntity != null || globalMode) {
             for (IModifierPanel panel : panels) {
-                panel.onEntitySelected(
-                        selectedEntity.id(),
-                        selectedEntity.entity()
-                );
+                panel.onEntitySelected(globalMode ? EntityModifierConfig.GLOBAL_KEY : selectedEntity.id(),
+                        globalMode ? null : selectedEntity.entity());
+            }
+            if (globalMode && selectedGlobalAttribute != null && panels.get(0) instanceof AttributePanel attributes) {
+                attributes.restoreGlobalSelection(selectedGlobalAttribute);
             }
         }
 
         int tabY = startY + 70;
+        int attrWidth = font.width(Component.translatable(
+                "gui.entitycontrol.modifier.modifier.tab.attributes"
+        ).getString()) + 16;
+        int buffWidth = font.width(Component.translatable(
+                "gui.entitycontrol.modifier.modifier.tab.buffs"
+        ).getString()) + 16;
 
-        int attrWidth =
-                font.width(
-                        Component.translatable(
-                                "gui.entitycontrol.modifier.modifier.tab.attributes"
-                        ).getString()
-                ) + 16;
-
-        int buffWidth =
-                font.width(
-                        Component.translatable(
-                                "gui.entitycontrol.modifier.modifier.tab.buffs"
-                        ).getString()
-                ) + 16;
-
-        attrTabBtn = Button.builder(
-                        Component.translatable(
-                                "gui.entitycontrol.modifier.modifier.tab.attributes"
-                        ),
-                        button ->
-                                setActivePanel(
-                                        panels.get(0),
-                                        0
-                                )
-                )
-                .bounds(
-                        rightX + 4,
-                        tabY,
-                        attrWidth,
-                        20
-                )
-                .build();
-
-        addRenderableWidget(attrTabBtn);
-
-        buffTabBtn = Button.builder(
-                        Component.translatable(
-                                "gui.entitycontrol.modifier.modifier.tab.buffs"
-                        ),
-                        button ->
-                                setActivePanel(
-                                        panels.get(1),
-                                        1
-                                )
-                )
-                .bounds(
-                        rightX + 4 + attrWidth + 6,
-                        tabY,
-                        buffWidth,
-                        20
-                )
-                .build();
-
-        addRenderableWidget(buffTabBtn);
-
-        int actionButtonY =
-                startY + PANEL_H - 30;
-
-        saveBtn = Button.builder(
-                        Component.translatable(
-                                "gui.entitycontrol.modifier.modifier.save"
-                        ),
-                        button -> {
-                            EntityModifierNetwork.CHANNEL
-                                    .sendToServer(
-                                            new EntityModifierNetwork.SaveModifierPacket(
-                                                    EntityModifierConfig.GSON.toJson(
-                                                            localData
-                                                    )
-                                            )
-                                    );
-
-                        }
-                )
-                .bounds(
-                        rightX + rightWidth - 215,
-                        actionButtonY,
-                        70,
-                        20
-                )
-                .build();
-
-        addRenderableWidget(saveBtn);
-
-        resetBtn = Button.builder(
-                        Component.translatable(
-                                "gui.entitycontrol.modifier.modifier.reset"
-                        ),
-                        button -> resetSelectedEntity()
-                )
-                .bounds(
-                        rightX + rightWidth - 140,
-                        actionButtonY,
-                        65,
-                        20
-                )
-                .build();
-
-        addRenderableWidget(resetBtn);
-
-        addRenderableWidget(
-                Button.builder(
-                                Component.translatable(
-                                        "gui.entitycontrol.modifier.modifier.close"
-                                ),
-                                button -> onClose()
-                        )
-                        .bounds(
-                                rightX + rightWidth - 70,
-                                actionButtonY,
-                                65,
-                                20
-                        )
-                        .build()
+        attrTabBtn = addButton(
+                rightX + 4,
+                tabY,
+                attrWidth,
+                Component.translatable("gui.entitycontrol.modifier.modifier.tab.attributes"),
+                null,
+                () -> setActivePanel(panels.get(0), 0)
         );
 
-        updateSearch(
-                searchBox.getValue()
+        buffTabBtn = addButton(
+                rightX + 4 + attrWidth + 6,
+                tabY,
+                buffWidth,
+                Component.translatable("gui.entitycontrol.modifier.modifier.tab.buffs"),
+                null,
+                () -> setActivePanel(panels.get(1), 1)
         );
 
+        int actionButtonY = startY + PANEL_H - 30;
+
+        saveBtn = addButton(
+                rightX + rightWidth - 215,
+                actionButtonY,
+                70,
+                Component.translatable("gui.entitycontrol.modifier.modifier.save"),
+                null,
+                () -> EntityModifierNetwork.saveConfig(EntityModifierConfig.GSON.toJson(localData))
+        );
+
+        resetBtn = addButton(
+                rightX + rightWidth - 140,
+                actionButtonY,
+                65,
+                Component.translatable("gui.entitycontrol.modifier.modifier.reset"),
+                null,
+                this::resetSelectedEntity
+        );
+
+        addButton(
+                rightX + rightWidth - 70,
+                actionButtonY,
+                65,
+                Component.translatable("gui.entitycontrol.modifier.config.back"),
+                null,
+                this::navigateBack
+        );
+
+        updateSearch(searchBox.getValue());
         updatePanelVisibility();
     }
 
     private void resetSelectedEntity() {
+        if (globalMode) {
+            selectedGlobalAttribute = null;
+            localData.put(EntityModifierConfig.GLOBAL_KEY, new EntityModifierConfig.EntityEditData());
+            for (IModifierPanel panel : panels) panel.onEntitySelected(EntityModifierConfig.GLOBAL_KEY, null);
+            rebuildUi();
+            return;
+        }
         if (selectedEntity == null) {
             return;
         }
@@ -497,9 +446,66 @@ public class EntityModifierScreen extends KineticScreen {
     }
 
     private void updateSearch(String query) {
-        entityModel.refresh(query);
+        entityQuery = query == null ? "" : query;
+        entityModel.refresh(entityQuery);
         gridScroll.reset();
         updateGridScrollRange();
+    }
+
+    private EntityModifierConfig.EntityEditData globalData() {
+        return localData.computeIfAbsent(EntityModifierConfig.GLOBAL_KEY,
+                key -> new EntityModifierConfig.EntityEditData());
+    }
+
+    /** Exact selectable living entity IDs; only the core selector owns category filtering. */
+    public List<String> selectableLivingEntityIds() {
+        return allEntities.stream().map(EntityGuiInfo::id).toList();
+    }
+
+    public boolean isGlobalMode() {
+        return globalMode;
+    }
+
+    public void selectedGlobalAttribute(String id) {
+        selectedGlobalAttribute = id;
+    }
+
+    public String selectedGlobalAttribute() {
+        return selectedGlobalAttribute;
+    }
+
+    public void selectedIndividualAttribute(String id) {
+        selectedIndividualAttribute = id;
+    }
+
+    /** Expand the global editor in place; never destroy widgets during a click callback. */
+    private void setGlobalExpanded(boolean expanded, StateButton toggle) {
+        if (globalMode == expanded) return;
+        if (expanded) individualPanelIdx = savedActiveIdx;
+        globalMode = expanded;
+        toggle.setMessage(Component.translatable(globalMode
+                ? "gui.entitycontrol.modifier.global.collapse"
+                : "gui.entitycontrol.modifier.global.expand"));
+        toggle.setSelected(globalMode);
+        if (panels.isEmpty()) return;
+        for (IModifierPanel panel : panels) {
+            panel.onEntitySelected(globalMode ? EntityModifierConfig.GLOBAL_KEY
+                            : selectedEntity == null ? null : selectedEntity.id(),
+                    globalMode || selectedEntity == null ? null : selectedEntity.entity());
+        }
+        setActivePanel(panels.get(globalMode ? 0
+                : Math.min(individualPanelIdx, panels.size() - 1)),
+                globalMode ? 0 : Math.min(individualPanelIdx, panels.size() - 1));
+        String restoreId = globalMode ? selectedGlobalAttribute : selectedIndividualAttribute;
+        if (restoreId != null && panels.get(0) instanceof AttributePanel attributes) {
+            attributes.restoreGlobalSelection(restoreId);
+        }
+    }
+
+    private boolean globalTargetSelected(EntityGuiInfo info) {
+        if (!globalMode || selectedGlobalAttribute == null) return false;
+        EntityModifierConfig.AttributeRule rule = globalData().attributeRules.get(selectedGlobalAttribute);
+        return rule == null || rule.appliesTo(info.id());
     }
 
     private void updateGridScrollRange() {
@@ -548,24 +554,16 @@ public class EntityModifierScreen extends KineticScreen {
             int mouseY,
             float partialTick
     ) {
+        deferredEntityTooltip = null;
         refreshSelectedEditedState();
-        renderSearchPlaceholder(
-                graphics,
-                searchBox,
-                "gui.entitycontrol.modifier.modifier.search_entity"
-        );
-
         int gridX = startX + 15;
         int gridY = startY + 30;
         int gridHeight =
                 gridRowsVisible * CELL_SIZE;
 
-        graphics.fill(
-                gridX - 2,
-                gridY - 2,
-                gridX + gridActualWidth + 4,
-                gridY + gridHeight + 4,
-                0xAA000000
+        GuiTheme.panelAlt(
+                graphics, gridX - 2, gridY - 2,
+                gridActualWidth + 6, gridHeight + 6
         );
 
         List<EntityGuiInfo> displayEntities =
@@ -581,7 +579,7 @@ public class EntityModifierScreen extends KineticScreen {
                 displayEntities.size()
         );
 
-                enableCanvasScissor(graphics, gridX, gridY, gridX + gridActualWidth, gridY + gridHeight);
+                enableUiScissor(graphics, gridX, gridY, gridX + gridActualWidth, gridY + gridHeight);
         try {
 for (int i = startIndex;
              i < endIndex;
@@ -603,17 +601,16 @@ for (int i = startIndex;
                             * CELL_SIZE
                             - shift;
 
-            boolean selected =
-                    selectedEntity == info;
+            boolean selected = globalMode ? globalTargetSelected(info) : selectedEntity == info;
 
             boolean edited =
                     editedEntities.isEdited(info);
 
             boolean hovered =
-                    mouseX >= cellX
-                            && mouseX < cellX + CELL_SIZE
-                            && mouseY >= cellY
-                            && mouseY < cellY + CELL_SIZE;
+                    mouseX >= gridX && mouseX < gridX + gridActualWidth
+                            && mouseY >= gridY && mouseY < gridY + gridHeight
+                            && mouseX >= cellX && mouseX < cellX + CELL_SIZE
+                            && mouseY >= cellY && mouseY < cellY + CELL_SIZE;
 
             EntityPreviewRenderer.drawCheckerboard(
                     graphics,
@@ -623,46 +620,43 @@ for (int i = startIndex;
                     CELL_SIZE - 2
             );
 
-            int border = selected
-                    ? 0xFF00FF00
-                    : edited
-                    ? 0xFFFFAA00
-                    : 0xFF555555;
-
-            graphics.renderOutline(
-                    cellX,
-                    cellY,
-                    CELL_SIZE,
-                    CELL_SIZE,
-                    border
-            );
-
-            if (hovered) {
-                graphics.fill(
-                        cellX + 1,
-                        cellY + 1,
-                        cellX + CELL_SIZE - 1,
-                        cellY + CELL_SIZE - 1,
-                        0x44FFFFFF
+            if (selected || hovered) {
+                GuiTheme.stateOutline(
+                        graphics, cellX, cellY, CELL_SIZE, CELL_SIZE,
+                        selected, hovered, false
+                );
+            } else if (edited) {
+                GuiTheme.indicatorOutline(
+                        graphics, cellX, cellY, CELL_SIZE, CELL_SIZE, GuiTheme.Indicator.WARNING
+                );
+            } else {
+                GuiTheme.stateOutline(
+                        graphics, cellX, cellY, CELL_SIZE, CELL_SIZE, false, false, false
                 );
             }
 
-            entityPreviewRenderer.render(
+            entityPreviewRenderer.renderCanvas(
                     graphics,
-                    info.id(),
+                    info.entity(),
                     "modifier:grid:" + info.id(),
                     cellX + 2,
                     cellY + 2,
                     CELL_SIZE - 4,
                     CELL_SIZE - 4,
-                    canvasScale,
-                    canvasX,
-                    canvasY,
                     hovered
             );
+            int previewTop = Math.max(cellY, gridY);
+            int previewBottom = Math.min(cellY + CELL_SIZE, gridY + gridHeight);
+            if (previewBottom > previewTop) {
+                registerPreviewWheelTarget(entityPreviewRenderer, "modifier:grid:" + info.id(),
+                        cellX, previewTop, CELL_SIZE, previewBottom - previewTop);
+            }
+            if (hovered) {
+                deferredEntityTooltip = previewTooltip(info, "modifier:grid:" + info.id());
+            }
         }
         } finally {
-            graphics.disableScissor();
+            disableUiScissor(graphics);
         }
 
         GuiTheme.scrollbar(
@@ -677,6 +671,7 @@ for (int i = startIndex;
                 20
         );
 
+
         int rightX =
                 gridX + gridActualWidth + 30;
 
@@ -685,11 +680,16 @@ for (int i = startIndex;
                         - (rightX - startX)
                         - 15;
 
-        if (selectedEntity != null) {
-            renderSelectedEntity(
+        if (selectedEntity != null || globalMode) {
+            if (globalMode) {
+                graphics.drawString(font, Component.translatable("gui.entitycontrol.modifier.global.title"),
+                        rightX, startY + 27, 0xFFFFFF);
+            } else renderSelectedEntity(
                     graphics,
                     rightX,
-                    rightWidth
+                    rightWidth,
+                    mouseX,
+                    mouseY
             );
 
             if (currentPanel != null) {
@@ -717,7 +717,7 @@ for (int i = startIndex;
                         mouseX,
                         mouseY
                 )) {
-            GuiOverlay.requestFormattedTooltip(font.split(
+            KineticOverlays.requestFormattedTooltip(font.split(
                             Component.translatable(
                                     "gui.entitycontrol.modifier.modifier.save.tooltip"
                             ),
@@ -726,12 +726,12 @@ for (int i = startIndex;
         }
 
         if (resetBtn != null
-                && resetBtn.active
+                && resetBtn.isEnabled()
                 && resetBtn.isMouseOver(
                         mouseX,
                         mouseY
                 )) {
-            GuiOverlay.requestFormattedTooltip(font.split(
+            KineticOverlays.requestFormattedTooltip(font.split(
                             Component.translatable(
                                     "gui.entitycontrol.modifier.modifier.reset.tooltip"
                             ),
@@ -744,7 +744,7 @@ for (int i = startIndex;
                         mouseX,
                         mouseY
                 )) {
-            GuiOverlay.requestFormattedTooltip(font.split(
+            KineticOverlays.requestFormattedTooltip(font.split(
                             Component.translatable(
                                     "gui.entitycontrol.modifier.modifier.tab.attributes.tooltip"
                             ),
@@ -757,7 +757,7 @@ for (int i = startIndex;
                         mouseX,
                         mouseY
                 )) {
-            GuiOverlay.requestFormattedTooltip(font.split(
+            KineticOverlays.requestFormattedTooltip(font.split(
                             Component.translatable(
                                     "gui.entitycontrol.modifier.modifier.tab.buffs.tooltip"
                             ),
@@ -766,36 +766,12 @@ for (int i = startIndex;
         }
     }
 
-    private void renderSearchPlaceholder(
-            GuiGraphics graphics,
-            EditBox box,
-            String translationKey
-    ) {
-        if (box == null
-                || !box.visible
-                || !box.getValue().isEmpty()
-                || box.isFocused()) {
-            return;
-        }
-
-        String text = font.plainSubstrByWidth(
-                Component.translatable(translationKey).getString(),
-                Math.max(0, box.getWidth() - 10)
-        );
-        graphics.drawString(
-                font,
-                text,
-                box.getX() + 5,
-                box.getY() + (box.getHeight() - font.lineHeight) / 2,
-                0xFFAAAAAA,
-                false
-        );
-    }
-
     private void renderSelectedEntity(
             GuiGraphics graphics,
             int rightX,
-            int rightWidth
+            int rightWidth,
+            int mouseX,
+            int mouseY
     ) {
         int boxSize = 86;
         int boxX =
@@ -812,27 +788,25 @@ for (int i = startIndex;
                 boxSize
         );
 
-        graphics.renderOutline(
-                boxX,
-                boxY,
-                boxSize,
-                boxSize,
-                0xFF555555
-        );
+        GuiTheme.stateOutline(graphics, boxX, boxY, boxSize, boxSize, false, false, false);
 
-        entityPreviewRenderer.render(
+        entityPreviewRenderer.renderCanvas(
                 graphics,
-                selectedEntity.id(),
+                selectedEntity.entity(),
                 "modifier:detail:" + selectedEntity.id(),
                 boxX + 2,
                 boxY + 2,
                 boxSize - 4,
                 boxSize - 4,
-                canvasScale,
-                canvasX,
-                canvasY,
-                true
+                mouseX >= boxX && mouseX < boxX + boxSize
+                        && mouseY >= boxY && mouseY < boxY + boxSize
         );
+        registerPreviewWheelTarget(entityPreviewRenderer, "modifier:detail:" + selectedEntity.id(),
+                boxX, boxY, boxSize, boxSize);
+        if (mouseX >= boxX && mouseX < boxX + boxSize
+                && mouseY >= boxY && mouseY < boxY + boxSize) {
+            deferredEntityTooltip = previewTooltip(selectedEntity, "modifier:detail:" + selectedEntity.id());
+        }
 
         int textRightEdge =
                 boxX - 12;
@@ -860,6 +834,23 @@ for (int i = startIndex;
         );
     }
 
+    private List<Component> previewTooltip(EntityGuiInfo info, String stateKey) {
+        return List.of(
+                Component.translatable("gui.entitycontrol.modifier.modifier.entity_name", info.translatedName()),
+                Component.translatable("gui.entitycontrol.modifier.modifier.entity_id", info.id()),
+                Component.translatable("gui.entitycontrol.modifier.modifier.preview_zoom_hint",
+                        entityPreviewRenderer.getZoomPercent(stateKey))
+        );
+    }
+
+    @Override
+    protected void renderTooltips(GuiGraphics graphics, int virtualMouseX, int virtualMouseY,
+                                  int screenMouseX, int screenMouseY) {
+        if (deferredEntityTooltip != null) {
+            showTooltip(deferredEntityTooltip, null);
+        }
+    }
+
     @Override
     protected boolean canvasMouseClicked(
             double mouseX,
@@ -878,7 +869,7 @@ for (int i = startIndex;
         int gridHeight =
                 gridRowsVisible * CELL_SIZE;
 
-        if (button == 0
+        if (KineticMouseButtons.isPrimary(button)
                 && gridScroll.beginDrag(
                         mouseX,
                         mouseY,
@@ -912,8 +903,16 @@ for (int i = startIndex;
 
             if (index >= 0
                     && index < displayEntities.size()) {
+                if (globalMode) {
+                    if (KineticMouseButtons.isPrimary(button)
+                            && currentPanel instanceof AttributePanel attributes) {
+                        attributes.toggleGlobalTarget(displayEntities.get(index).id(), selectableLivingEntityIds());
+                    }
+                    return true;
+                }
                 selectedEntity =
                         displayEntities.get(index);
+                selectedIndividualAttribute = null;
 
                 for (IModifierPanel panel : panels) {
                     panel.onEntitySelected(
@@ -979,8 +978,7 @@ for (int i = startIndex;
             double mouseY,
             int button
     ) {
-        boolean released =
-                gridScroll.release(button);
+        boolean released = gridScroll.release(button);
 
         if (currentPanel != null) {
             currentPanel.mouseReleased(
@@ -1004,6 +1002,34 @@ for (int i = startIndex;
             double mouseY,
             double delta
     ) {
+        if (delta != 0D) {
+            int gridX = startX + 15;
+            int gridY = startY + 30;
+            int gridHeight = gridRowsVisible * CELL_SIZE;
+            if (mouseX >= gridX && mouseX < gridX + gridActualWidth
+                    && mouseY >= gridY && mouseY < gridY + gridHeight) {
+                int row = (int) ((mouseY - gridY + gridScroll.visualShift(CELL_SIZE)) / CELL_SIZE);
+                int column = (int) ((mouseX - gridX) / CELL_SIZE);
+                int index = gridScroll.smoothIndexOffset() * gridCols + row * gridCols + column;
+                List<EntityGuiInfo> visible = entityModel.items();
+                if (index >= 0 && index < visible.size()) {
+                    if (entityPreviewRenderer.handleControlWheel(
+                            "modifier:grid:" + visible.get(index).id(), true, delta)) return true;
+                }
+            }
+            if (!globalMode && selectedEntity != null) {
+                int rightX = startX + gridActualWidth + 30;
+                int rightWidth = PANEL_W - (rightX - startX) - 15;
+                int boxSize = 86;
+                int boxX = rightX + rightWidth - boxSize - 4;
+                int boxY = startY + 5;
+                if (mouseX >= boxX && mouseX < boxX + boxSize
+                        && mouseY >= boxY && mouseY < boxY + boxSize) {
+                    if (entityPreviewRenderer.handleControlWheel(
+                            "modifier:detail:" + selectedEntity.id(), true, delta)) return true;
+                }
+            }
+        }
         if (mouseX
                 < startX
                 + gridActualWidth
@@ -1037,9 +1063,8 @@ for (int i = startIndex;
     }
 
     @Override
-    public void removed() {
+    protected void screenRemoved() {
         entityPreviewRenderer.clear();
         editedEntities.clear();
-        super.removed();
     }
 }

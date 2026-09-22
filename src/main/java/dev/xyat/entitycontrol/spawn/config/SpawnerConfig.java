@@ -3,6 +3,9 @@ package dev.xyat.entitycontrol.spawn.config;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import dev.xyat.entitycontrol.spawn.SpawnModule;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.runtime.KineticPaths;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -10,8 +13,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobCategory;
-import net.minecraftforge.fml.loading.FMLPaths;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.io.Reader;
 import java.io.Writer;
@@ -33,7 +34,7 @@ import java.util.TreeMap;
 public class SpawnerConfig {
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    private static final Path BASE_DIR = FMLPaths.CONFIGDIR.get().resolve("kineticcore");
+    private static final Path BASE_DIR = KineticPaths.configDirectory().resolve("kineticcore");
     private static final Path CONFIG_PATH = BASE_DIR.resolve("spawner.json");
     private static final Path BACKUP_PATH = BASE_DIR.resolve("spawner_backup.json");
 
@@ -287,9 +288,9 @@ public class SpawnerConfig {
     public static synchronized List<String> getEditableEntityIds(MinecraftServer server) {
         if (!editableEntityCacheBuilt) {
             ArrayList<String> ids = new ArrayList<>();
-            for (Map.Entry<ResourceKey<EntityType<?>>, EntityType<?>> entry : ForgeRegistries.ENTITY_TYPES.getEntries()) {
+            for (Map.Entry<ResourceLocation, EntityType<?>> entry : KineticRegistries.entityTypes().entries().entrySet()) {
                 EntityType<?> type = entry.getValue();
-                ResourceLocation id = entry.getKey().location();
+                ResourceLocation id = entry.getKey();
                 if (type == null || !isEditableEntity(type, server)) {
                     continue;
                 }
@@ -427,8 +428,8 @@ public class SpawnerConfig {
     }
 
     private static boolean isRegisteredEntityId(String entityId) {
-        ResourceLocation id = ResourceLocation.tryParse(entityId);
-        return id == null || !ForgeRegistries.ENTITY_TYPES.containsKey(id);
+        ResourceLocation id = KineticResourceIds.tryParse(entityId);
+        return id == null || !KineticRegistries.entityTypes().contains(id);
     }
 
     private static boolean saveAllInternal() {
@@ -562,7 +563,7 @@ public class SpawnerConfig {
 
         TreeMap<String, SpawnerRule> normalized = new TreeMap<>();
         for (Map.Entry<String, SpawnerRule> entry : target.entities.entrySet()) {
-            ResourceLocation id = ResourceLocation.tryParse(entry.getKey());
+            ResourceLocation id = KineticResourceIds.tryParse(entry.getKey());
             if (id == null) {
                 continue;
             }
@@ -582,7 +583,7 @@ public class SpawnerConfig {
 
         TreeMap<String, BackupEntry> normalized = new TreeMap<>();
         for (Map.Entry<String, BackupEntry> entry : target.entities.entrySet()) {
-            ResourceLocation id = ResourceLocation.tryParse(entry.getKey());
+            ResourceLocation id = KineticResourceIds.tryParse(entry.getKey());
             if (id == null) {
                 continue;
             }

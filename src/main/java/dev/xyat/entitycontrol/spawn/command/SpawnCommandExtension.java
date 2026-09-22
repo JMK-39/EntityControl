@@ -1,18 +1,18 @@
 package dev.xyat.entitycontrol.spawn.command;
 
-import dev.xyat.kineticcore.command.KTCommandApi;
-import dev.xyat.kineticcore.command.KTCommandExtension;
+import dev.xyat.kineticcore.api.command.KineticCommands;
+import dev.xyat.kineticcore.api.command.CommandExtension;
 import dev.xyat.entitycontrol.spawn.SpawnModule;
 import dev.xyat.entitycontrol.spawn.config.BiomeSpawnConfig;
 import dev.xyat.entitycontrol.spawn.config.SpawnerConfig;
 import net.minecraft.commands.CommandSourceStack;
 
-public final class SpawnCommandExtension implements KTCommandExtension {
+public final class SpawnCommandExtension implements CommandExtension {
     private SpawnCommandExtension() {
     }
 
     public static void install() {
-        KTCommandApi.register(SpawnModule.MODID, new SpawnCommandExtension());
+        KineticCommands.registerExtension(SpawnModule.MODID, new SpawnCommandExtension());
     }
 
     @Override

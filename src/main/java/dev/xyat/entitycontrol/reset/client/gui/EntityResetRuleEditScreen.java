@@ -1,27 +1,25 @@
 package dev.xyat.entitycontrol.reset.client.gui;
 
 import dev.xyat.kineticcore.api.client.theme.GuiTheme;
-import dev.xyat.kineticcore.api.client.overlay.GuiOverlay;
+import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
 import dev.xyat.kineticcore.api.client.screen.KineticScreen;
-import dev.xyat.kineticcore.config.client.KTConfigApi;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.EntityPreviewRenderer;
+import dev.xyat.kineticcore.api.config.client.KTConfigApi;
+import dev.xyat.kineticcore.api.client.widget.KineticWidgets;
+import dev.xyat.kineticcore.api.client.widget.button.KineticButtons.StateButton;
+import dev.xyat.kineticcore.api.client.widget.input.KineticTextFields.KineticEditBox;
+import dev.xyat.kineticcore.api.client.widget.render.KineticEntityPreview.EntityPreviewRenderer;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import dev.xyat.entitycontrol.reset.config.EntityReseConfig;
 import dev.xyat.entitycontrol.reset.config.EntityReseConfigGui;
 import dev.xyat.entitycontrol.reset.network.EntityReseRuleNetwork;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.NotNull;
 
-@OnlyIn(Dist.CLIENT)
 public final class EntityResetRuleEditScreen extends KineticScreen {
     private static final int PREVIEW_X = 46;
     private static final int PREVIEW_Y = 62;
@@ -34,14 +32,14 @@ public final class EntityResetRuleEditScreen extends KineticScreen {
 
     private final EntityResetRuleListScreen parent;
     private final String entityId;
-    private final EntityPreviewRenderer previewRenderer = new EntityPreviewRenderer();
+    private final EntityPreviewRenderer previewRenderer = KineticWidgets.createEntityPreviewRenderer();
 
-    private EditBox thresholdBox;
-    private Button realDeathButton;
-    private Button preventedDeathButton;
-    private Button cancelledDeathButton;
-    private Button clearButton;
-    private Button saveButton;
+    private KineticEditBox thresholdBox;
+    private StateButton realDeathButton;
+    private StateButton preventedDeathButton;
+    private StateButton cancelledDeathButton;
+    private StateButton clearButton;
+    private StateButton saveButton;
     private boolean countRealDeath;
     private boolean countPreventedDeath;
     private boolean countCancelledDeath;
@@ -80,6 +78,7 @@ public final class EntityResetRuleEditScreen extends KineticScreen {
     public EntityResetRuleEditScreen(EntityResetRuleListScreen parent, String entityId) {
         super(Component.translatable("gui.entitycontrol.reset.rule_edit.title"));
         this.parent = parent;
+        setParentScreen(parent);
         this.entityId = entityId;
 
         EntityReseConfig.EntityRule rule = EntityReseConfig.getRule(entityId);
@@ -94,72 +93,74 @@ public final class EntityResetRuleEditScreen extends KineticScreen {
             countCancelledDeath = rule.countCancelledDeath;
             thresholdText = Integer.toString(Math.max(1, rule.threshold));
         }
-        useCanvas(640F, 360F, 6);
         configureStandaloneDraft(this::captureRuleDraftSnapshot, this::restoreRuleDraftSnapshot);
     }
 
     @Override
     protected void buildUi() {
-        thresholdBox = addRenderableWidget(new EditBox(
-                font,
+        thresholdBox = addTextField(
                 338,
                 108,
                 192,
-                20,
-                Component.translatable("gui.entitycontrol.reset.rule_edit.threshold")
-        ));
+                Component.translatable("gui.entitycontrol.reset.rule_edit.threshold"),
+                null,
+                value -> value.isEmpty() || value.chars().allMatch(Character::isDigit),
+                null
+        );
         thresholdBox.setMaxLength(9);
-        thresholdBox.setFilter(value -> value.isEmpty() || value.chars().allMatch(Character::isDigit));
         thresholdBox.setValue(thresholdText == null || thresholdText.isBlank() ? "1" : thresholdText);
         thresholdBox.setResponder(value -> thresholdText = value == null ? "" : value);
 
-        realDeathButton = addRenderableWidget(Button.builder(
-                        realDeathMessage(),
-                        button -> {
-                            countRealDeath = !countRealDeath;
-                            button.setMessage(realDeathMessage());
-                        })
-                .bounds(326, 146, 216, 20)
-                .tooltip(Tooltip.create(Component.translatable("gui.entitycontrol.reset.rule_edit.count_real.tooltip")))
-                .build());
+        realDeathButton = addButtonWithHandler(
+                326, 146, 216,
+                realDeathMessage(),
+                Component.translatable("gui.entitycontrol.reset.rule_edit.count_real.tooltip"),
+                button -> {
+                    countRealDeath = !countRealDeath;
+                    button.setText(realDeathMessage());
+                }
+        );
 
-        preventedDeathButton = addRenderableWidget(Button.builder(
-                        preventedDeathMessage(),
-                        button -> {
-                            countPreventedDeath = !countPreventedDeath;
-                            button.setMessage(preventedDeathMessage());
-                        })
-                .bounds(326, 174, 216, 20)
-                .tooltip(Tooltip.create(Component.translatable("gui.entitycontrol.reset.rule_edit.count_prevented.tooltip")))
-                .build());
+        preventedDeathButton = addButtonWithHandler(
+                326, 174, 216,
+                preventedDeathMessage(),
+                Component.translatable("gui.entitycontrol.reset.rule_edit.count_prevented.tooltip"),
+                button -> {
+                    countPreventedDeath = !countPreventedDeath;
+                    button.setText(preventedDeathMessage());
+                }
+        );
 
-        cancelledDeathButton = addRenderableWidget(Button.builder(
-                        cancelledDeathMessage(),
-                        button -> {
-                            countCancelledDeath = !countCancelledDeath;
-                            button.setMessage(cancelledDeathMessage());
-                        })
-                .bounds(326, 202, 216, 20)
-                .tooltip(Tooltip.create(Component.translatable("gui.entitycontrol.reset.rule_edit.count_cancelled.tooltip")))
-                .build());
+        cancelledDeathButton = addButtonWithHandler(
+                326, 202, 216,
+                cancelledDeathMessage(),
+                Component.translatable("gui.entitycontrol.reset.rule_edit.count_cancelled.tooltip"),
+                button -> {
+                    countCancelledDeath = !countCancelledDeath;
+                    button.setText(cancelledDeathMessage());
+                }
+        );
 
-        clearButton = addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.reset.rule_list.clear"),
-                        button -> clearRule())
-                .bounds(326, 244, 68, 20)
-                .build());
+        clearButton = addButton(
+                326, 244, 68,
+                Component.translatable("gui.entitycontrol.reset.rule_list.clear"),
+                null,
+                this::clearRule
+        );
 
-        saveButton = addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.reset.rule_edit.save"),
-                        button -> saveRule())
-                .bounds(400, 244, 68, 20)
-                .build());
+        saveButton = addButton(
+                400, 244, 68,
+                Component.translatable("gui.entitycontrol.reset.rule_edit.save"),
+                null,
+                this::saveRule
+        );
 
-        addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.reset.rule_edit.back"),
-                        button -> closeToParent())
-                .bounds(474, 244, 68, 20)
-                .build());
+        addButton(
+                474, 244, 68,
+                Component.translatable("gui.entitycontrol.reset.rule_edit.back"),
+                null,
+                this::closeToParent
+        );
 
         updateControlsEnabled();
     }
@@ -191,9 +192,8 @@ public final class EntityResetRuleEditScreen extends KineticScreen {
     private void saveRule() {
         if (waitingForServer) return;
 
-        Minecraft client = Minecraft.getInstance();
-        if (client.getConnection() == null) {
-            GuiOverlay.toast(Component.translatable("msg.entitycontrol.reset.rule_list.save_failed"));
+        if (!KineticClientRuntime.connected()) {
+            KineticOverlays.toast(Component.translatable("msg.entitycontrol.reset.rule_list.save_failed"));
             return;
         }
 
@@ -208,12 +208,12 @@ public final class EntityResetRuleEditScreen extends KineticScreen {
         try {
             threshold = Integer.parseInt((thresholdText == null ? "" : thresholdText).trim());
         } catch (Exception ignored) {
-            GuiOverlay.toast(Component.translatable("msg.entitycontrol.reset.rule_edit.invalid_threshold"));
+            KineticOverlays.toast(Component.translatable("msg.entitycontrol.reset.rule_edit.invalid_threshold"));
             return;
         }
 
         if (threshold < 1) {
-            GuiOverlay.toast(Component.translatable("msg.entitycontrol.reset.rule_edit.invalid_threshold"));
+            KineticOverlays.toast(Component.translatable("msg.entitycontrol.reset.rule_edit.invalid_threshold"));
             return;
         }
 
@@ -255,29 +255,29 @@ public final class EntityResetRuleEditScreen extends KineticScreen {
             return;
         }
 
-        GuiOverlay.toast(Component.translatable("msg.entitycontrol.reset.rule_list.save_failed"));
+        KineticOverlays.toast(Component.translatable("msg.entitycontrol.reset.rule_list.save_failed"));
     }
 
     private void updateControlsEnabled() {
         boolean enabled = !waitingForServer;
         boolean editable = enabled && !pendingRemoval;
-        if (thresholdBox != null) thresholdBox.active = editable;
-        if (realDeathButton != null) realDeathButton.active = editable;
-        if (preventedDeathButton != null) preventedDeathButton.active = editable;
-        if (cancelledDeathButton != null) cancelledDeathButton.active = editable;
-        if (clearButton != null) clearButton.active = editable && EntityReseConfig.hasRule(entityId);
-        if (saveButton != null) saveButton.active = enabled;
+        if (thresholdBox != null) thresholdBox.setEnabled(editable);
+        if (realDeathButton != null) realDeathButton.setEnabled(editable);
+        if (preventedDeathButton != null) preventedDeathButton.setEnabled(editable);
+        if (cancelledDeathButton != null) cancelledDeathButton.setEnabled(editable);
+        if (clearButton != null) clearButton.setEnabled(editable && EntityReseConfig.hasRule(entityId));
+        if (saveButton != null) saveButton.setEnabled(enabled);
     }
 
     @Override
     protected void renderCanvasBackground(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fillGradient(0, 0, canvasWidth, canvasHeight, 0xFF171717, 0xFF0E0E0E);
+        GuiTheme.canvasBackground(graphics, canvasWidth(), canvasHeight());
         GuiTheme.panel(graphics, 24, 18, 592, 324);
-        GuiTheme.itemGrid(graphics, PREVIEW_X, PREVIEW_Y, PREVIEW_W, PREVIEW_H, 6);
-        graphics.renderOutline(PREVIEW_X, PREVIEW_Y, PREVIEW_W, PREVIEW_H, 0xFFFFFFFF);
+        GuiTheme.itemGrid(graphics, PREVIEW_X, PREVIEW_Y, PREVIEW_W, PREVIEW_H);
+        GuiTheme.stateOutline(graphics, PREVIEW_X, PREVIEW_Y, PREVIEW_W, PREVIEW_H, false, false, false);
         GuiTheme.panelAlt(graphics, EDIT_X, EDIT_Y, EDIT_W, EDIT_H);
 
-        graphics.drawCenteredString(font, title, canvasWidth / 2, 30, 0xFFFFFFFF);
+        graphics.drawCenteredString(font, title, canvasWidth() / 2, 30, 0xFFFFFFFF);
         graphics.drawCenteredString(font, Component.literal(entityName()), PREVIEW_X + PREVIEW_W / 2, 46, 0xFFFFFFFF);
 
         boolean hovered = inPreview(mouseX, mouseY);
@@ -289,9 +289,9 @@ public final class EntityResetRuleEditScreen extends KineticScreen {
                 PREVIEW_Y + 8,
                 PREVIEW_W - 16,
                 PREVIEW_H - 16,
-                canvasScale,
-                canvasX,
-                canvasY,
+                canvasScale(),
+                canvasX(),
+                canvasY(),
                 hovered
         );
 
@@ -327,8 +327,8 @@ public final class EntityResetRuleEditScreen extends KineticScreen {
     }
 
     private String entityName() {
-        ResourceLocation location = ResourceLocation.tryParse(entityId);
-        EntityType<?> type = location == null ? null : ForgeRegistries.ENTITY_TYPES.getValue(location);
+        ResourceLocation location = KineticResourceIds.tryParse(entityId);
+        EntityType<?> type = location == null ? null : KineticRegistries.entityTypes().get(location);
         return type == null ? entityId : type.getDescription().getString();
     }
 
@@ -342,19 +342,17 @@ public final class EntityResetRuleEditScreen extends KineticScreen {
     }
 
     private void closeToParent() {
-        if (minecraft != null) minecraft.setScreen(parent);
+        navigateBack();
     }
 
     @Override
-    public void onClose() {
-        discardDraft();
-        closeToParent();
+    protected boolean handleCloseRequest() {
+        return false;
     }
 
     @Override
-    public void removed() {
+    protected void screenRemoved() {
         previewRenderer.clear();
-        super.removed();
     }
 
     @Override

@@ -1,28 +1,24 @@
 package dev.xyat.entitycontrol.reset.network;
 
-import dev.xyat.kineticcore.api.KTNetworkProtocol;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import dev.xyat.kineticcore.api.NetworkCompressUtil;
 import dev.xyat.entitycontrol.reset.ResetModule;
 import dev.xyat.entitycontrol.reset.client.EntityReseRuleClient;
 import dev.xyat.entitycontrol.reset.config.EntityReseConfig;
-import net.minecraft.network.FriendlyByteBuf;
+import dev.xyat.kineticcore.api.network.KineticCompression;
+import dev.xyat.kineticcore.api.network.NetworkBuffer;
+import dev.xyat.kineticcore.api.network.NetworkCodec;
+import dev.xyat.kineticcore.api.network.NetworkVersionPolicy;
+import dev.xyat.kineticcore.api.network.PacketChannel;
+import dev.xyat.kineticcore.api.network.PacketRegistrations;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkDirection;
-import net.minecraftforge.network.NetworkEvent;
-import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.PacketDistributor;
-import net.minecraftforge.network.simple.SimpleChannel;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Supplier;
 
 public final class EntityReseRuleNetwork {
     public static final byte RESULT_SAVE_SUCCESS = 1;
@@ -38,52 +34,63 @@ public final class EntityReseRuleNetwork {
     private static final int MAX_DECOMPRESSED_RULE_BYTES = 8 * 1024 * 1024;
     private static final Gson GSON = new Gson();
     private static final Type RULE_LIST_TYPE = new TypeToken<List<String>>() { }.getType();
-    private static int packetId;
-    private static boolean registered;
-
-    private static final SimpleChannel CHANNEL = NetworkRegistry.ChannelBuilder
-            .named(new ResourceLocation(ResetModule.MODID, "entity_rese_rules"))
-            .networkProtocolVersion(() -> PROTOCOL)
-            .clientAcceptedVersions(KTNetworkProtocol::acceptsAnyVersion)
-            .serverAcceptedVersions(KTNetworkProtocol::acceptsAnyVersion)
-            .simpleChannel();
+    private static final PacketChannel CHANNEL = PacketChannel.create(
+            KineticResourceIds.of(ResetModule.MODID, "entity_rese_rules"),
+            PROTOCOL,
+            NetworkVersionPolicy.ANY
+    );
+    private static boolean requestRegistered;
+    private static boolean saveRegistered;
+    private static boolean removeRegistered;
+    private static boolean snapshotRegistered;
+    private static boolean resultRegistered;
 
     private EntityReseRuleNetwork() {
     }
 
     public static synchronized void register() {
-        if (registered) return;
-        registered = true;
-
-        CHANNEL.messageBuilder(RequestRulesPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
-                .decoder(RequestRulesPacket::new)
-                .encoder(RequestRulesPacket::encode)
-                .consumerMainThread(RequestRulesPacket::handle)
-                .add();
-
-        CHANNEL.messageBuilder(SaveRulePacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
-                .decoder(SaveRulePacket::new)
-                .encoder(SaveRulePacket::encode)
-                .consumerMainThread(SaveRulePacket::handle)
-                .add();
-
-        CHANNEL.messageBuilder(RemoveRulePacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
-                .decoder(RemoveRulePacket::new)
-                .encoder(RemoveRulePacket::encode)
-                .consumerMainThread(RemoveRulePacket::handle)
-                .add();
-
-        CHANNEL.messageBuilder(RulesSnapshotPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(RulesSnapshotPacket::new)
-                .encoder(RulesSnapshotPacket::encode)
-                .consumerMainThread(RulesSnapshotPacket::handle)
-                .add();
-
-        CHANNEL.messageBuilder(OperationResultPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(OperationResultPacket::new)
-                .encoder(OperationResultPacket::encode)
-                .consumerMainThread(OperationResultPacket::handle)
-                .add();
+        PacketRegistrations.runIndependent(
+                () -> {
+                    if (!requestRegistered) {
+                        CHANNEL.registerServerbound(0, RequestRulesPacket.class,
+                                NetworkCodec.of((buffer, message) -> message.encode(buffer), RequestRulesPacket::new),
+                                (message, context) -> sendSnapshot(context.sender()));
+                        requestRegistered = true;
+                    }
+                },
+                () -> {
+                    if (!saveRegistered) {
+                        CHANNEL.registerServerbound(1, SaveRulePacket.class,
+                                NetworkCodec.of((buffer, message) -> message.encode(buffer), SaveRulePacket::new),
+                                EntityReseRuleNetwork::handleSaveRule);
+                        saveRegistered = true;
+                    }
+                },
+                () -> {
+                    if (!removeRegistered) {
+                        CHANNEL.registerServerbound(2, RemoveRulePacket.class,
+                                NetworkCodec.of((buffer, message) -> message.encode(buffer), RemoveRulePacket::new),
+                                EntityReseRuleNetwork::handleRemoveRule);
+                        removeRegistered = true;
+                    }
+                },
+                () -> {
+                    if (!snapshotRegistered) {
+                        CHANNEL.registerClientbound(3, RulesSnapshotPacket.class,
+                                NetworkCodec.of((buffer, message) -> message.encode(buffer), RulesSnapshotPacket::new),
+                                message -> EntityReseRuleClient.handleSnapshot(new ArrayList<>(message.rules)));
+                        snapshotRegistered = true;
+                    }
+                },
+                () -> {
+                    if (!resultRegistered) {
+                        CHANNEL.registerClientbound(4, OperationResultPacket.class,
+                                NetworkCodec.of((buffer, message) -> message.encode(buffer), OperationResultPacket::new),
+                                message -> EntityReseRuleClient.handleOperationResult(message.result, new ArrayList<>(message.rules)));
+                        resultRegistered = true;
+                    }
+                }
+        );
     }
 
     public static void requestRules() {
@@ -111,51 +118,36 @@ public final class EntityReseRuleNetwork {
     }
 
     private static void sendSnapshot(ServerPlayer player) {
-        CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
-                new RulesSnapshotPacket(EntityReseConfig.snapshotRules())
-        );
+        CHANNEL.sendToPlayer(player, new RulesSnapshotPacket(EntityReseConfig.snapshotRules()));
     }
 
     private static void broadcastSnapshot() {
-        CHANNEL.send(
-                PacketDistributor.ALL.noArg(),
-                new RulesSnapshotPacket(EntityReseConfig.snapshotRules())
-        );
+        CHANNEL.broadcast(new RulesSnapshotPacket(EntityReseConfig.snapshotRules()));
     }
 
     private static void sendResult(ServerPlayer player, byte result) {
-        CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
-                new OperationResultPacket(result, EntityReseConfig.snapshotRules())
-        );
+        CHANNEL.sendToPlayer(player, new OperationResultPacket(result, EntityReseConfig.snapshotRules()));
     }
 
-    private static boolean canEdit(ServerPlayer player) {
-        return player != null && player.hasPermissions(2);
+    private static boolean cannotEdit(ServerPlayer player) {
+        return player == null || !player.hasPermissions(2);
     }
 
-    private static boolean validEntityId(String entityId) {
-        ResourceLocation id = ResourceLocation.tryParse(entityId == null ? "" : entityId.trim());
-        return id != null && ForgeRegistries.ENTITY_TYPES.containsKey(id);
+    private static boolean invalidEntityId(String entityId) {
+        ResourceLocation id = KineticResourceIds.tryParse(entityId == null ? "" : entityId.trim());
+        return id == null || KineticRegistries.entityTypes().get(id) == null;
     }
 
     public static final class RequestRulesPacket {
         public RequestRulesPacket() {
         }
 
-        private RequestRulesPacket(FriendlyByteBuf buffer) {
+        private RequestRulesPacket(NetworkBuffer buffer) {
         }
 
-        private void encode(FriendlyByteBuf buffer) {
+        private void encode(NetworkBuffer buffer) {
         }
 
-        private void handle(Supplier<NetworkEvent.Context> supplier) {
-            NetworkEvent.Context context = supplier.get();
-            ServerPlayer player = context.getSender();
-            if (player != null) sendSnapshot(player);
-            context.setPacketHandled(true);
-        }
     }
 
     public static final class SaveRulePacket {
@@ -179,7 +171,7 @@ public final class EntityReseRuleNetwork {
             this.countCancelledDeath = countCancelledDeath;
         }
 
-        private SaveRulePacket(FriendlyByteBuf buffer) {
+        private SaveRulePacket(NetworkBuffer buffer) {
             this(
                     buffer.readUtf(MAX_RULE_LENGTH),
                     buffer.readVarInt(),
@@ -189,7 +181,7 @@ public final class EntityReseRuleNetwork {
             );
         }
 
-        private void encode(FriendlyByteBuf buffer) {
+        private void encode(NetworkBuffer buffer) {
             buffer.writeUtf(entityId, MAX_RULE_LENGTH);
             buffer.writeVarInt(threshold);
             buffer.writeBoolean(countRealDeath);
@@ -197,35 +189,6 @@ public final class EntityReseRuleNetwork {
             buffer.writeBoolean(countCancelledDeath);
         }
 
-        private void handle(Supplier<NetworkEvent.Context> supplier) {
-            NetworkEvent.Context context = supplier.get();
-            ServerPlayer player = context.getSender();
-            if (!canEdit(player)) {
-                if (player != null) sendResult(player, RESULT_PERMISSION_DENIED);
-                context.setPacketHandled(true);
-                return;
-            }
-            if (threshold < 1 || !validEntityId(entityId)) {
-                sendResult(player, RESULT_INVALID_RULE);
-                context.setPacketHandled(true);
-                return;
-            }
-
-            boolean saved = EntityReseConfig.saveRuleAuthoritative(
-                    entityId,
-                    threshold,
-                    countRealDeath,
-                    countPreventedDeath,
-                    countCancelledDeath
-            );
-            if (saved) {
-                broadcastSnapshot();
-                sendResult(player, RESULT_SAVE_SUCCESS);
-            } else {
-                sendResult(player, RESULT_SAVE_FAILED);
-            }
-            context.setPacketHandled(true);
-        }
     }
 
     public static final class RemoveRulePacket {
@@ -235,37 +198,14 @@ public final class EntityReseRuleNetwork {
             this.entityId = entityId == null ? "" : entityId;
         }
 
-        private RemoveRulePacket(FriendlyByteBuf buffer) {
+        private RemoveRulePacket(NetworkBuffer buffer) {
             this(buffer.readUtf(MAX_RULE_LENGTH));
         }
 
-        private void encode(FriendlyByteBuf buffer) {
+        private void encode(NetworkBuffer buffer) {
             buffer.writeUtf(entityId, MAX_RULE_LENGTH);
         }
 
-        private void handle(Supplier<NetworkEvent.Context> supplier) {
-            NetworkEvent.Context context = supplier.get();
-            ServerPlayer player = context.getSender();
-            if (!canEdit(player)) {
-                if (player != null) sendResult(player, RESULT_PERMISSION_DENIED);
-                context.setPacketHandled(true);
-                return;
-            }
-            if (!validEntityId(entityId)) {
-                sendResult(player, RESULT_INVALID_RULE);
-                context.setPacketHandled(true);
-                return;
-            }
-
-            boolean saved = EntityReseConfig.removeRuleAuthoritative(entityId);
-            if (saved) {
-                broadcastSnapshot();
-                sendResult(player, RESULT_REMOVE_SUCCESS);
-            } else {
-                sendResult(player, RESULT_SAVE_FAILED);
-            }
-            context.setPacketHandled(true);
-        }
     }
 
     public static final class RulesSnapshotPacket {
@@ -275,23 +215,14 @@ public final class EntityReseRuleNetwork {
             this.rules = sanitizeRules(rules);
         }
 
-        private RulesSnapshotPacket(FriendlyByteBuf buffer) {
+        private RulesSnapshotPacket(NetworkBuffer buffer) {
             this.rules = readRules(buffer);
         }
 
-        private void encode(FriendlyByteBuf buffer) {
+        private void encode(NetworkBuffer buffer) {
             writeRules(buffer, rules);
         }
 
-        private void handle(Supplier<NetworkEvent.Context> supplier) {
-            NetworkEvent.Context context = supplier.get();
-            List<String> copiedRules = new ArrayList<>(rules);
-            context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(
-                    Dist.CLIENT,
-                    () -> () -> EntityReseRuleClient.handleSnapshot(copiedRules)
-            ));
-            context.setPacketHandled(true);
-        }
     }
 
     public static final class OperationResultPacket {
@@ -303,25 +234,61 @@ public final class EntityReseRuleNetwork {
             this.rules = sanitizeRules(rules);
         }
 
-        private OperationResultPacket(FriendlyByteBuf buffer) {
+        private OperationResultPacket(NetworkBuffer buffer) {
             this.result = buffer.readByte();
             this.rules = readRules(buffer);
         }
 
-        private void encode(FriendlyByteBuf buffer) {
+        private void encode(NetworkBuffer buffer) {
             buffer.writeByte(result);
             writeRules(buffer, rules);
         }
 
-        private void handle(Supplier<NetworkEvent.Context> supplier) {
-            NetworkEvent.Context context = supplier.get();
-            byte copiedResult = result;
-            List<String> copiedRules = new ArrayList<>(rules);
-            context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(
-                    Dist.CLIENT,
-                    () -> () -> EntityReseRuleClient.handleOperationResult(copiedResult, copiedRules)
-            ));
-            context.setPacketHandled(true);
+    }
+
+    private static void handleSaveRule(SaveRulePacket message, dev.xyat.kineticcore.api.network.ServerPacketContext context) {
+        ServerPlayer player = context.sender();
+        if (cannotEdit(player)) {
+            sendResult(player, RESULT_PERMISSION_DENIED);
+            return;
+        }
+        if (message.threshold < 1 || invalidEntityId(message.entityId)) {
+            sendResult(player, RESULT_INVALID_RULE);
+            return;
+        }
+
+        boolean saved = EntityReseConfig.saveRuleAuthoritative(
+                message.entityId,
+                message.threshold,
+                message.countRealDeath,
+                message.countPreventedDeath,
+                message.countCancelledDeath
+        );
+        if (saved) {
+            broadcastSnapshot();
+            sendResult(player, RESULT_SAVE_SUCCESS);
+        } else {
+            sendResult(player, RESULT_SAVE_FAILED);
+        }
+    }
+
+    private static void handleRemoveRule(RemoveRulePacket message, dev.xyat.kineticcore.api.network.ServerPacketContext context) {
+        ServerPlayer player = context.sender();
+        if (cannotEdit(player)) {
+            sendResult(player, RESULT_PERMISSION_DENIED);
+            return;
+        }
+        if (invalidEntityId(message.entityId)) {
+            sendResult(player, RESULT_INVALID_RULE);
+            return;
+        }
+
+        boolean saved = EntityReseConfig.removeRuleAuthoritative(message.entityId);
+        if (saved) {
+            broadcastSnapshot();
+            sendResult(player, RESULT_REMOVE_SUCCESS);
+        } else {
+            sendResult(player, RESULT_SAVE_FAILED);
         }
     }
 
@@ -336,18 +303,18 @@ public final class EntityReseRuleNetwork {
         return result;
     }
 
-    private static void writeRules(FriendlyByteBuf buffer, List<String> rules) {
+    private static void writeRules(NetworkBuffer buffer, List<String> rules) {
         List<String> safeRules = sanitizeRules(rules);
-        byte[] compressed = NetworkCompressUtil.compress(GSON.toJson(safeRules, RULE_LIST_TYPE));
+        byte[] compressed = KineticCompression.compressUtf8(GSON.toJson(safeRules, RULE_LIST_TYPE), MAX_COMPRESSED_RULE_BYTES, MAX_DECOMPRESSED_RULE_BYTES);
         if (compressed.length > MAX_COMPRESSED_RULE_BYTES) {
             throw new IllegalArgumentException("compressed entity rule payload is too large");
         }
         buffer.writeByteArray(compressed);
     }
 
-    private static List<String> readRules(FriendlyByteBuf buffer) {
+    private static List<String> readRules(NetworkBuffer buffer) {
         byte[] compressed = buffer.readByteArray(MAX_COMPRESSED_RULE_BYTES);
-        String json = NetworkCompressUtil.decompress(compressed, MAX_DECOMPRESSED_RULE_BYTES);
+        String json = KineticCompression.decompressUtf8(compressed, MAX_DECOMPRESSED_RULE_BYTES);
         List<String> decoded = GSON.fromJson(json, RULE_LIST_TYPE);
         if (decoded == null) return new ArrayList<>();
         if (decoded.size() > MAX_RULES) {

@@ -9,8 +9,9 @@ import dev.xyat.entitycontrol.modifier.ModifierModule;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraftforge.fml.loading.FMLPaths;
-import net.minecraftforge.registries.ForgeRegistries;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.runtime.KineticPaths;
 
 import java.io.Reader;
 import java.io.StringReader;
@@ -19,13 +20,15 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.TreeSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
 public class EntityModifierConfig {
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path CONFIG_PATH = FMLPaths.CONFIGDIR.get().resolve("kineticcore").resolve("entity_modifier.json");
+    private static final Path CONFIG_PATH = KineticPaths.configDirectory().resolve("kineticcore/entity_modifier.json");
 
     public static Map<String, EntityEditData> ENTITY_DATA = new TreeMap<>();
 
@@ -36,9 +39,35 @@ public class EntityModifierConfig {
         public String dimensions = "";
     }
 
+    public static final String GLOBAL_KEY = "__global__";
+
+    /** A rule applies to the original base value, never to the previous edited result. */
+    public static class AttributeRule {
+        public String mode = "SET";
+        public double value;
+        /** Null means all entity types; an empty set intentionally matches none. */
+        public Set<String> targetEntities;
+
+        public boolean appliesTo(String entityId) {
+            return targetEntities == null || targetEntities.contains(entityId);
+        }
+
+        public AttributeRule() {}
+        public AttributeRule(String mode, double value) {
+            this.mode = mode;
+            this.value = value;
+        }
+    }
+
     public static class EntityEditData {
+        // Legacy fixed values remain readable and editable without migration.
         public Map<String, Double> attributes = new TreeMap<>();
+        public Map<String, AttributeRule> attributeRules = new TreeMap<>();
         public Map<String, PotionBuff> buffs = new TreeMap<>();
+
+        public boolean hasRules() {
+            return !attributes.isEmpty() || !attributeRules.isEmpty() || !buffs.isEmpty();
+        }
     }
 
     public static void load() {
@@ -133,7 +162,8 @@ public class EntityModifierConfig {
     }
 
     private static EntityEditData normalizeStructure(EntityEditData source) {
-        if (source == null || source.attributes == null || source.buffs == null) {
+        if (source == null || source.attributes == null || source.buffs == null
+                || source.attributeRules == null) {
             return null;
         }
 
@@ -148,6 +178,25 @@ public class EntityModifierConfig {
             target.attributes.put(attributeId, value);
         }
 
+        for (Map.Entry<String, AttributeRule> ruleEntry : source.attributeRules.entrySet()) {
+            String id = normalizeResourceId(ruleEntry.getKey());
+            AttributeRule rule = ruleEntry.getValue();
+            if (id == null || rule == null || rule.mode == null || !Double.isFinite(rule.value)
+                    || Math.abs(rule.value) > 1.0E9D
+                    || !List.of("SET", "MULTIPLY", "ADD", "SUBTRACT").contains(rule.mode)) {
+                return null;
+            }
+            AttributeRule normalizedRule = new AttributeRule(rule.mode, rule.value);
+            if (rule.targetEntities != null) {
+                normalizedRule.targetEntities = new TreeSet<>();
+                for (String raw : rule.targetEntities) {
+                    String targetId = normalizeResourceId(raw);
+                    if (targetId == null) return null;
+                    normalizedRule.targetEntities.add(targetId);
+                }
+            }
+            target.attributeRules.put(id, normalizedRule);
+        }
         for (Map.Entry<String, PotionBuff> buffEntry : source.buffs.entrySet()) {
             String effectId = normalizeResourceId(buffEntry.getKey());
             PotionBuff sourceBuff = buffEntry.getValue();
@@ -207,7 +256,7 @@ public class EntityModifierConfig {
         if (trimmed.isEmpty()) {
             return null;
         }
-        ResourceLocation key = ResourceLocation.tryParse(trimmed);
+        ResourceLocation key = KineticResourceIds.tryParse(trimmed);
         return key == null ? null : key.toString();
     }
 
@@ -224,18 +273,15 @@ public class EntityModifierConfig {
 
         for (Map.Entry<String, EntityEditData> entityEntry : data.entrySet()) {
             String entityId = entityEntry.getKey();
-            if ("__global__".equals(entityId)) {
-                continue;
-            }
-
-            EntityEditData target = validateEntityEntry(entityId, entityEntry.getValue(), dimensions);
+            boolean global = GLOBAL_KEY.equals(entityId);
+            EntityEditData target = validateEntityEntry(global ? null : entityId, entityEntry.getValue(), dimensions);
             if (target == null) {
                 ModifierModule.LOGGER.warn("Removed invalid entity modifier config entry: {}", entityId);
                 continue;
             }
 
-            if (!target.attributes.isEmpty() || !target.buffs.isEmpty()) {
-                validated.put(normalizeResourceId(entityId), target);
+            if (global || target.hasRules()) {
+                validated.put(global ? GLOBAL_KEY : normalizeResourceId(entityId), target);
             }
         }
 
@@ -243,14 +289,11 @@ public class EntityModifierConfig {
     }
 
     private static EntityEditData validateEntityEntry(String entityId, EntityEditData source, Set<ResourceLocation> dimensions) {
-        String normalizedEntityId = normalizeResourceId(entityId);
-        if (normalizedEntityId == null) {
-            return null;
-        }
-
-        ResourceLocation entityKey = ResourceLocation.tryParse(normalizedEntityId);
-        if (entityKey == null || !ForgeRegistries.ENTITY_TYPES.containsKey(entityKey)) {
-            return null;
+        if (entityId != null) {
+            String normalizedEntityId = normalizeResourceId(entityId);
+            if (normalizedEntityId == null) return null;
+            ResourceLocation entityKey = KineticResourceIds.tryParse(normalizedEntityId);
+            if (entityKey == null || !KineticRegistries.entityTypes().contains(entityKey)) return null;
         }
 
         EntityEditData normalized = normalizeStructure(source);
@@ -259,18 +302,29 @@ public class EntityModifierConfig {
         }
 
         EntityEditData target = new EntityEditData();
+        for (Map.Entry<String, AttributeRule> entry : normalized.attributeRules.entrySet()) {
+            ResourceLocation attributeKey = KineticResourceIds.tryParse(entry.getKey());
+            if (attributeKey == null || !KineticRegistries.attributes().contains(attributeKey)) return null;
+            AttributeRule rule = entry.getValue();
+            if (rule.targetEntities != null) {
+                for (String targetId : rule.targetEntities) {
+                    if (!KineticRegistries.entityTypes().contains(KineticResourceIds.tryParse(targetId))) return null;
+                }
+            }
+            target.attributeRules.put(attributeKey.toString(), rule);
+        }
 
         for (Map.Entry<String, Double> attributeEntry : normalized.attributes.entrySet()) {
-            ResourceLocation attributeKey = ResourceLocation.tryParse(attributeEntry.getKey());
-            if (attributeKey == null || !ForgeRegistries.ATTRIBUTES.containsKey(attributeKey)) {
+            ResourceLocation attributeKey = KineticResourceIds.tryParse(attributeEntry.getKey());
+            if (attributeKey == null || !KineticRegistries.attributes().contains(attributeKey)) {
                 return null;
             }
             target.attributes.put(attributeKey.toString(), attributeEntry.getValue());
         }
 
         for (Map.Entry<String, PotionBuff> buffEntry : normalized.buffs.entrySet()) {
-            ResourceLocation effectKey = ResourceLocation.tryParse(buffEntry.getKey());
-            if (effectKey == null || !ForgeRegistries.MOB_EFFECTS.containsKey(effectKey)) {
+            ResourceLocation effectKey = KineticResourceIds.tryParse(buffEntry.getKey());
+            if (effectKey == null || !KineticRegistries.mobEffects().contains(effectKey)) {
                 return null;
             }
 
@@ -278,7 +332,7 @@ public class EntityModifierConfig {
             StringBuilder normalizedDimensions = new StringBuilder();
             if (!sourceBuff.dimensions.isEmpty()) {
                 for (String rawDimension : sourceBuff.dimensions.split(",")) {
-                    ResourceLocation dimensionKey = ResourceLocation.tryParse(rawDimension);
+                    ResourceLocation dimensionKey = KineticResourceIds.tryParse(rawDimension);
                     if (dimensionKey == null || !dimensions.contains(dimensionKey)) {
                         return null;
                     }

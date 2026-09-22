@@ -3,6 +3,9 @@ package dev.xyat.entitycontrol.breakspawn.config;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import dev.xyat.entitycontrol.breakspawn.BreakSpawnModule;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.runtime.KineticPaths;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -10,8 +13,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.Item;
-import net.minecraftforge.fml.loading.FMLPaths;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.io.Reader;
 import java.io.StringReader;
@@ -28,7 +29,7 @@ import java.util.TreeMap;
 
 public final class BreakSpawnConfig {
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path CONFIG_PATH = FMLPaths.CONFIGDIR.get().resolve("kineticcore").resolve("break_spawn.json");
+    private static final Path CONFIG_PATH = KineticPaths.configDirectory().resolve("kineticcore").resolve("break_spawn.json");
     private static final int MAX_NBT_LENGTH = 131072;
 
     public static volatile ConfigRoot CURRENT = new ConfigRoot();
@@ -302,13 +303,13 @@ public final class BreakSpawnConfig {
         ServerLevel validationLevel = server.overworld();
 
         for (Map.Entry<String, EntityRule> entry : normalized.entities.entrySet()) {
-            ResourceLocation entityId = ResourceLocation.tryParse(entry.getKey());
-            if (entityId == null || !ForgeRegistries.ENTITY_TYPES.containsKey(entityId)) {
+            ResourceLocation entityId = KineticResourceIds.tryParse(entry.getKey());
+            if (entityId == null || !KineticRegistries.entityTypes().contains(entityId)) {
                 return null;
             }
             Entity created;
             try {
-                var type = ForgeRegistries.ENTITY_TYPES.getValue(entityId);
+                var type = KineticRegistries.entityTypes().get(entityId);
                 created = type == null ? null : type.create(validationLevel);
             } catch (Throwable throwable) {
                 return null;
@@ -324,8 +325,8 @@ public final class BreakSpawnConfig {
         }
 
         for (Map.Entry<String, BlockRule> entry : normalized.blocks.entrySet()) {
-            ResourceLocation blockId = ResourceLocation.tryParse(entry.getKey());
-            if (blockId == null || !ForgeRegistries.BLOCKS.containsKey(blockId)) {
+            ResourceLocation blockId = KineticResourceIds.tryParse(entry.getKey());
+            if (blockId == null || !KineticRegistries.blocks().contains(blockId)) {
                 return null;
             }
             BlockRule rule = validateBlockRule(entry.getValue(), target.entities);
@@ -359,9 +360,9 @@ public final class BreakSpawnConfig {
     private static BlockRule validateBlockRule(BlockRule source, Map<String, EntityRule> entities) {
         BlockRule rule = normalizeBlockRule(source);
         if (rule == null
-                || !finiteChance(rule.baseChance)
-                || !finiteChance(rule.chancePerFailure)
-                || !finiteChance(rule.maxChance)
+                || invalidChance(rule.baseChance)
+                || invalidChance(rule.chancePerFailure)
+                || invalidChance(rule.maxChance)
                 || rule.maxChance < rule.baseChance
                 || rule.resetAfterTicks < 0
                 || rule.resetAfterTicks > 7_200_000
@@ -381,13 +382,13 @@ public final class BreakSpawnConfig {
                 || rule.minLight < 0
                 || rule.maxLight < rule.minLight
                 || rule.maxLight > 15
-                || !validateRegistryList(rule.dimensions, RegistryKind.DIMENSION)
-                || !validateRegistryList(rule.biomes, RegistryKind.BIOME)) {
+                || hasInvalidRegistryList(rule.dimensions, RegistryKind.DIMENSION)
+                || hasInvalidRegistryList(rule.biomes, RegistryKind.BIOME)) {
             return null;
         }
         Map<String, Integer> validWeights = new TreeMap<>();
         for (Map.Entry<String, Integer> entry : rule.entityWeights.entrySet()) {
-            ResourceLocation entityId = ResourceLocation.tryParse(entry.getKey());
+            ResourceLocation entityId = KineticResourceIds.tryParse(entry.getKey());
             Integer weight = entry.getValue();
             if (entityId == null || weight == null || weight < 0 || weight > 1_000_000
                     || !entities.containsKey(entityId.toString())) {
@@ -399,8 +400,8 @@ public final class BreakSpawnConfig {
         return rule;
     }
 
-    private static boolean finiteChance(double value) {
-        return Double.isFinite(value) && value >= 0.0D && value <= 1.0D;
+    private static boolean invalidChance(double value) {
+        return !Double.isFinite(value) || value < 0.0D || value > 1.0D;
     }
 
     private static EntityRule validateEntityRule(EntityRule source) {
@@ -417,10 +418,10 @@ public final class BreakSpawnConfig {
                 || rule.entityNbt.length() > MAX_NBT_LENGTH) {
             return null;
         }
-        if (!validateRegistryList(rule.dimensions, RegistryKind.DIMENSION)
-                || !validateRegistryList(rule.biomes, RegistryKind.BIOME)
-                || !validateRegistryList(rule.allowedBlocks, RegistryKind.BLOCK)
-                || !validateRegistryList(rule.blockedBlocks, RegistryKind.BLOCK)) {
+        if (hasInvalidRegistryList(rule.dimensions, RegistryKind.DIMENSION)
+                || hasInvalidRegistryList(rule.biomes, RegistryKind.BIOME)
+                || hasInvalidRegistryList(rule.allowedBlocks, RegistryKind.BLOCK)
+                || hasInvalidRegistryList(rule.blockedBlocks, RegistryKind.BLOCK)) {
             return null;
         }
         if (!rule.entityNbt.isEmpty()) {
@@ -432,9 +433,9 @@ public final class BreakSpawnConfig {
         }
         Map<String, AttributeRange> validAttributes = new TreeMap<>();
         for (Map.Entry<String, AttributeRange> entry : rule.attributes.entrySet()) {
-            ResourceLocation id = ResourceLocation.tryParse(entry.getKey());
+            ResourceLocation id = KineticResourceIds.tryParse(entry.getKey());
             AttributeRange range = entry.getValue();
-            if (id == null || !ForgeRegistries.ATTRIBUTES.containsKey(id) || range == null
+            if (id == null || !KineticRegistries.attributes().contains(id) || range == null
                     || !Double.isFinite(range.min) || !Double.isFinite(range.max)
                     || range.max < range.min) {
                 return null;
@@ -452,8 +453,8 @@ public final class BreakSpawnConfig {
             if (spec.itemId.isBlank()) {
                 continue;
             }
-            ResourceLocation itemId = ResourceLocation.tryParse(spec.itemId);
-            Item item = itemId == null ? null : ForgeRegistries.ITEMS.getValue(itemId);
+            ResourceLocation itemId = KineticResourceIds.tryParse(spec.itemId);
+            Item item = itemId == null ? null : KineticRegistries.items().get(itemId);
             if (itemId == null || item == null
                     || spec.count < 1 || spec.count > 64
                     || !Double.isFinite(spec.dropChance)
@@ -481,20 +482,20 @@ public final class BreakSpawnConfig {
         BLOCK
     }
 
-    private static boolean validateRegistryList(String csv, RegistryKind kind) {
+    private static boolean hasInvalidRegistryList(String csv, RegistryKind kind) {
         if (csv == null || csv.isBlank()) {
-            return true;
+            return false;
         }
         for (String raw : csv.split(",")) {
-            ResourceLocation id = ResourceLocation.tryParse(raw.trim());
+            ResourceLocation id = KineticResourceIds.tryParse(raw.trim());
             if (id == null) {
-                return false;
+                return true;
             }
-            if (kind == RegistryKind.BLOCK && !ForgeRegistries.BLOCKS.containsKey(id)) {
-                return false;
+            if (kind == RegistryKind.BLOCK && !KineticRegistries.blocks().contains(id)) {
+                return true;
             }
         }
-        return true;
+        return false;
     }
 
     private static String normalizeResourceList(String raw, boolean keepInvalid) {
@@ -517,7 +518,7 @@ public final class BreakSpawnConfig {
         if (raw == null || raw.isBlank()) {
             return null;
         }
-        ResourceLocation id = ResourceLocation.tryParse(raw.trim());
+        ResourceLocation id = KineticResourceIds.tryParse(raw.trim());
         return id == null ? null : id.toString();
     }
 

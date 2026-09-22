@@ -1,27 +1,27 @@
 package dev.xyat.entitycontrol.reset.client.gui;
 
+import dev.xyat.kineticcore.api.client.input.KineticMouseButtons;
 import dev.xyat.kineticcore.api.client.theme.GuiTheme;
 import dev.xyat.kineticcore.api.client.search.KineticSearch;
-import dev.xyat.kineticcore.api.client.overlay.GuiOverlay;
+import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
 import dev.xyat.kineticcore.api.client.screen.KineticScreen;
-import dev.xyat.kineticcore.config.client.KTConfigApi;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.EntityPreviewRenderer;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.GridScrollController;
+import dev.xyat.kineticcore.api.config.client.KTConfigApi;
+import dev.xyat.kineticcore.api.client.widget.KineticWidgets;
+import dev.xyat.kineticcore.api.client.widget.input.KineticTextFields.KineticEditBox;
+import dev.xyat.kineticcore.api.client.widget.render.KineticEntityPreview.EntityPreviewRenderer;
+import dev.xyat.kineticcore.api.client.widget.scroll.KineticScroll.GridScrollController;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import dev.xyat.entitycontrol.reset.config.EntityReseConfig;
 import dev.xyat.entitycontrol.reset.config.EntityReseConfigGui;
 import dev.xyat.entitycontrol.reset.network.EntityReseRuleNetwork;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-@OnlyIn(Dist.CLIENT)
 public final class EntityResetRuleListScreen extends KineticScreen {
     private static final int PANEL_X = 20;
     private static final int PANEL_Y = 12;
@@ -60,9 +59,9 @@ public final class EntityResetRuleListScreen extends KineticScreen {
     private final List<String> filteredEntityIds = new ArrayList<>();
     private final Map<String, String> searchData = new HashMap<>();
     private final GridScrollController scroll = new GridScrollController();
-    private final EntityPreviewRenderer previewRenderer = new EntityPreviewRenderer();
+    private final EntityPreviewRenderer previewRenderer = KineticWidgets.createEntityPreviewRenderer();
 
-    private EditBox searchBox;
+    private KineticEditBox searchBox;
     private String searchQuery = "";
     private List<Component> deferredTooltip;
     private boolean syncRequested;
@@ -71,40 +70,41 @@ public final class EntityResetRuleListScreen extends KineticScreen {
     public EntityResetRuleListScreen(Screen parent) {
         super(Component.translatable("gui.entitycontrol.reset.rule_list.title"));
         this.parent = parent;
-        useCanvas(640F, 360F, 6);
+        setParentScreen(parent);
         rebuildEntityData();
     }
 
     @Override
     protected void buildUi() {
-        searchBox = addRenderableWidget(new EditBox(
-                font,
+        searchBox = addTextField(
                 SEARCH_X,
                 SEARCH_Y,
                 SEARCH_W,
-                SEARCH_H,
-                Component.translatable("gui.entitycontrol.reset.rule_list.search_hint")
-        ));
+                Component.translatable("gui.entitycontrol.reset.rule_list.search_hint"),
+                Component.translatable("gui.entitycontrol.reset.rule_list.search_hint"),
+                null,
+                null
+        );
         searchBox.setMaxLength(256);
         searchBox.setValue(searchQuery);
-        searchBox.setSuggestion(Component.translatable("gui.entitycontrol.reset.rule_list.search_hint").getString());
         searchBox.setResponder(value -> {
             searchQuery = value == null ? "" : value;
             updateSearch(searchQuery);
         });
 
-        addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.reset.rule_list.back"),
-                        button -> closeToParent())
-                .bounds(BUTTON_X, BUTTON_Y, BUTTON_W, BUTTON_H)
-                .build());
+        addButton(
+                BUTTON_X, BUTTON_Y, BUTTON_W,
+                Component.translatable("gui.entitycontrol.reset.rule_list.back"),
+                null,
+                this::closeToParent
+        );
 
         updateSearch(searchQuery);
         requestServerRulesOnce();
     }
 
     private void requestServerRulesOnce() {
-        if (syncRequested || Minecraft.getInstance().getConnection() == null) return;
+        if (syncRequested || !KineticClientRuntime.connected()) return;
         syncRequested = true;
         initialSyncPending = true;
         EntityReseRuleNetwork.requestRules();
@@ -117,10 +117,10 @@ public final class EntityResetRuleListScreen extends KineticScreen {
 
     private void buildEntityList() {
         allEntityIds.clear();
-        ForgeRegistries.ENTITY_TYPES.getKeys().stream()
+        KineticRegistries.entityTypes().ids().stream()
                 .sorted(ResourceLocation::compareTo)
                 .forEach(id -> {
-                    EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(id);
+                    EntityType<?> type = KineticRegistries.entityTypes().get(id);
                     String value = id.toString();
                     if (EntityReseConfig.hasRule(value)
                             || (type != null && type.getCategory() != MobCategory.MISC)) {
@@ -172,11 +172,11 @@ public final class EntityResetRuleListScreen extends KineticScreen {
     @Override
     protected void renderCanvasBackground(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         deferredTooltip = null;
-        graphics.fillGradient(0, 0, canvasWidth, canvasHeight, 0xFF171717, 0xFF0E0E0E);
+        GuiTheme.canvasBackground(graphics, canvasWidth(), canvasHeight());
         GuiTheme.panel(graphics, PANEL_X, PANEL_Y, PANEL_W, PANEL_H);
-        GuiTheme.itemGrid(graphics, GRID_X - 4, GRID_Y - 4, GRID_W + 8, GRID_H + 8, 6);
-        graphics.renderOutline(GRID_X - 4, GRID_Y - 4, GRID_W + 8, GRID_H + 8, 0xFFFFFFFF);
-        graphics.drawCenteredString(font, title, canvasWidth / 2, 18, 0xFFFFFFFF);
+        GuiTheme.itemGrid(graphics, GRID_X - 4, GRID_Y - 4, GRID_W + 8, GRID_H + 8);
+        GuiTheme.stateOutline(graphics, GRID_X - 4, GRID_Y - 4, GRID_W + 8, GRID_H + 8, false, false, false);
+        graphics.drawCenteredString(font, title, canvasWidth() / 2, 18, 0xFFFFFFFF);
         renderEntityCount(graphics);
         renderGrid(graphics, mouseX, mouseY);
         GuiTheme.scrollbar(
@@ -223,7 +223,7 @@ public final class EntityResetRuleListScreen extends KineticScreen {
         int first = firstRow * COLS;
         int last = Math.min(first + (VISIBLE_ROWS + 1) * COLS, filteredEntityIds.size());
 
-        enableCanvasScissor(graphics, GRID_X, GRID_Y, GRID_X + GRID_W, GRID_Y + GRID_H);
+        enableUiScissor(graphics, GRID_X, GRID_Y, GRID_X + GRID_W, GRID_Y + GRID_H);
         try {
             for (int index = first; index < last; index++) {
                 int localIndex = index - first;
@@ -235,10 +235,11 @@ public final class EntityResetRuleListScreen extends KineticScreen {
                         && mouseX >= x && mouseX < x + CELL_W
                         && mouseY >= y && mouseY < y + CELL_H;
 
-                GuiTheme.itemSlot(graphics, x, y, CELL_W, CELL_H, 4, hovered);
+                GuiTheme.itemSlot(graphics, x, y, CELL_W, CELL_H, 4, false, hovered, false);
                 if (configured) {
-                    graphics.renderOutline(x, y, CELL_W, CELL_H, 0xFF55FF55);
-                    graphics.renderOutline(x + 1, y + 1, CELL_W - 2, CELL_H - 2, 0xFF55FF55);
+                    GuiTheme.indicatorOutline(
+                            graphics, x, y, CELL_W, CELL_H, GuiTheme.Indicator.SUCCESS, 2
+                    );
                 }
 
                 boolean rendered = previewRenderer.render(
@@ -249,9 +250,9 @@ public final class EntityResetRuleListScreen extends KineticScreen {
                         y + 3,
                         CELL_W - 6,
                         CELL_H - 6,
-                        canvasScale,
-                        canvasX,
-                        canvasY,
+                        canvasScale(),
+                        canvasX(),
+                        canvasY(),
                         hovered
                 );
                 if (!rendered) {
@@ -263,7 +264,7 @@ public final class EntityResetRuleListScreen extends KineticScreen {
                 }
             }
         } finally {
-            graphics.disableScissor();
+            disableUiScissor(graphics);
         }
     }
 
@@ -307,8 +308,8 @@ public final class EntityResetRuleListScreen extends KineticScreen {
     }
 
     private String entityName(String id) {
-        ResourceLocation location = ResourceLocation.tryParse(id);
-        EntityType<?> type = location == null ? null : ForgeRegistries.ENTITY_TYPES.getValue(location);
+        ResourceLocation location = KineticResourceIds.tryParse(id);
+        EntityType<?> type = location == null ? null : KineticRegistries.entityTypes().get(location);
         return type == null ? id : type.getDescription().getString();
     }
 
@@ -325,8 +326,8 @@ public final class EntityResetRuleListScreen extends KineticScreen {
     }
 
     private void openRuleEditor(String entityId) {
-        if (minecraft == null || initialSyncPending) return;
-        minecraft.setScreen(new EntityResetRuleEditScreen(this, entityId));
+        if (initialSyncPending) return;
+        KineticClientRuntime.openScreen(new EntityResetRuleEditScreen(this, entityId));
     }
 
     public void onServerOperationResult(byte result) {
@@ -336,7 +337,7 @@ public final class EntityResetRuleListScreen extends KineticScreen {
                 || result == EntityReseRuleNetwork.RESULT_SAVE_SUCCESS) {
             KTConfigApi.notifySaved(EntityReseConfigGui.PAGE_ID);
         } else {
-            GuiOverlay.toast(Component.translatable("msg.entitycontrol.reset.rule_list.save_failed"));
+            KineticOverlays.toast(Component.translatable("msg.entitycontrol.reset.rule_list.save_failed"));
         }
     }
 
@@ -357,7 +358,7 @@ public final class EntityResetRuleListScreen extends KineticScreen {
             return true;
         }
 
-        if (button == 0 && scroll.beginDrag(
+        if (KineticMouseButtons.isPrimary(button) && scroll.beginDrag(
                 mouseX,
                 mouseY,
                 SCROLL_X,
@@ -370,7 +371,7 @@ public final class EntityResetRuleListScreen extends KineticScreen {
             return true;
         }
 
-        if (button == 0 && inGrid(mouseX, mouseY)) {
+        if (KineticMouseButtons.isPrimary(button) && inGrid(mouseX, mouseY)) {
             int index = entityIndex(mouseX, mouseY);
             if (index >= 0 && index < filteredEntityIds.size()) {
                 openRuleEditor(filteredEntityIds.get(index));
@@ -394,7 +395,7 @@ public final class EntityResetRuleListScreen extends KineticScreen {
 
     @Override
     protected boolean canvasMouseScrolled(double mouseX, double mouseY, double delta) {
-        if (Screen.hasControlDown() && inGrid(mouseX, mouseY)) {
+        if (KineticClientRuntime.controlModifierDown() && inGrid(mouseX, mouseY)) {
             int index = entityIndex(mouseX, mouseY);
             if (index >= 0 && index < filteredEntityIds.size()) {
                 String id = filteredEntityIds.get(index);
@@ -417,23 +418,22 @@ public final class EntityResetRuleListScreen extends KineticScreen {
             int mouseY
     ) {
         if (deferredTooltip != null) {
-            GuiOverlay.requestTooltip(deferredTooltip, mouseX, mouseY);
+            KineticOverlays.requestTooltip(deferredTooltip, mouseX, mouseY);
         }
     }
 
     private void closeToParent() {
-        if (minecraft != null) minecraft.setScreen(parent);
+        navigateBack();
     }
 
     @Override
-    public void onClose() {
-        closeToParent();
+    protected boolean handleCloseRequest() {
+        return false;
     }
 
     @Override
-    public void removed() {
+    protected void screenRemoved() {
         previewRenderer.clear();
-        super.removed();
     }
 
     @Override

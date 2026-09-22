@@ -1,21 +1,25 @@
 package dev.xyat.entitycontrol.modifier.client.gui;
 
 import net.minecraft.ChatFormatting;
+import dev.xyat.kineticcore.api.client.input.KineticMouseButtons;
 import dev.xyat.kineticcore.api.client.theme.GuiTheme;
-import dev.xyat.kineticcore.api.client.overlay.GuiOverlay;
+import dev.xyat.kineticcore.api.client.widget.KineticWidgets;
+import dev.xyat.kineticcore.api.client.widget.button.KineticButtons.StateButton;
+import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
 import dev.xyat.kineticcore.api.client.screen.KineticScreen;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.GridScrollController;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.NumericEditBox;
+import dev.xyat.kineticcore.api.client.widget.input.KineticNumericFields.NumericEditBox;
+import dev.xyat.kineticcore.api.client.widget.scroll.KineticScroll.GridScrollController;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import dev.xyat.entitycontrol.modifier.config.EntityModifierConfig;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class BuffEditScreen extends KineticScreen {
     private static final int VISIBLE_DIMENSIONS = 6;
@@ -33,6 +37,7 @@ public class BuffEditScreen extends KineticScreen {
 
     private final GridScrollController dimensionScroll =
             new GridScrollController();
+    private final Map<String, StateButton> dimensionButtons = new HashMap<>();
 
     private NumericEditBox chanceBox;
     private NumericEditBox minBox;
@@ -49,6 +54,7 @@ public class BuffEditScreen extends KineticScreen {
         ));
 
         this.parent = parent;
+        setParentScreen(parent);
         this.entityId = entityId;
         this.effectId = effectId;
         this.buff = buff;
@@ -66,17 +72,9 @@ public class BuffEditScreen extends KineticScreen {
     private void refreshDimList() {
         allDims.clear();
 
-        if (Minecraft.getInstance()
-                .getConnection() != null) {
-            Minecraft.getInstance()
-                    .getConnection()
-                    .levels()
-                    .forEach(key ->
-                            allDims.add(
-                                    key.location().toString()
-                            )
-                    );
-        }
+        KineticClientRuntime.knownLevels().forEach(key ->
+                allDims.add(key.location().toString())
+        );
 
         for (String dimension : addedDimensions) {
             if (!allDims.contains(dimension)) {
@@ -106,139 +104,86 @@ public class BuffEditScreen extends KineticScreen {
 
     @Override
     protected void buildUi() {
-        int centerX = canvasWidth / 2;
-        int centerY = canvasHeight / 2;
+        int centerX = canvasWidth() / 2;
+        int centerY = canvasHeight() / 2;
 
-        int chanceLabelWidth =
-                font.width(
-                        Component.translatable(
-                                "gui.entitycontrol.modifier.modifier.buff.chance"
-                        )
-                );
+        int chanceLabelWidth = font.width(Component.translatable(
+                "gui.entitycontrol.modifier.modifier.buff.chance"
+        ));
+        int minLabelWidth = font.width(Component.translatable(
+                "gui.entitycontrol.modifier.modifier.buff.min"
+        ));
+        int maxLabelWidth = font.width(Component.translatable(
+                "gui.entitycontrol.modifier.modifier.buff.max"
+        ));
 
-        int minLabelWidth =
-                font.width(
-                        Component.translatable(
-                                "gui.entitycontrol.modifier.modifier.buff.min"
-                        )
-                );
+        int totalRowWidth = chanceLabelWidth + 5 + 40 + 15
+                + minLabelWidth + 5 + 30 + 15
+                + maxLabelWidth + 5 + 30;
+        int currentX = centerX - totalRowWidth / 2;
+        int topRowY = centerY - 70;
 
-        int maxLabelWidth =
-                font.width(
-                        Component.translatable(
-                                "gui.entitycontrol.modifier.modifier.buff.max"
-                        )
-                );
-
-        int totalRowWidth =
-                chanceLabelWidth
-                        + 5
-                        + 40
-                        + 15
-                        + minLabelWidth
-                        + 5
-                        + 30
-                        + 15
-                        + maxLabelWidth
-                        + 5
-                        + 30;
-
-        int currentX =
-                centerX - totalRowWidth / 2;
-
-        int topRowY =
-                centerY - 70;
-
-        chanceBox = NumericEditBox.decimal(
-                font,
+        chanceBox = addDecimalField(
                 currentX + chanceLabelWidth + 5,
                 topRowY,
                 40,
-                20,
                 Component.empty(),
                 false,
                 0D,
-                1D
+                1D,
+                null,
+                null
         );
+        chanceBox.setDoubleValue(buff.chance);
 
-        chanceBox.setValue(
-                NumericEditBox.format(buff.chance)
-        );
+        currentX += chanceLabelWidth + 5 + 40 + 15;
 
-        addRenderableWidget(chanceBox);
-
-        currentX +=
-                chanceLabelWidth + 5 + 40 + 15;
-
-        minBox = NumericEditBox.integer(
-                font,
+        minBox = addIntegerField(
                 currentX + minLabelWidth + 5,
                 topRowY,
                 30,
-                20,
                 Component.empty(),
                 false,
                 0,
+                null,
+                null,
                 null
         );
-
         minBox.setIntValue(buff.minLevel);
-        addRenderableWidget(minBox);
 
-        currentX +=
-                minLabelWidth + 5 + 30 + 15;
+        currentX += minLabelWidth + 5 + 30 + 15;
 
-        maxBox = NumericEditBox.integer(
-                font,
+        maxBox = addIntegerField(
                 currentX + maxLabelWidth + 5,
                 topRowY,
                 30,
-                20,
                 Component.empty(),
                 false,
                 0,
+                null,
+                null,
                 null
         );
-
         maxBox.setIntValue(buff.maxLevel);
-        addRenderableWidget(maxBox);
 
         refreshDimList();
 
-        addRenderableWidget(
-                Button.builder(
-                                Component.translatable(
-                                        "gui.entitycontrol.modifier.modifier.save"
-                                ),
-                                button -> saveAndBack()
-                        )
-                        .bounds(
-                                centerX - 75,
-                                centerY + 115,
-                                65,
-                                20
-                        )
-                        .build()
+        addButton(
+                centerX - 75,
+                centerY + 115,
+                65,
+                Component.translatable("gui.entitycontrol.modifier.modifier.save"),
+                null,
+                this::saveAndBack
         );
 
-        addRenderableWidget(
-                Button.builder(
-                                Component.translatable(
-                                        "gui.entitycontrol.modifier.config.back"
-                                ),
-                                button -> {
-                                    if (minecraft != null) {
-                                        minecraft.setScreen(parent);
-                                    }
-                                }
-                        )
-                        .bounds(
-                                centerX + 10,
-                                centerY + 115,
-                                65,
-                                20
-                        )
-                        .build()
+        addButton(
+                centerX + 10,
+                centerY + 115,
+                65,
+                Component.translatable("gui.entitycontrol.modifier.config.back"),
+                null,
+                this::navigateBack
         );
     }
 
@@ -256,7 +201,7 @@ public class BuffEditScreen extends KineticScreen {
                 || minLevel == null
                 || maxLevel == null
                 || maxLevel < minLevel) {
-            GuiOverlay.toast(
+            KineticOverlays.toast(
                     Component.translatable(
                             "msg.entitycontrol.modifier.invalid_number"
                     )
@@ -282,9 +227,35 @@ public class BuffEditScreen extends KineticScreen {
                         buff
                 );
 
-        if (minecraft != null) {
-            minecraft.setScreen(parent);
+        navigateBack();
+    }
+
+    private StateButton dimensionButton(String dimension, int x, int y, int width, int clipTop, int clipBottom) {
+        StateButton button = dimensionButtons.computeIfAbsent(dimension, id -> KineticWidgets.createCompactButton(
+                0, 0, width, Component.empty(), null, () -> toggleDimension(id)
+        ));
+        boolean added = addedDimensions.contains(dimension);
+        button.setX(x);
+        button.setY(y);
+        button.setWidth(width);
+        button.setText(Component.translatable(
+                added
+                        ? "gui.entitycontrol.modifier.modifier.buff.dim_remove_btn"
+                        : "gui.entitycontrol.modifier.modifier.buff.dim_add_btn"
+        ));
+        button.setError(added);
+        button.setSelected(false);
+        button.setClipBounds(x, clipTop, x + width, clipBottom);
+        return button;
+    }
+
+    private void toggleDimension(String dimension) {
+        if (addedDimensions.contains(dimension)) {
+            addedDimensions.remove(dimension);
+        } else {
+            addedDimensions.add(dimension);
         }
+        refreshDimList();
     }
 
     @Override
@@ -294,8 +265,8 @@ public class BuffEditScreen extends KineticScreen {
             int mouseY,
             float partialTick
     ) {
-        int centerX = canvasWidth / 2;
-        int centerY = canvasHeight / 2;
+        int centerX = canvasWidth() / 2;
+        int centerY = canvasHeight() / 2;
 
         GuiTheme.panel(
                 graphics,
@@ -399,21 +370,7 @@ public class BuffEditScreen extends KineticScreen {
         int listW = 330;
         int listH = 132;
 
-        graphics.fill(
-                listX,
-                listY,
-                listX + listW,
-                listY + listH,
-                0xFF111111
-        );
-
-        graphics.renderOutline(
-                listX,
-                listY,
-                listW,
-                listH,
-                0xFF555555
-        );
+        GuiTheme.panelAlt(graphics, listX, listY, listW, listH);
     }
 
     @Override
@@ -423,8 +380,8 @@ public class BuffEditScreen extends KineticScreen {
             int mouseY,
             float partialTick
     ) {
-        int centerX = canvasWidth / 2;
-        int centerY = canvasHeight / 2;
+        int centerX = canvasWidth() / 2;
+        int centerY = canvasHeight() / 2;
 
         int listX = centerX - 165;
         int listY = centerY - 35;
@@ -443,7 +400,7 @@ public class BuffEditScreen extends KineticScreen {
                 allDims.size() - first
         );
 
-        enableCanvasScissor(graphics, listX, listY, listX + listW - 8, listY + listH);
+        enableUiScissor(graphics, listX, listY, listX + listW - 8, listY + listH);
         for (int row = 0; row < visibleCount; row++) {
             int drawY =
                     listY + row * 22 - shift;
@@ -460,15 +417,10 @@ public class BuffEditScreen extends KineticScreen {
                             && mouseY >= drawY
                             && mouseY < drawY + 22;
 
-            if (hovered) {
-                graphics.fill(
-                        listX + 1,
-                        drawY,
-                        listX + listW - 8,
-                        drawY + 22,
-                        0x33FFFFFF
-                );
-            }
+            GuiTheme.stateSurface(
+                    graphics, listX + 1, drawY, listW - 9, 22,
+                    GuiTheme.Surface.PANEL_ALT, false, hovered, false
+            );
 
             graphics.drawString(
                     font,
@@ -485,43 +437,13 @@ public class BuffEditScreen extends KineticScreen {
             int buttonY =
                     drawY + 3;
 
-            boolean buttonHovered =
-                    mouseX >= buttonX
-                            && mouseX <= buttonX + buttonWidth
-                            && mouseY >= buttonY
-                            && mouseY <= buttonY + 16;
-
-            graphics.fill(
-                    buttonX,
-                    buttonY,
-                    buttonX + buttonWidth,
-                    buttonY + 16,
-                    added
-                            ? buttonHovered
-                            ? 0xFFFF5555
-                            : 0xFFAA0000
-                            : buttonHovered
-                            ? 0xFF55FF55
-                            : 0xFF00AA00
+            StateButton dimensionButton = dimensionButton(
+                    dimension, buttonX, buttonY, buttonWidth, listY, listY + listH
             );
-
-            String buttonText =
-                    Component.translatable(
-                            added
-                                    ? "gui.entitycontrol.modifier.modifier.buff.dim_remove_btn"
-                                    : "gui.entitycontrol.modifier.modifier.buff.dim_add_btn"
-                    ).getString();
-
-            graphics.drawCenteredString(
-                    font,
-                    buttonText,
-                    buttonX + buttonWidth / 2,
-                    buttonY + 4,
-                    0xFFFFFF
-            );
+            KineticWidgets.renderControl(dimensionButton, graphics, mouseX, mouseY, partialTick);
         }
 
-        graphics.disableScissor();
+        disableUiScissor(graphics);
 
         dimensionScroll.render(
                 graphics,
@@ -541,15 +463,15 @@ public class BuffEditScreen extends KineticScreen {
             double mouseY,
             int button
     ) {
-        int centerX = canvasWidth / 2;
-        int centerY = canvasHeight / 2;
+        int centerX = canvasWidth() / 2;
+        int centerY = canvasHeight() / 2;
 
         int listX = centerX - 165;
         int listY = centerY - 35;
         int listW = 330;
         int listH = 132;
 
-        if (button == 0
+        if (KineticMouseButtons.isPrimary(button)
                 && dimensionScroll.beginDrag(
                         mouseX,
                         mouseY,
@@ -576,20 +498,14 @@ public class BuffEditScreen extends KineticScreen {
                         allDims.get(index);
 
                 int buttonWidth = 44;
-                int buttonX =
-                        listX + listW - 10 - buttonWidth;
-
-                if (mouseX >= buttonX
-                        && mouseX <= buttonX + buttonWidth) {
-                    if (addedDimensions.contains(dimension)) {
-                        addedDimensions.remove(dimension);
-                    } else {
-                        addedDimensions.add(dimension);
-                    }
-
-                    refreshDimList();
-                    return true;
-                }
+                int buttonX = listX + listW - 10 - buttonWidth;
+                int drawY = listY
+                        + (index - dimensionScroll.smoothIndexOffset()) * 22
+                        - dimensionScroll.visualShift(22);
+                StateButton dimensionButton = dimensionButton(
+                        dimension, buttonX, drawY + 3, buttonWidth, listY, listY + listH
+                );
+                if (dimensionButton.mouseClicked(mouseX, mouseY, button)) return true;
             }
         }
 
@@ -610,7 +526,7 @@ public class BuffEditScreen extends KineticScreen {
     ) {
         if (dimensionScroll.drag(
                 mouseY,
-                canvasHeight / 2 - 34,
+                canvasHeight() / 2 - 34,
                 130,
                 15
         )) {

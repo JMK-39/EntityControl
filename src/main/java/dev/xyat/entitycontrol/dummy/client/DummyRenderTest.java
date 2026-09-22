@@ -1,5 +1,8 @@
 package dev.xyat.entitycontrol.dummy.client;
 
+import javax.annotation.Nonnull;
+
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.xyat.entitycontrol.dummy.entity.DummyEntityTest;
 import net.minecraft.client.model.VillagerModel;
@@ -12,14 +15,14 @@ import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 
 public class DummyRenderTest extends LivingEntityRenderer<DummyEntityTest, VillagerModel<DummyEntityTest>> {
-    private static final ResourceLocation VILLAGER_TEXTURE = new ResourceLocation("minecraft", "textures/entity/villager/villager.png");
+    private static final ResourceLocation VILLAGER_TEXTURE = KineticResourceIds.of("minecraft", "textures/entity/villager/villager.png");
 
     public DummyRenderTest(EntityRendererProvider.Context context) {
         super(context, new VillagerModel<>(context.bakeLayer(ModelLayers.VILLAGER)), 0.5F);
     }
 
     @Override
-    protected void scale(@NotNull DummyEntityTest entity, PoseStack poseStack, float partialTickTime) {
+    protected void scale(@NotNull DummyEntityTest entity, @Nonnull PoseStack poseStack, float partialTickTime) {
         float s = 0.9375F;
         poseStack.scale(s, s, s);
     }

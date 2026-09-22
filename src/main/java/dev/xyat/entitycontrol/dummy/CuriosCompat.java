@@ -6,7 +6,7 @@ import dev.xyat.entitycontrol.dummy.config.DummyConfig;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.fml.ModList;
+import dev.xyat.kineticcore.api.runtime.KineticPlatform;
 import top.theillusivec4.curios.api.CuriosApi;
 import top.theillusivec4.curios.api.type.capability.ICuriosItemHandler;
 
@@ -19,7 +19,7 @@ public final class CuriosCompat {
     }
 
     public static boolean isAvailable() {
-        return ModList.get().isLoaded("curios");
+        return KineticPlatform.isModLoaded("curios");
     }
 
     public static void initDummySlots(LivingEntity entity) {

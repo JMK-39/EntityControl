@@ -3,6 +3,8 @@ package dev.xyat.entitycontrol.spawn.mixin;
 import net.minecraft.ChatFormatting;
 import dev.xyat.entitycontrol.spawn.api.SpawnerRuntimeAccessor;
 import dev.xyat.entitycontrol.spawn.config.SpawnerConfig;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -14,7 +16,6 @@ import net.minecraft.world.level.BaseSpawner;
 import net.minecraft.world.level.SpawnData;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
-import net.minecraftforge.registries.ForgeRegistries;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -356,8 +357,8 @@ public abstract class BaseSpawnerMixin implements SpawnerRuntimeAccessor {
             return null;
         }
 
-        ResourceLocation id = ResourceLocation.tryParse(entityTag.getString("id"));
-        if (id == null || !ForgeRegistries.ENTITY_TYPES.containsKey(id)) {
+        ResourceLocation id = KineticResourceIds.tryParse(entityTag.getString("id"));
+        if (id == null || !KineticRegistries.entityTypes().contains(id)) {
             return null;
         }
         return id;

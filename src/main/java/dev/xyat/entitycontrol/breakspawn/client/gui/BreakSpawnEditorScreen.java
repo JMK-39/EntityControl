@@ -1,32 +1,32 @@
 package dev.xyat.entitycontrol.breakspawn.client.gui;
 
-import dev.xyat.kineticcore.api.client.overlay.GuiOverlay;
+import dev.xyat.kineticcore.api.client.input.KineticMouseButtons;
+import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
 import dev.xyat.entitycontrol.breakspawn.config.BreakSpawnConfig;
 import dev.xyat.entitycontrol.breakspawn.network.BreakSpawnNetwork;
 import dev.xyat.kineticcore.api.client.search.KineticSearch;
 import dev.xyat.kineticcore.api.client.theme.GuiTheme;
 import dev.xyat.kineticcore.api.client.screen.KineticScreen;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.EntityPreviewRenderer;
-import dev.xyat.kineticcore.api.client.selector.EntitySelectorScreen;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.GridScrollController;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.HighZButton;
-import dev.xyat.kineticcore.api.client.selector.NbtEditorScreen;
-import net.minecraft.client.Minecraft;
+import dev.xyat.kineticcore.api.client.widget.KineticWidgets;
+import dev.xyat.kineticcore.api.client.widget.KineticControl;
+import dev.xyat.kineticcore.api.client.widget.render.KineticEntityPreview.EntityPreviewRenderer;
+import dev.xyat.kineticcore.api.client.selector.KineticSelectors;
+import dev.xyat.kineticcore.api.client.widget.scroll.KineticScroll.GridScrollController;
+import dev.xyat.kineticcore.api.client.widget.button.KineticButtons.StateButton;
+import dev.xyat.kineticcore.api.client.widget.input.KineticTextFields.KineticEditBox;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -56,57 +56,52 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
 
     private final Screen parent;
     private final BreakSpawnConfig.ConfigRoot localConfig;
-    private final EntityPreviewRenderer previewRenderer = new EntityPreviewRenderer();
+    private final EntityPreviewRenderer previewRenderer = KineticWidgets.createEntityPreviewRenderer();
     private final GridScrollController listScroll = new GridScrollController();
     private final List<String> filteredIds = new ArrayList<>();
-    private final List<Button> globalWidgets = new ArrayList<>();
-    private final List<Button> entityButtons = new ArrayList<>();
-    private final List<EditBox> globalBoxes = new ArrayList<>();
-    private final List<EditBox> entityBoxes = new ArrayList<>();
-    private final List<EditBox> conditionBoxes = new ArrayList<>();
-    private final List<Button> contextButtons = new ArrayList<>();
+    private final List<StateButton> globalWidgets = new ArrayList<>();
+    private final List<StateButton> entityButtons = new ArrayList<>();
+    private final List<KineticEditBox> globalBoxes = new ArrayList<>();
+    private final List<KineticEditBox> entityBoxes = new ArrayList<>();
+    private final List<KineticEditBox> conditionBoxes = new ArrayList<>();
 
-    private EditBox searchBox;
-    private EditBox chanceBox;
-    private EditBox minCountBox;
-    private EditBox maxCountBox;
-    private EditBox minDistanceBox;
-    private EditBox radiusBox;
-    private EditBox verticalRadiusBox;
-    private EditBox attemptsBox;
-    private EditBox cooldownBox;
-    private EditBox weightBox;
-    private EditBox minYBox;
-    private EditBox maxYBox;
-    private EditBox customNameBox;
-    private EditBox dimensionsBox;
-    private EditBox biomesBox;
-    private EditBox allowedBlocksBox;
-    private EditBox blockedBlocksBox;
-    private EditBox minLightBox;
-    private EditBox maxLightBox;
-    private Button globalEnabledButton;
-    private Button creativeButton;
-    private Button spawnModeButton;
-    private Button globalTabButton;
-    private Button entityTabButton;
-    private Button conditionsTabButton;
+    private KineticEditBox searchBox;
+    private KineticEditBox chanceBox;
+    private KineticEditBox minCountBox;
+    private KineticEditBox maxCountBox;
+    private KineticEditBox minDistanceBox;
+    private KineticEditBox radiusBox;
+    private KineticEditBox verticalRadiusBox;
+    private KineticEditBox attemptsBox;
+    private KineticEditBox cooldownBox;
+    private KineticEditBox weightBox;
+    private KineticEditBox minYBox;
+    private KineticEditBox maxYBox;
+    private KineticEditBox customNameBox;
+    private KineticEditBox dimensionsBox;
+    private KineticEditBox biomesBox;
+    private KineticEditBox allowedBlocksBox;
+    private KineticEditBox blockedBlocksBox;
+    private KineticEditBox minLightBox;
+    private KineticEditBox maxLightBox;
+    private StateButton globalEnabledButton;
+    private StateButton creativeButton;
+    private StateButton spawnModeButton;
+    private StateButton globalTabButton;
+    private StateButton entityTabButton;
+    private StateButton conditionsTabButton;
     private String selectedId;
     private int activeTab = 0;
-    private int contextX;
-    private int contextY;
-    private boolean contextOpen;
-    private List<Component> deferredTooltip;
 
     public BreakSpawnEditorScreen(Screen parent, String serverSnapshotJson) {
         super(Component.translatable("gui.entitycontrol.breakspawn.editor.title"));
         this.parent = parent;
+        setParentScreen(parent);
         BreakSpawnConfig.ConfigRoot parsed = BreakSpawnConfig.parseConfigJson(serverSnapshotJson);
         if (parsed == null) {
             throw new IllegalArgumentException("Invalid break spawn snapshot");
         }
         this.localConfig = parsed;
-        useCanvas(640f, 360f, 6);
         previewRenderer.setRotationSpeedPercent(100);
         refreshFiltered("");
         configureStandaloneDraft(
@@ -122,52 +117,31 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
     @Override
     protected void buildUi() {
         clearWidgetLists();
-        searchBox = addRenderableWidget(new EditBox(
-                font,
-                LEFT_X,
-                SEARCH_Y,
-                142,
-                20,
-                Component.translatable("gui.entitycontrol.breakspawn.search.entities")
-        ));
+        searchBox = addTextField(
+                LEFT_X, SEARCH_Y, 142,
+                Component.translatable("gui.entitycontrol.breakspawn.search.entities"),
+                Component.translatable("gui.entitycontrol.breakspawn.search.entities.placeholder"),
+                null, null
+        );
         searchBox.setMaxLength(128);
         searchBox.setResponder(this::refreshFiltered);
 
-        addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.manage_entities"),
-                        ignored -> openEntitySelector())
-                .bounds(LEFT_X + 147, SEARCH_Y, 77, 20)
-                .build());
-
-        globalTabButton = addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.tab.global"),
-                        ignored -> setActiveTab(0))
-                .bounds(RIGHT_X, TAB_Y, 121, 20).build());
-        entityTabButton = addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.tab.entity"),
-                        ignored -> setActiveTab(1))
-                .bounds(RIGHT_X + 126, TAB_Y, 121, 20).build());
-        conditionsTabButton = addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.tab.conditions"),
-                        ignored -> setActiveTab(2))
-                .bounds(RIGHT_X + 252, TAB_Y, 121, 20).build());
+        addButton(LEFT_X + 147, SEARCH_Y, 77, Component.translatable("gui.entitycontrol.breakspawn.manage_entities"), null, this::openEntitySelector);
+        globalTabButton = addButton(RIGHT_X, TAB_Y, 121, Component.translatable("gui.entitycontrol.breakspawn.tab.global"), null, () -> setActiveTab(0));
+        entityTabButton = addButton(RIGHT_X + 126, TAB_Y, 121, Component.translatable("gui.entitycontrol.breakspawn.tab.entity"), null, () -> setActiveTab(1));
+        conditionsTabButton = addButton(RIGHT_X + 252, TAB_Y, 121, Component.translatable("gui.entitycontrol.breakspawn.tab.conditions"), null, () -> setActiveTab(2));
 
         buildGlobalWidgets();
         buildEntityWidgets();
         buildConditionWidgets();
-        buildContextButtons();
 
-        Button saveButton = addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.save"),
-                        ignored -> saveConfig())
-                .bounds(405, 322, 104, 22)
-                .build());
-        saveButton.setTooltip(Tooltip.create(Component.translatable("gui.entitycontrol.breakspawn.save.tooltip")));
-        addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.back"),
-                        ignored -> onClose())
-                .bounds(514, 322, 104, 22)
-                .build());
+        addButton(
+                405, 322, 104,
+                Component.translatable("gui.entitycontrol.breakspawn.save"),
+                Component.translatable("gui.entitycontrol.breakspawn.save.tooltip"),
+                this::saveConfig
+        );
+        addButton(514, 322, 104, Component.translatable("gui.entitycontrol.breakspawn.back"), null, this::onClose);
 
         refreshFiltered(searchBox.getValue());
         refreshSelectionWidgets();
@@ -180,7 +154,6 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
         globalBoxes.clear();
         entityBoxes.clear();
         conditionBoxes.clear();
-        contextButtons.clear();
     }
 
     private void buildGlobalWidgets() {
@@ -209,8 +182,8 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
             localConfig.global.creativeCanTrigger = !localConfig.global.creativeCanTrigger;
             updateGlobalToggleLabels();
         });
-        Button blockRulesButton = addGlobalButton(255, 258, 363, this::openBlockRuleEditor);
-        blockRulesButton.setMessage(Component.translatable("gui.entitycontrol.breakspawn.block_rules"));
+        StateButton blockRulesButton = addGlobalButton(255, 258, 363, this::openBlockRuleEditor);
+        blockRulesButton.setText(Component.translatable("gui.entitycontrol.breakspawn.block_rules"));
         updateGlobalToggleLabels();
     }
 
@@ -229,15 +202,15 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
             updateSpawnModeLabel();
         }));
         addEntityButton(442, 184, this::openAttributeEditor)
-                .setMessage(Component.translatable("gui.entitycontrol.breakspawn.attributes"));
+                .setText(Component.translatable("gui.entitycontrol.breakspawn.attributes"));
         addEntityButton(255, 216, this::openEquipmentEditor)
-                .setMessage(Component.translatable("gui.entitycontrol.breakspawn.equipment"));
+                .setText(Component.translatable("gui.entitycontrol.breakspawn.equipment"));
         addEntityButton(442, 216, this::openEntityNbtEditor)
-                .setMessage(Component.translatable("gui.entitycontrol.breakspawn.entity_nbt"));
+                .setText(Component.translatable("gui.entitycontrol.breakspawn.entity_nbt"));
         addEntityButton(255, 248, this::openEntitySelector)
-                .setMessage(Component.translatable("gui.entitycontrol.breakspawn.manage_entities"));
+                .setText(Component.translatable("gui.entitycontrol.breakspawn.manage_entities"));
         addEntityButton(442, 248, this::removeSelected)
-                .setMessage(Component.translatable("gui.entitycontrol.breakspawn.remove"));
+                .setText(Component.translatable("gui.entitycontrol.breakspawn.remove"));
     }
 
     private void buildConditionWidgets() {
@@ -255,38 +228,27 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
                 value -> selectedRule().ifPresent(rule -> rule.maxLight = clampInt((int) value, 0, 15)));
     }
 
-    private void buildContextButtons() {
-        for (int i = 0; i < 7; i++) {
-            final int index = i;
-            HighZButton button = new HighZButton(0, 0, 150, 18, Component.empty(), ignored -> toggleContextValue(index), null, 300);
-            button.visible = false;
-            contextButtons.add(addRenderableWidget(button));
-        }
-    }
-
-    private Button addGlobalButton(int x, int y, int width, Runnable action) {
-        Button button = addRenderableWidget(Button.builder(Component.empty(), ignored -> action.run())
-                .bounds(x, y, width, 20).build());
+    private StateButton addGlobalButton(int x, int y, int width, Runnable action) {
+        StateButton button = addButton(x, y, width, Component.empty(), null, action);
         globalWidgets.add(button);
         return button;
     }
 
-    private Button addEntityButton(int x, int y, Runnable action) {
-        Button button = addRenderableWidget(Button.builder(Component.empty(), ignored -> action.run())
-                .bounds(x, y, 176, 20).build());
+    private StateButton addEntityButton(int x, int y, Runnable action) {
+        StateButton button = addButton(x, y, 176, Component.empty(), null, action);
         entityButtons.add(button);
         return button;
     }
 
-    private EditBox createNumberBox(
+    private KineticEditBox createNumberBox(
             int x,
             int y,
             int width,
             String initial,
-            List<? super EditBox> group,
+            List<KineticEditBox> group,
             java.util.function.DoubleConsumer consumer
     ) {
-        EditBox box = new EditBox(font, x, y, width, 20, Component.empty());
+        KineticEditBox box = addTextField(x, y, width, Component.empty());
         box.setMaxLength(32);
         box.setValue(initial);
         box.setResponder(value -> {
@@ -295,21 +257,19 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
             } catch (Exception ignored) {
             }
         });
-        addRenderableWidget(box);
         group.add(box);
         return box;
     }
 
-    private EditBox createTextBox(
+    private KineticEditBox createTextBox(
             int y,
-            List<? super EditBox> group,
+            List<KineticEditBox> group,
             Consumer<String> consumer
     ) {
-        EditBox box = new EditBox(font, 350, y, 268, 20, Component.empty());
+        KineticEditBox box = addTextField(350, y, 268, Component.empty());
         box.setMaxLength(4096);
         box.setValue("");
         box.setResponder(consumer);
-        addRenderableWidget(box);
         group.add(box);
         return box;
     }
@@ -317,23 +277,23 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
     private void setActiveTab(int tab) {
         activeTab = clampInt(tab, 0, 2);
         boolean hasEntity = selectedId != null && localConfig.entities.containsKey(selectedId);
-        globalTabButton.active = activeTab != 0;
-        entityTabButton.active = hasEntity && activeTab != 1;
-        conditionsTabButton.active = hasEntity && activeTab != 2;
+        globalTabButton.setEnabled(activeTab != 0);
+        entityTabButton.setEnabled(hasEntity && activeTab != 1);
+        conditionsTabButton.setEnabled(hasEntity && activeTab != 2);
         setVisible(globalBoxes, activeTab == 0);
-        for (Button button : globalWidgets) {
-            button.visible = activeTab == 0;
+        for (StateButton button : globalWidgets) {
+            button.setVisible(activeTab == 0);
         }
         setVisible(entityBoxes, activeTab == 1 && hasEntity);
-        for (Button button : entityButtons) {
-            button.visible = activeTab == 1 && hasEntity;
+        for (StateButton button : entityButtons) {
+            button.setVisible(activeTab == 1 && hasEntity);
         }
         setVisible(conditionBoxes, activeTab == 2 && hasEntity);
     }
 
-    private void setVisible(Collection<? extends net.minecraft.client.gui.components.AbstractWidget> widgets, boolean visible) {
-        for (net.minecraft.client.gui.components.AbstractWidget widget : widgets) {
-            widget.visible = visible;
+    private void setVisible(List<? extends KineticControl> widgets, boolean visible) {
+        for (KineticControl widget : widgets) {
+            widget.setVisible(visible);
         }
     }
 
@@ -361,12 +321,12 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
     }
 
     private void updateGlobalToggleLabels() {
-        globalEnabledButton.setMessage(toggleLabel("gui.entitycontrol.breakspawn.global_enabled", localConfig.global.enabled));
-        creativeButton.setMessage(toggleLabel("gui.entitycontrol.breakspawn.creative_trigger", localConfig.global.creativeCanTrigger));
+        globalEnabledButton.setText(toggleLabel("gui.entitycontrol.breakspawn.global_enabled", localConfig.global.enabled));
+        creativeButton.setText(toggleLabel("gui.entitycontrol.breakspawn.creative_trigger", localConfig.global.creativeCanTrigger));
     }
 
     private void updateSpawnModeLabel() {
-        selectedRule().ifPresent(rule -> spawnModeButton.setMessage(Component.translatable(
+        selectedRule().ifPresent(rule -> spawnModeButton.setText(Component.translatable(
                 "gui.entitycontrol.breakspawn.spawn_mode",
                 Component.translatable("gui.entitycontrol.breakspawn.spawn_mode." + rule.spawnMode.toLowerCase(Locale.ROOT))
         )));
@@ -402,12 +362,11 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
 
     private void openBlockRuleEditor() {
         syncFieldValues();
-        Minecraft.getInstance().setScreen(new BlockRuleEditorScreen(this, localConfig));
+        KineticClientRuntime.openScreen(new BlockRuleEditorScreen(this, localConfig));
     }
 
     private void openEntitySelector() {
-        Minecraft minecraft = Minecraft.getInstance();
-        minecraft.setScreen(new EntitySelectorScreen(
+        KineticSelectors.openEntitySelector(
                 this,
                 Component.translatable("gui.entitycontrol.breakspawn.entity_selector.title"),
                 localConfig.entities.keySet(),
@@ -439,12 +398,12 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
                     refreshFiltered(searchBox == null ? "" : searchBox.getValue());
                     refreshSelectionWidgets();
                 }
-        ));
+        );
     }
 
     private boolean isLivingEntity(String id) {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null) {
+        var level = KineticClientRuntime.currentLevel();
+        if (level == null) {
             return false;
         }
         EntityType<?> type = entityType(id);
@@ -452,7 +411,7 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
             return false;
         }
         try {
-            Entity entity = type.create(minecraft.level);
+            Entity entity = type.create(level);
             return entity instanceof LivingEntity;
         } catch (Throwable ignored) {
             return false;
@@ -460,30 +419,30 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
     }
 
     private EntityType<?> entityType(String id) {
-        ResourceLocation location = ResourceLocation.tryParse(id);
-        return location == null ? null : ForgeRegistries.ENTITY_TYPES.getValue(location);
+        ResourceLocation location = KineticResourceIds.tryParse(id);
+        return location == null ? null : KineticRegistries.entityTypes().get(location);
     }
 
     private void openAttributeEditor() {
         if (selectedId == null) {
             return;
         }
-        Minecraft.getInstance().setScreen(new AttributeRangeScreen(this, selectedId, localConfig.entities.get(selectedId)));
+        KineticClientRuntime.openScreen(new AttributeRangeScreen(this, selectedId, localConfig.entities.get(selectedId)));
     }
 
     private void openEquipmentEditor() {
         if (selectedId == null) {
             return;
         }
-        Minecraft.getInstance().setScreen(new EquipmentEditorScreen(this, selectedId, localConfig.entities.get(selectedId)));
+        KineticClientRuntime.openScreen(new EquipmentEditorScreen(this, selectedId, localConfig.entities.get(selectedId)));
     }
 
     private void openEntityNbtEditor() {
-        selectedRule().ifPresent(rule -> Minecraft.getInstance().setScreen(new NbtEditorScreen(
+        selectedRule().ifPresent(rule -> KineticSelectors.openNbtEditor(
+                this,
                 rule.entityNbt == null ? "" : rule.entityNbt,
-                value -> rule.entityNbt = value == null ? "" : value,
-                this
-        )));
+                value -> rule.entityNbt = value == null ? "" : value
+        ));
     }
 
     private void removeSelected() {
@@ -513,7 +472,7 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
 
     private void saveConfig() {
         syncFieldValues();
-        BreakSpawnNetwork.CHANNEL.sendToServer(new BreakSpawnNetwork.SaveConfigPacket(BreakSpawnConfig.GSON.toJson(localConfig)));
+        BreakSpawnNetwork.saveConfig(BreakSpawnConfig.GSON.toJson(localConfig));
         commitDraft();
     }
 
@@ -540,7 +499,7 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
         });
     }
 
-    private void applyDouble(EditBox box, java.util.function.DoubleConsumer consumer) {
+    private void applyDouble(KineticEditBox box, java.util.function.DoubleConsumer consumer) {
         if (box == null) {
             return;
         }
@@ -552,17 +511,12 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
 
     @Override
     public void renderCanvasBackground(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        deferredTooltip = null;
-        graphics.fill(0, 0, canvasWidth, canvasHeight, 0xD9000000);
-        GuiTheme.panel(graphics, PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 0xD91A1E26, 0xFF506070);
-        GuiTheme.panel(graphics, LEFT_X, LIST_Y, LEFT_W, LIST_H, 0xB010141A, 0xFF43515F);
-        GuiTheme.panel(graphics, RIGHT_X, RIGHT_Y, RIGHT_W, RIGHT_H, 0xB010141A, 0xFF43515F);
+        GuiTheme.panel(graphics, PANEL_X, PANEL_Y, PANEL_W, PANEL_H);
+        GuiTheme.panelAlt(graphics, LEFT_X, LIST_Y, LEFT_W, LIST_H);
+        GuiTheme.panelAlt(graphics, RIGHT_X, RIGHT_Y, RIGHT_W, RIGHT_H);
         graphics.drawString(font, title, 14, 16, 0xFFFFFFFF, false);
         renderEntityList(graphics, mouseX, mouseY, partialTick);
         renderRightPanel(graphics, mouseX, mouseY);
-        if (contextOpen) {
-            renderContextCard(graphics);
-        }
     }
 
     private void renderEntityList(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
@@ -573,7 +527,7 @@ public final class BreakSpawnEditorScreen extends KineticScreen {
         int shift = listScroll.visualShift(ROW_H + ROW_GAP);
         int end = Math.min(filteredIds.size(), start + VISIBLE_ROWS + 1);
         int rowIndex = 0;
-                enableCanvasScissor(graphics, LEFT_X + 2, LIST_Y + 2, LEFT_X + LEFT_W - 10, LIST_Y + LIST_H - 2);
+                enableUiScissor(graphics, LEFT_X + 2, LIST_Y + 2, LEFT_X + LEFT_W - 10, LIST_Y + LIST_H - 2);
         try {
 for (int index = start; index < end; index++) {
             int rowY = LIST_Y + rowIndex * (ROW_H + ROW_GAP) + 2 - shift;
@@ -584,9 +538,13 @@ for (int index = start; index < end; index++) {
             BreakSpawnConfig.EntityRule rule = localConfig.entities.get(id);
             boolean hovered = isInside(mouseX, mouseY, LEFT_X + 2, rowY, LEFT_W - 12, ROW_H);
             boolean selected = id.equals(selectedId);
-            int outline = hovered ? 0xFFAAAAAA : rule != null && rule.enabled ? 0xFF00C853 : 0xFF59636E;
-            int background = selected ? 0xB0283440 : 0xA0182028;
-            GuiTheme.panel(graphics, LEFT_X + 2, rowY, LEFT_W - 12, ROW_H, background, outline);
+            GuiTheme.stateSurface(
+                    graphics, LEFT_X + 2, rowY, LEFT_W - 12, ROW_H,
+                    GuiTheme.Surface.PANEL_ALT,
+                    selected || (rule != null && rule.enabled),
+                    hovered,
+                    false
+            );
             EntityPreviewRenderer.drawCheckerboard(graphics, LEFT_X + 5, rowY + 4, 44, 44);
             previewRenderer.render(
                     graphics,
@@ -596,9 +554,9 @@ for (int index = start; index < end; index++) {
                     rowY + 4,
                     44,
                     44,
-                    canvasScale,
-                    canvasX,
-                    canvasY,
+                    canvasScale(),
+                    canvasX(),
+                    canvasY(),
                     hovered
             );
             EntityType<?> type = entityType(id);
@@ -612,7 +570,7 @@ for (int index = start; index < end; index++) {
             rowIndex++;
         }
         } finally {
-            graphics.disableScissor();
+            disableUiScissor(graphics);
         }
         GuiTheme.scrollbar(listScroll, graphics, mouseX, mouseY, SCROLL_X, LIST_Y + 2, SCROLL_W, LIST_H - 4, 24);
     }
@@ -672,56 +630,27 @@ for (int index = start; index < end; index++) {
         graphics.drawString(font, Component.translatable(key), x, y, 0xFFFFFFFF, false);
     }
 
-    private void renderContextCard(GuiGraphics graphics) {
-        graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, 250);
-        GuiTheme.panel(graphics, contextX, contextY, 162, 196, 0xF018202A, 0xFFAAAAAA);
-        graphics.drawString(font, Component.translatable("gui.entitycontrol.breakspawn.quick_switches"), contextX + 8, contextY + 7, 0xFFFFFFFF, false);
-        graphics.pose().popPose();
-    }
-
-    @Override
-    protected void renderCanvasForeground(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        if (searchBox != null && searchBox.getValue().isEmpty() && !searchBox.isFocused()) {
-            String placeholder = font.plainSubstrByWidth(
-                    Component.translatable("gui.entitycontrol.breakspawn.search.entities.placeholder").getString(),
-                    Math.max(0, searchBox.getWidth() - 10)
-            );
-            graphics.drawString(font, placeholder, searchBox.getX() + 5, searchBox.getY() + 6, 0xFFB8C8D8, false);
-        }
-    }
-
-    @Override
-    protected void renderTooltips(GuiGraphics graphics, int scaledMouseX, int scaledMouseY, int mouseX, int mouseY) {
-        if (deferredTooltip != null) {
-            GuiOverlay.requestTooltip(deferredTooltip, mouseX, mouseY);
-        }
-    }
-
     @Override
     protected boolean canvasMouseClicked(double mouseX, double mouseY, int button) {
-        if (contextOpen && !isInside(mouseX, mouseY, contextX, contextY, 162, 196)) {
-            closeContextMenu();
-        }
         boolean widgetHandled = super.canvasMouseClicked(mouseX, mouseY, button);
         if (widgetHandled) {
             return true;
         }
-        if (button == 0 && listScroll.beginDrag(mouseX, mouseY, SCROLL_X, LIST_Y + 2, SCROLL_W, LIST_H - 4, 24, 2)) {
+        if (KineticMouseButtons.isPrimary(button) && listScroll.beginDrag(mouseX, mouseY, SCROLL_X, LIST_Y + 2, SCROLL_W, LIST_H - 4, 24, 2)) {
             return true;
         }
         int index = rowIndexAt(mouseX, mouseY);
         if (index >= 0 && index < filteredIds.size()) {
             String id = filteredIds.get(index);
-            if (button == 0) {
+            if (KineticMouseButtons.isPrimary(button)) {
                 selectedId = id;
                 refreshSelectionWidgets();
                 return true;
             }
-            if (button == 1) {
+            if (KineticMouseButtons.isSecondary(button)) {
                 selectedId = id;
                 refreshSelectionWidgets();
-                openContextMenu(mouseX, mouseY);
+                openEntityContextMenu(mouseX, mouseY);
                 return true;
             }
         }
@@ -742,7 +671,7 @@ for (int index = start; index < end; index++) {
     @Override
     protected boolean canvasMouseScrolled(double mouseX, double mouseY, double delta) {
         int index = rowIndexAt(mouseX, mouseY);
-        if (net.minecraft.client.gui.screens.Screen.hasControlDown() && index >= 0 && index < filteredIds.size()) {
+        if (KineticClientRuntime.controlModifierDown() && index >= 0 && index < filteredIds.size()) {
             String id = filteredIds.get(index);
             previewRenderer.adjustZoom("breakspawn:" + id, delta);
             return true;
@@ -767,24 +696,40 @@ for (int index = start; index < end; index++) {
         return listScroll.smoothIndexOffset() + row;
     }
 
-    private void openContextMenu(double mouseX, double mouseY) {
-        contextX = clampInt((int) mouseX + 6, 8, 640 - 170);
-        contextY = clampInt((int) mouseY + 6, 8, 360 - 204);
-        contextOpen = true;
-        for (int i = 0; i < contextButtons.size(); i++) {
-            Button button = contextButtons.get(i);
-            button.setX(contextX + 6);
-            button.setY(contextY + 26 + i * 23);
-            button.visible = true;
+    private void openEntityContextMenu(double mouseX, double mouseY) {
+        BreakSpawnConfig.EntityRule rule = selectedRule().orElse(null);
+        if (rule == null) {
+            return;
         }
-        updateContextLabels();
-    }
-
-    private void closeContextMenu() {
-        contextOpen = false;
-        for (Button button : contextButtons) {
-            button.visible = false;
+        boolean[] values = {
+                rule.enabled,
+                rule.persistent,
+                rule.silent,
+                rule.glowing,
+                rule.noAi,
+                rule.invulnerable,
+                rule.customNameVisible
+        };
+        String[] keys = {
+                "gui.entitycontrol.breakspawn.switch.entity_enabled",
+                "gui.entitycontrol.breakspawn.switch.persistent",
+                "gui.entitycontrol.breakspawn.switch.silent",
+                "gui.entitycontrol.breakspawn.switch.glowing",
+                "gui.entitycontrol.breakspawn.switch.no_ai",
+                "gui.entitycontrol.breakspawn.switch.invulnerable",
+                "gui.entitycontrol.breakspawn.switch.name_visible"
+        };
+        List<KineticOverlays.MenuItem> items = new ArrayList<>();
+        for (int i = 0; i < keys.length; i++) {
+            int index = i;
+            items.add(KineticOverlays.MenuItem.toggle(
+                    Component.translatable(keys[i]),
+                    Component.translatable(keys[i]),
+                    values[i],
+                    () -> toggleContextValue(index)
+            ));
         }
+        openContextMenu(mouseX, mouseY, items);
     }
 
     private void toggleContextValue(int index) {
@@ -799,33 +744,6 @@ for (int index = start; index < end; index++) {
                 case 6 -> rule.customNameVisible = !rule.customNameVisible;
                 default -> {
                 }
-            }
-            updateContextLabels();
-        });
-    }
-
-    private void updateContextLabels() {
-        selectedRule().ifPresent(rule -> {
-            boolean[] values = {
-                    rule.enabled,
-                    rule.persistent,
-                    rule.silent,
-                    rule.glowing,
-                    rule.noAi,
-                    rule.invulnerable,
-                    rule.customNameVisible
-            };
-            String[] keys = {
-                    "gui.entitycontrol.breakspawn.switch.entity_enabled",
-                    "gui.entitycontrol.breakspawn.switch.persistent",
-                    "gui.entitycontrol.breakspawn.switch.silent",
-                    "gui.entitycontrol.breakspawn.switch.glowing",
-                    "gui.entitycontrol.breakspawn.switch.no_ai",
-                    "gui.entitycontrol.breakspawn.switch.invulnerable",
-                    "gui.entitycontrol.breakspawn.switch.name_visible"
-            };
-            for (int i = 0; i < contextButtons.size(); i++) {
-                contextButtons.get(i).setMessage(toggleLabel(keys[i], values[i]));
             }
         });
     }
@@ -843,7 +761,12 @@ for (int index = start; index < end; index++) {
     }
 
     @Override
-    public void onClose() {
-        Minecraft.getInstance().setScreen(parent);
+    protected boolean handleCloseRequest() {
+        return false;
+    }
+
+    @Override
+    protected void screenRemoved() {
+        previewRenderer.clear();
     }
 }

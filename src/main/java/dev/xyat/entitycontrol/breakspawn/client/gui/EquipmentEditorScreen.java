@@ -1,21 +1,19 @@
 package dev.xyat.entitycontrol.breakspawn.client.gui;
 
 import dev.xyat.entitycontrol.breakspawn.config.BreakSpawnConfig;
-import dev.xyat.kineticcore.api.client.theme.GuiTheme;
-import dev.xyat.kineticcore.api.client.selector.ItemSelectorScreen;
 import dev.xyat.kineticcore.api.client.screen.KineticScreen;
-import dev.xyat.kineticcore.api.client.selector.NbtEditorScreen;
-import net.minecraft.client.Minecraft;
+import dev.xyat.kineticcore.api.client.selector.KineticSelectors;
+import dev.xyat.kineticcore.api.client.theme.GuiTheme;
+import dev.xyat.kineticcore.api.client.widget.input.KineticTextFields.KineticEditBox;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.LinkedHashMap;
@@ -31,14 +29,14 @@ public final class EquipmentEditorScreen extends KineticScreen {
     private final Screen parent;
     private final String entityId;
     private final BreakSpawnConfig.EntityRule rule;
-    private final Map<String, EditBox> dropBoxes = new LinkedHashMap<>();
+    private final Map<String, KineticEditBox> dropBoxes = new LinkedHashMap<>();
 
     public EquipmentEditorScreen(Screen parent, String entityId, BreakSpawnConfig.EntityRule rule) {
         super(Component.translatable("gui.entitycontrol.breakspawn.equipment.title"));
         this.parent = parent;
+        setParentScreen(parent);
         this.entityId = entityId;
         this.rule = rule;
-        useCanvas(640f, 360f, 6);
     }
 
     @Override
@@ -49,7 +47,7 @@ public final class EquipmentEditorScreen extends KineticScreen {
             int x = CARD_X[index];
             int y = CARD_Y[index];
             BreakSpawnConfig.EquipmentSpec spec = rule.equipment.computeIfAbsent(slot, ignored -> new BreakSpawnConfig.EquipmentSpec());
-            EditBox dropBox = addRenderableWidget(new EditBox(font, x + 109, y + 27, 68, 18, Component.empty()));
+            KineticEditBox dropBox = addTextField(x + 109, y + 27, 68, Component.empty());
             dropBox.setMaxLength(16);
             dropBox.setValue(String.valueOf(spec.dropChance * 100.0D));
             dropBox.setResponder(value -> {
@@ -60,32 +58,40 @@ public final class EquipmentEditorScreen extends KineticScreen {
             });
             dropBoxes.put(slot, dropBox);
 
-            addRenderableWidget(Button.builder(
-                            Component.translatable("gui.entitycontrol.breakspawn.equipment.select"),
-                            ignored -> openItemSelector(slot))
-                    .bounds(x + 8, y + 72, 54, 20).build());
-            addRenderableWidget(Button.builder(
-                            Component.translatable("gui.entitycontrol.breakspawn.equipment.nbt"),
-                            ignored -> openNbtEditor(slot))
-                    .bounds(x + 67, y + 72, 54, 20).build());
-            addRenderableWidget(Button.builder(
-                            Component.translatable("gui.entitycontrol.breakspawn.equipment.clear"),
-                            ignored -> clearSlot(slot))
-                    .bounds(x + 126, y + 72, 54, 20).build());
+            addButton(
+                    x + 8, y + 72, 54,
+                    Component.translatable("gui.entitycontrol.breakspawn.equipment.select"),
+                    null,
+                    () -> openItemSelector(slot)
+            );
+            addButton(
+                    x + 67, y + 72, 54,
+                    Component.translatable("gui.entitycontrol.breakspawn.equipment.nbt"),
+                    null,
+                    () -> openNbtEditor(slot)
+            );
+            addButton(
+                    x + 126, y + 72, 54,
+                    Component.translatable("gui.entitycontrol.breakspawn.equipment.clear"),
+                    null,
+                    () -> clearSlot(slot)
+            );
         }
-        addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.back"),
-                        ignored -> onClose())
-                .bounds(430, 322, 190, 22).build());
+        addButton(
+                430, 322, 190,
+                Component.translatable("gui.entitycontrol.breakspawn.back"),
+                null,
+                this::onClose
+        );
     }
 
     private void openItemSelector(String slot) {
-        Minecraft.getInstance().setScreen(new ItemSelectorScreen(this, selection -> {
+        KineticSelectors.openItemSelector(this, selection -> {
             if (!selection.isItem()) {
                 return;
             }
             ItemStack stack = selection.stack().copy();
-            ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
+            ResourceLocation id = KineticRegistries.items().id(stack.getItem());
             if (id == null) {
                 return;
             }
@@ -93,16 +99,16 @@ public final class EquipmentEditorScreen extends KineticScreen {
             spec.itemId = id.toString();
             spec.count = 1;
             spec.nbt = stack.hasTag() && stack.getTag() != null ? stack.getTag().toString() : "";
-        }));
+        });
     }
 
     private void openNbtEditor(String slot) {
         BreakSpawnConfig.EquipmentSpec spec = rule.equipment.computeIfAbsent(slot, ignored -> new BreakSpawnConfig.EquipmentSpec());
-        Minecraft.getInstance().setScreen(new NbtEditorScreen(
+        KineticSelectors.openNbtEditor(
+                this,
                 spec.nbt == null ? "" : spec.nbt,
-                value -> spec.nbt = value == null ? "" : value,
-                this
-        ));
+                value -> spec.nbt = value == null ? "" : value
+        );
     }
 
     private void clearSlot(String slot) {
@@ -111,7 +117,7 @@ public final class EquipmentEditorScreen extends KineticScreen {
         spec.nbt = "";
         spec.count = 1;
         spec.dropChance = 0.0D;
-        EditBox dropBox = dropBoxes.get(slot);
+        KineticEditBox dropBox = dropBoxes.get(slot);
         if (dropBox != null) {
             dropBox.setValue("0.0");
         }
@@ -119,8 +125,7 @@ public final class EquipmentEditorScreen extends KineticScreen {
 
     @Override
     protected void renderCanvasBackground(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, canvasWidth, canvasHeight, 0xD9000000);
-        GuiTheme.panel(graphics, 8, 8, 624, 344, 0xD91A1E26, 0xFF506070);
+        GuiTheme.panel(graphics, 8, 8, 624, 344);
         graphics.drawString(font, title, 20, 18, 0xFFFFFFFF, false);
         graphics.drawString(font, Component.literal(entityId), 20, 38, 0xFFB8C8D8, false);
         for (int index = 0; index < SLOTS.length; index++) {
@@ -130,7 +135,7 @@ public final class EquipmentEditorScreen extends KineticScreen {
     }
 
     private void renderCard(GuiGraphics graphics, String slot, int x, int y) {
-        GuiTheme.panel(graphics, x, y, CARD_W, CARD_H, 0xB010141A, 0xFF43515F);
+        GuiTheme.panelAlt(graphics, x, y, CARD_W, CARD_H);
         graphics.drawString(font, Component.translatable("gui.entitycontrol.breakspawn.slot." + slot), x + 8, y + 8, 0xFFFFFFFF, false);
         BreakSpawnConfig.EquipmentSpec spec = rule.equipment.get(slot);
         ItemStack stack = stackFromSpec(spec);
@@ -148,8 +153,8 @@ public final class EquipmentEditorScreen extends KineticScreen {
         if (spec == null || spec.itemId == null || spec.itemId.isBlank()) {
             return ItemStack.EMPTY;
         }
-        ResourceLocation id = ResourceLocation.tryParse(spec.itemId);
-        Item item = id == null ? null : ForgeRegistries.ITEMS.getValue(id);
+        ResourceLocation id = KineticResourceIds.tryParse(spec.itemId);
+        Item item = id == null ? null : KineticRegistries.items().get(id);
         if (item == null) {
             return ItemStack.EMPTY;
         }
@@ -164,7 +169,7 @@ public final class EquipmentEditorScreen extends KineticScreen {
     }
 
     @Override
-    public void onClose() {
-        Minecraft.getInstance().setScreen(parent);
+    protected boolean handleCloseRequest() {
+        return false;
     }
 }

@@ -1,14 +1,16 @@
 package dev.xyat.entitycontrol.breakspawn.client.gui;
 
 import dev.xyat.entitycontrol.breakspawn.config.BreakSpawnConfig;
+import dev.xyat.kineticcore.api.client.input.KineticMouseButtons;
+import dev.xyat.kineticcore.api.client.screen.KineticScreen;
 import dev.xyat.kineticcore.api.client.search.KineticSearch;
 import dev.xyat.kineticcore.api.client.theme.GuiTheme;
-import dev.xyat.kineticcore.api.client.screen.KineticScreen;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.GridScrollController;
-import net.minecraft.client.Minecraft;
+import dev.xyat.kineticcore.api.client.widget.input.KineticTextFields.KineticEditBox;
+import dev.xyat.kineticcore.api.client.widget.scroll.KineticScroll.GridScrollController;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -16,7 +18,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
-import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -39,35 +40,35 @@ public final class AttributeRangeScreen extends KineticScreen {
     private final List<Attribute> allAttributes = new ArrayList<>();
     private final List<Attribute> filtered = new ArrayList<>();
     private LivingEntity previewEntity;
-    private EditBox searchBox;
-    private EditBox minBox;
-    private EditBox maxBox;
+    private KineticEditBox searchBox;
+    private KineticEditBox minBox;
+    private KineticEditBox maxBox;
     private Attribute selected;
     private boolean loadingFields;
 
     public AttributeRangeScreen(Screen parent, String entityId, BreakSpawnConfig.EntityRule rule) {
         super(Component.translatable("gui.entitycontrol.breakspawn.attributes.title"));
         this.parent = parent;
+        setParentScreen(parent);
         this.entityId = entityId;
         this.rule = rule;
-        useCanvas(640f, 360f, 6);
         buildPreviewEntity();
         buildAttributeList();
         refreshFilter("");
     }
 
     private void buildPreviewEntity() {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null) {
+        var level = KineticClientRuntime.currentLevel();
+        if (level == null) {
             return;
         }
-        ResourceLocation id = ResourceLocation.tryParse(entityId);
-        EntityType<?> type = id == null ? null : ForgeRegistries.ENTITY_TYPES.getValue(id);
+        ResourceLocation id = KineticResourceIds.tryParse(entityId);
+        EntityType<?> type = id == null ? null : KineticRegistries.entityTypes().get(id);
         if (type == null) {
             return;
         }
         try {
-            Entity entity = type.create(minecraft.level);
+            Entity entity = type.create(level);
             if (entity instanceof LivingEntity living) {
                 previewEntity = living;
             }
@@ -77,8 +78,8 @@ public final class AttributeRangeScreen extends KineticScreen {
 
     private void buildAttributeList() {
         allAttributes.clear();
-        for (Attribute attribute : ForgeRegistries.ATTRIBUTES.getValues()) {
-            ResourceLocation id = ForgeRegistries.ATTRIBUTES.getKey(attribute);
+        for (Attribute attribute : KineticRegistries.attributes().values()) {
+            ResourceLocation id = KineticRegistries.attributes().id(attribute);
             if (id == null) {
                 continue;
             }
@@ -89,39 +90,50 @@ public final class AttributeRangeScreen extends KineticScreen {
             }
         }
         allAttributes.sort(Comparator.comparing(attribute -> {
-            ResourceLocation id = ForgeRegistries.ATTRIBUTES.getKey(attribute);
+            ResourceLocation id = KineticRegistries.attributes().id(attribute);
             return id == null ? "" : id.toString();
         }));
     }
 
     @Override
     protected void buildUi() {
-        searchBox = addRenderableWidget(new EditBox(
-                font, LIST_X, 40, LIST_W, 20,
-                Component.translatable("gui.entitycontrol.breakspawn.attributes.search")
-        ));
+        searchBox = addTextField(
+                LIST_X,
+                40,
+                LIST_W,
+                Component.translatable("gui.entitycontrol.breakspawn.attributes.search"),
+                Component.translatable("gui.entitycontrol.breakspawn.attributes.search.placeholder"),
+                null,
+                null
+        );
         searchBox.setMaxLength(128);
         searchBox.setResponder(this::refreshFilter);
 
-        minBox = addRenderableWidget(new EditBox(font, 495, 132, 120, 20, Component.empty()));
-        maxBox = addRenderableWidget(new EditBox(font, 495, 169, 120, 20, Component.empty()));
+        minBox = addTextField(495, 132, 120, Component.empty());
+        maxBox = addTextField(495, 169, 120, Component.empty());
         minBox.setMaxLength(32);
         maxBox.setMaxLength(32);
         minBox.setResponder(value -> updateSelectedRange(true, value));
         maxBox.setResponder(value -> updateSelectedRange(false, value));
 
-        addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.attributes.use_default"),
-                        ignored -> useDefaultValue())
-                .bounds(420, 211, 195, 20).build());
-        addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.attributes.clear"),
-                        ignored -> clearSelected())
-                .bounds(420, 236, 195, 20).build());
-        addRenderableWidget(Button.builder(
-                        Component.translatable("gui.entitycontrol.breakspawn.back"),
-                        ignored -> onClose())
-                .bounds(420, 305, 195, 20).build());
+        addButton(
+                420, 211, 195,
+                Component.translatable("gui.entitycontrol.breakspawn.attributes.use_default"),
+                null,
+                this::useDefaultValue
+        );
+        addButton(
+                420, 236, 195,
+                Component.translatable("gui.entitycontrol.breakspawn.attributes.clear"),
+                null,
+                this::clearSelected
+        );
+        addButton(
+                420, 305, 195,
+                Component.translatable("gui.entitycontrol.breakspawn.back"),
+                null,
+                this::onClose
+        );
         updateFieldState();
     }
 
@@ -129,7 +141,7 @@ public final class AttributeRangeScreen extends KineticScreen {
         String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
         filtered.clear();
         for (Attribute attribute : allAttributes) {
-            ResourceLocation id = ForgeRegistries.ATTRIBUTES.getKey(attribute);
+            ResourceLocation id = KineticRegistries.attributes().id(attribute);
             if (id == null) {
                 continue;
             }
@@ -140,8 +152,8 @@ public final class AttributeRangeScreen extends KineticScreen {
             }
         }
         filtered.sort((left, right) -> {
-            ResourceLocation leftId = ForgeRegistries.ATTRIBUTES.getKey(left);
-            ResourceLocation rightId = ForgeRegistries.ATTRIBUTES.getKey(right);
+            ResourceLocation leftId = KineticRegistries.attributes().id(left);
+            ResourceLocation rightId = KineticRegistries.attributes().id(right);
             boolean leftEdited = leftId != null && rule.attributes.containsKey(leftId.toString());
             boolean rightEdited = rightId != null && rule.attributes.containsKey(rightId.toString());
             if (leftEdited != rightEdited) {
@@ -156,7 +168,7 @@ public final class AttributeRangeScreen extends KineticScreen {
         if (loadingFields || selected == null) {
             return;
         }
-        ResourceLocation id = ForgeRegistries.ATTRIBUTES.getKey(selected);
+        ResourceLocation id = KineticRegistries.attributes().id(selected);
         if (id == null) {
             return;
         }
@@ -185,7 +197,7 @@ public final class AttributeRangeScreen extends KineticScreen {
         if (selected == null) {
             return;
         }
-        ResourceLocation id = ForgeRegistries.ATTRIBUTES.getKey(selected);
+        ResourceLocation id = KineticRegistries.attributes().id(selected);
         if (id == null) {
             return;
         }
@@ -202,7 +214,7 @@ public final class AttributeRangeScreen extends KineticScreen {
         if (selected == null) {
             return;
         }
-        ResourceLocation id = ForgeRegistries.ATTRIBUTES.getKey(selected);
+        ResourceLocation id = KineticRegistries.attributes().id(selected);
         if (id != null) {
             rule.attributes.remove(id.toString());
         }
@@ -214,14 +226,14 @@ public final class AttributeRangeScreen extends KineticScreen {
         loadingFields = true;
         try {
             boolean active = selected != null;
-            minBox.active = active;
-            maxBox.active = active;
+            minBox.setEnabled(active);
+            maxBox.setEnabled(active);
             if (!active) {
                 minBox.setValue("");
                 maxBox.setValue("");
                 return;
             }
-            ResourceLocation id = ForgeRegistries.ATTRIBUTES.getKey(selected);
+            ResourceLocation id = KineticRegistries.attributes().id(selected);
             BreakSpawnConfig.AttributeRange range = id == null ? null : rule.attributes.get(id.toString());
             double base = getDefaultValue(selected);
             minBox.setValue(String.valueOf(range == null ? base : range.min));
@@ -240,10 +252,9 @@ public final class AttributeRangeScreen extends KineticScreen {
 
     @Override
     protected void renderCanvasBackground(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, canvasWidth, canvasHeight, 0xD9000000);
-        GuiTheme.panel(graphics, 8, 8, 624, 344, 0xD91A1E26, 0xFF506070);
-        GuiTheme.panel(graphics, LIST_X, LIST_Y, LIST_W, LIST_H, 0xB010141A, 0xFF43515F);
-        GuiTheme.panel(graphics, 410, LIST_Y, 210, LIST_H, 0xB010141A, 0xFF43515F);
+        GuiTheme.panel(graphics, 8, 8, 624, 344);
+        GuiTheme.panelAlt(graphics, LIST_X, LIST_Y, LIST_W, LIST_H);
+        GuiTheme.panelAlt(graphics, 410, LIST_Y, 210, LIST_H);
         graphics.drawString(font, title, 20, 18, 0xFFFFFFFF, false);
         renderList(graphics, mouseX, mouseY);
         renderDetails(graphics);
@@ -253,28 +264,37 @@ public final class AttributeRangeScreen extends KineticScreen {
         int start = scroll.smoothIndexOffset();
         int shift = scroll.visualShift(ROW_H);
         int end = Math.min(filtered.size(), start + VISIBLE_ROWS + 1);
-                enableCanvasScissor(graphics, LIST_X + 2, LIST_Y + 2, LIST_X + LIST_W - 10, LIST_Y + LIST_H - 2);
+        enableUiScissor(graphics, LIST_X + 2, LIST_Y + 2, LIST_X + LIST_W - 10, LIST_Y + LIST_H - 2);
         try {
-for (int index = start; index < end; index++) {
-            int row = index - start;
-            int y = LIST_Y + row * ROW_H + 2 - shift;
-            Attribute attribute = filtered.get(index);
-            ResourceLocation id = ForgeRegistries.ATTRIBUTES.getKey(attribute);
-            if (id == null) {
-                continue;
+            for (int index = start; index < end; index++) {
+                int row = index - start;
+                int y = LIST_Y + row * ROW_H + 2 - shift;
+                Attribute attribute = filtered.get(index);
+                ResourceLocation id = KineticRegistries.attributes().id(attribute);
+                if (id == null) {
+                    continue;
+                }
+                boolean hovered = isInside(mouseX, mouseY, LIST_X + 2, y, LIST_W - 12, ROW_H - 1);
+                boolean edited = rule.attributes.containsKey(id.toString());
+                boolean selectedRow = attribute == selected;
+                GuiTheme.stateSurface(
+                        graphics,
+                        LIST_X + 2,
+                        y,
+                        LIST_W - 12,
+                        ROW_H - 1,
+                        GuiTheme.Surface.PANEL_ALT,
+                        selectedRow,
+                        hovered,
+                        false
+                );
+                String name = Component.translatable(attribute.getDescriptionId()).getString();
+                graphics.drawString(font, Component.literal(GuiTheme.trim(font, name, 165)), LIST_X + 7, y + 6, 0xFFFFFFFF, false);
+                int idColor = edited ? GuiTheme.current().translatedText() : GuiTheme.current().mutedText();
+                graphics.drawString(font, Component.literal(GuiTheme.trim(font, id.toString(), 175)), LIST_X + 190, y + 6, idColor, false);
             }
-            boolean hovered = isInside(mouseX, mouseY, LIST_X + 2, y, LIST_W - 12, ROW_H - 1);
-            boolean edited = rule.attributes.containsKey(id.toString());
-            boolean selectedRow = attribute == selected;
-            int outline = hovered ? 0xFFAAAAAA : edited ? 0xFF00C853 : 0xFF59636E;
-            int background = selectedRow ? 0xB0283440 : 0xA0182028;
-            GuiTheme.panel(graphics, LIST_X + 2, y, LIST_W - 12, ROW_H - 1, background, outline);
-            String name = Component.translatable(attribute.getDescriptionId()).getString();
-            graphics.drawString(font, Component.literal(GuiTheme.trim(font, name, 165)), LIST_X + 7, y + 6, 0xFFFFFFFF, false);
-            graphics.drawString(font, Component.literal(GuiTheme.trim(font, id.toString(), 175)), LIST_X + 190, y + 6, 0xFFB8C8D8, false);
-        }
         } finally {
-            graphics.disableScissor();
+            disableUiScissor(graphics);
         }
         GuiTheme.scrollbar(scroll, graphics, mouseX, mouseY, LIST_X + LIST_W - 6, LIST_Y + 2, 4, LIST_H - 4, 24);
     }
@@ -284,11 +304,11 @@ for (int index = start; index < end; index++) {
             graphics.drawCenteredString(font, Component.translatable("gui.entitycontrol.breakspawn.attributes.select_hint"), 515, 95, 0xFFFFFFFF);
             return;
         }
-        ResourceLocation id = ForgeRegistries.ATTRIBUTES.getKey(selected);
+        ResourceLocation id = KineticRegistries.attributes().id(selected);
         String name = Component.translatable(selected.getDescriptionId()).getString();
         graphics.drawString(font, Component.literal(GuiTheme.trim(font, name, 190)), 420, 82, 0xFFFFFFFF, false);
         if (id != null) {
-            graphics.drawString(font, Component.literal(GuiTheme.trim(font, id.toString(), 190)), 420, 99, 0xFFB8C8D8, false);
+            graphics.drawString(font, Component.literal(GuiTheme.trim(font, id.toString(), 190)), 420, 99, GuiTheme.current().mutedText(), false);
         }
         graphics.drawString(font, Component.translatable("gui.entitycontrol.breakspawn.attributes.min"), 420, 138, 0xFFFFFFFF, false);
         graphics.drawString(font, Component.translatable("gui.entitycontrol.breakspawn.attributes.max"), 420, 175, 0xFFFFFFFF, false);
@@ -296,23 +316,12 @@ for (int index = start; index < end; index++) {
     }
 
     @Override
-    protected void renderCanvasForeground(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        if (searchBox != null && searchBox.getValue().isEmpty() && !searchBox.isFocused()) {
-            String placeholder = font.plainSubstrByWidth(
-                    Component.translatable("gui.entitycontrol.breakspawn.attributes.search.placeholder").getString(),
-                    Math.max(0, searchBox.getWidth() - 10)
-            );
-            graphics.drawString(font, placeholder, searchBox.getX() + 5, searchBox.getY() + 6, 0xFFB8C8D8, false);
-        }
-    }
-
-    @Override
     protected boolean canvasMouseClicked(double mouseX, double mouseY, int button) {
         boolean handled = super.canvasMouseClicked(mouseX, mouseY, button);
-        if (button == 0 && scroll.beginDrag(mouseX, mouseY, LIST_X + LIST_W - 6, LIST_Y + 2, 4, LIST_H - 4, 24, 2)) {
+        if (KineticMouseButtons.isPrimary(button) && scroll.beginDrag(mouseX, mouseY, LIST_X + LIST_W - 6, LIST_Y + 2, 4, LIST_H - 4, 24, 2)) {
             return true;
         }
-        if (button == 0 && isInside(mouseX, mouseY, LIST_X + 2, LIST_Y + 2, LIST_W - 12, LIST_H - 4)) {
+        if (KineticMouseButtons.isPrimary(button) && isInside(mouseX, mouseY, LIST_X + 2, LIST_Y + 2, LIST_W - 12, LIST_H - 4)) {
             int localY = (int) mouseY - (LIST_Y + 2) + scroll.visualShift(ROW_H);
             int row = localY / ROW_H;
             int index = scroll.smoothIndexOffset() + row;
@@ -349,7 +358,7 @@ for (int index = start; index < end; index++) {
     }
 
     @Override
-    public void onClose() {
-        Minecraft.getInstance().setScreen(parent);
+    protected boolean handleCloseRequest() {
+        return false;
     }
 }

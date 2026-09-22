@@ -1,21 +1,21 @@
 package dev.xyat.entitycontrol.dummy.command;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import dev.xyat.kineticcore.command.CommandUtils;
-import dev.xyat.kineticcore.command.KTCommandApi;
-import dev.xyat.kineticcore.command.KTCommandExtension;
+import dev.xyat.kineticcore.api.command.CommandText;
+import dev.xyat.kineticcore.api.command.KineticCommands;
+import dev.xyat.kineticcore.api.command.CommandExtension;
 import dev.xyat.entitycontrol.dummy.DummyModule;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.MutableComponent;
 
 import java.util.List;
 
-public final class DummyCommandExtension implements KTCommandExtension {
+public final class DummyCommandExtension implements CommandExtension {
     private DummyCommandExtension() {
     }
 
     public static void install() {
-        KTCommandApi.register(DummyModule.MODID, new DummyCommandExtension());
+        KineticCommands.registerExtension(DummyModule.MODID, new DummyCommandExtension());
     }
 
     @Override
@@ -25,7 +25,7 @@ public final class DummyCommandExtension implements KTCommandExtension {
 
     @Override
     public void appendHelpItems(CommandSourceStack source, List<MutableComponent> items) {
-        items.add(CommandUtils.createExecutableCommand(
+        items.add(CommandText.executable(
                 "/kt dummy",
                 "cmd.entitycontrol.dummy.dummy.desc"
         ));

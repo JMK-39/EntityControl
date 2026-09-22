@@ -1,8 +1,12 @@
 package dev.xyat.entitycontrol.breakspawn.event;
 
-import dev.xyat.entitycontrol.breakspawn.BreakSpawnModule;
 import dev.xyat.entitycontrol.breakspawn.config.BreakSpawnConfig;
 import dev.xyat.entitycontrol.breakspawn.data.PlacedBlockTracker;
+import dev.xyat.kineticcore.api.event.KineticEventPriority;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.server.event.KineticServerEvents;
+import dev.xyat.kineticcore.api.world.event.KineticWorldEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
@@ -27,13 +31,6 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.event.level.BlockEvent;
-import net.minecraftforge.event.server.ServerStartingEvent;
-import net.minecraftforge.event.server.ServerStoppingEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,7 +38,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-@Mod.EventBusSubscriber(modid = BreakSpawnModule.MODID)
 public final class BreakSpawnEventHandler {
     private static final Map<UUID, Long> PLAYER_COOLDOWNS = new HashMap<>();
     private static final Map<UUID, Map<String, ChanceState>> PLAYER_CHANCE_STATES = new HashMap<>();
@@ -50,15 +46,20 @@ public final class BreakSpawnEventHandler {
     private BreakSpawnEventHandler() {
     }
 
-    @SubscribeEvent
-    public static void onServerStarting(ServerStartingEvent event) {
-        BreakSpawnConfig.loadAndClean(event.getServer());
-        clearRuntimeState();
-    }
+    private static boolean registered;
 
-    @SubscribeEvent
-    public static void onServerStopping(ServerStoppingEvent event) {
-        clearRuntimeState();
+    public static synchronized void register() {
+        if (registered) {
+            return;
+        }
+        KineticServerEvents.onStarting(KineticEventPriority.NORMAL, server -> {
+            BreakSpawnConfig.loadAndClean(server);
+            clearRuntimeState();
+        });
+        KineticServerEvents.onStopping(KineticEventPriority.NORMAL, server -> clearRuntimeState());
+        KineticWorldEvents.onBlockPlace(KineticEventPriority.LOWEST, BreakSpawnEventHandler::onBlockPlaced);
+        KineticWorldEvents.onBlockBreak(KineticEventPriority.LOWEST, BreakSpawnEventHandler::onBlockBroken);
+        registered = true;
     }
 
     private static void clearRuntimeState() {
@@ -71,18 +72,16 @@ public final class BreakSpawnEventHandler {
         clearRuntimeState();
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onBlockPlaced(BlockEvent.EntityPlaceEvent event) {
-        if (event.isCanceled() || !(event.getLevel() instanceof ServerLevel level)) {
+    private static void onBlockPlaced(KineticWorldEvents.BlockPlaceContext event) {
+        if (event.cancelled() || !(event.level() instanceof ServerLevel level)) {
             return;
         }
-        PlacedBlockTracker.get(level).mark(event.getPos().asLong());
+        PlacedBlockTracker.get(level).mark(event.pos().asLong());
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onBlockBroken(BlockEvent.BreakEvent event) {
-        if (event.isCanceled() || !(event.getLevel() instanceof ServerLevel level)
-                || !(event.getPlayer() instanceof ServerPlayer player)) {
+    private static void onBlockBroken(KineticWorldEvents.BlockBreakContext event) {
+        if (event.cancelled() || !(event.level() instanceof ServerLevel level)
+                || !(event.player() instanceof ServerPlayer player)) {
             return;
         }
 
@@ -91,7 +90,7 @@ public final class BreakSpawnEventHandler {
             return;
         }
 
-        ResourceLocation blockIdLocation = ForgeRegistries.BLOCKS.getKey(event.getState().getBlock());
+        ResourceLocation blockIdLocation = KineticRegistries.blocks().id(event.state().getBlock());
         if (blockIdLocation == null) {
             return;
         }
@@ -100,7 +99,7 @@ public final class BreakSpawnEventHandler {
 
         resetPreviousStackIfNeeded(player.getUUID(), blockId, config, gameTime);
 
-        if (PlacedBlockTracker.get(level).consumeIfPlaced(event.getPos().asLong())) {
+        if (PlacedBlockTracker.get(level).consumeIfPlaced(event.pos().asLong())) {
             return;
         }
 
@@ -113,7 +112,7 @@ public final class BreakSpawnEventHandler {
         if (player.isCreative() && !config.global.creativeCanTrigger) {
             return;
         }
-        if (!matchesBlockRuleConditions(level, event.getPos(), blockRule)) {
+        if (!matchesBlockRuleConditions(level, event.pos(), blockRule)) {
             return;
         }
 
@@ -136,8 +135,8 @@ public final class BreakSpawnEventHandler {
             return;
         }
 
-        BlockPos brokenPos = event.getPos().immutable();
-        BlockState brokenState = event.getState();
+        BlockPos brokenPos = event.pos().immutable();
+        BlockState brokenState = event.state();
         int spawned = spawnEncounter(level, brokenPos, brokenState, config, blockRule);
         if (spawned > 0) {
             if (blockRule.resetOnTrigger) {
@@ -243,7 +242,7 @@ public final class BreakSpawnEventHandler {
             if (weightedRule == null) {
                 break;
             }
-            EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(weightedRule.id());
+            EntityType<?> type = KineticRegistries.entityTypes().get(weightedRule.id());
             if (type == null) {
                 continue;
             }
@@ -267,7 +266,7 @@ public final class BreakSpawnEventHandler {
     ) {
         List<WeightedRule> result = new ArrayList<>();
         ResourceLocation dimensionId = level.dimension().location();
-        ResourceLocation blockId = ForgeRegistries.BLOCKS.getKey(brokenState.getBlock());
+        ResourceLocation blockId = KineticRegistries.blocks().id(brokenState.getBlock());
         ResourceLocation biomeId = level.registryAccess()
                 .registryOrThrow(Registries.BIOME)
                 .getKey(level.getBiome(brokenPos).value());
@@ -277,7 +276,7 @@ public final class BreakSpawnEventHandler {
             if (weight <= 0) {
                 continue;
             }
-            ResourceLocation entityId = ResourceLocation.tryParse(poolEntry.getKey());
+            ResourceLocation entityId = KineticResourceIds.tryParse(poolEntry.getKey());
             BreakSpawnConfig.EntityRule rule = rules.get(poolEntry.getKey());
             if (entityId == null || rule == null || !rule.enabled) {
                 continue;
@@ -291,7 +290,7 @@ public final class BreakSpawnEventHandler {
             if (!matchesCsv(rule.biomes, biomeId)) {
                 continue;
             }
-            if (!matchesAllowedBlock(rule.allowedBlocks, blockId)) {
+            if (failsAllowedBlock(rule.allowedBlocks, blockId)) {
                 continue;
             }
             if (matchesBlockedBlock(rule.blockedBlocks, blockId)) {
@@ -317,8 +316,8 @@ public final class BreakSpawnEventHandler {
         return false;
     }
 
-    private static boolean matchesAllowedBlock(String csv, ResourceLocation current) {
-        return csv == null || csv.isBlank() || matchesCsv(csv, current);
+    private static boolean failsAllowedBlock(String csv, ResourceLocation current) {
+        return csv != null && !csv.isBlank() && !matchesCsv(csv, current);
     }
 
     private static boolean matchesBlockedBlock(String csv, ResourceLocation current) {
@@ -510,8 +509,8 @@ public final class BreakSpawnEventHandler {
         }
         boolean healthChanged = false;
         for (Map.Entry<String, BreakSpawnConfig.AttributeRange> entry : attributes.entrySet()) {
-            ResourceLocation id = ResourceLocation.tryParse(entry.getKey());
-            Attribute attribute = id == null ? null : ForgeRegistries.ATTRIBUTES.getValue(id);
+            ResourceLocation id = KineticResourceIds.tryParse(entry.getKey());
+            Attribute attribute = id == null ? null : KineticRegistries.attributes().get(id);
             BreakSpawnConfig.AttributeRange range = entry.getValue();
             if (attribute == null || range == null) {
                 continue;
@@ -548,8 +547,8 @@ public final class BreakSpawnEventHandler {
             if (slot == null || spec == null || spec.itemId == null || spec.itemId.isBlank()) {
                 continue;
             }
-            ResourceLocation itemId = ResourceLocation.tryParse(spec.itemId);
-            Item item = itemId == null ? null : ForgeRegistries.ITEMS.getValue(itemId);
+            ResourceLocation itemId = KineticResourceIds.tryParse(spec.itemId);
+            Item item = itemId == null ? null : KineticRegistries.items().get(itemId);
             if (item == null) {
                 continue;
             }

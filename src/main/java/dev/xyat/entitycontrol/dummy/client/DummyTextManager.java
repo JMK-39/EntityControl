@@ -5,7 +5,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.Tesselator;
 import dev.xyat.entitycontrol.dummy.config.DummyClientConfig;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.network.chat.Component;
@@ -15,9 +14,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.TickEvent;
+import dev.xyat.kineticcore.api.client.event.KineticClientEvents;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
 
@@ -47,13 +45,15 @@ public class DummyTextManager {
     private static int arcCounter = 0;
 
     public static void register() {
-        MinecraftForge.EVENT_BUS.addListener(DummyTextManager::onClientTick);
-        MinecraftForge.EVENT_BUS.addListener(DummyTextManager::onRenderLevel);
+        KineticClientEvents.onTick(KineticClientEvents.TickPhase.END, DummyTextManager::onClientTick);
+        KineticClientEvents.onLevelRender(KineticClientEvents.LevelRenderStage.AFTER_PARTICLES, DummyTextManager::onRenderLevel);
     }
 
     public static void handlePacket(int entityId, Component source, Component type, float total, float dps, float avgDps, int hits, float currentDmg, boolean isDummy, int minionOwnerId) {
         if (isDummy) {
             updateHud(entityId, source, type, total, dps, avgDps, hits);
+            // The training dummy already displays accumulated damage in its dedicated HUD.
+            return;
         }
 
         if (!DummyClientConfig.showDamageParticles.get() || currentDmg <= 0f) {
@@ -63,7 +63,7 @@ public class DummyTextManager {
         boolean minion = minionOwnerId != -1;
         int color;
         if (minion) {
-            Player localPlayer = Minecraft.getInstance().player;
+            Player localPlayer = KineticClientRuntime.localPlayer();
             if (localPlayer == null || localPlayer.getId() != minionOwnerId || !DummyClientConfig.showMinionDamage.get()) {
                 return;
             }
@@ -85,7 +85,8 @@ public class DummyTextManager {
     }
 
     private static void spawnDamageNumber(int entityId, float amount, int color, boolean minion) {
-        Entity entity = Minecraft.getInstance().level != null ? Minecraft.getInstance().level.getEntity(entityId) : null;
+        var level = KineticClientRuntime.currentLevel();
+        Entity entity = level == null ? null : level.getEntity(entityId);
         if (entity == null) return;
 
         Vec3 origin = entity.position().add(0, entity.getBbHeight() * 0.8, 0);
@@ -107,8 +108,8 @@ public class DummyTextManager {
     }
 
     private static void updateCumulativeNumber(int entityId, float amount, int color, boolean minion) {
-        Minecraft minecraft = Minecraft.getInstance();
-        Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(entityId);
+        var level = KineticClientRuntime.currentLevel();
+        Entity entity = level == null ? null : level.getEntity(entityId);
         if (entity == null || !entity.isAlive()) {
             return;
         }
@@ -135,41 +136,41 @@ public class DummyTextManager {
         cumulativeNumbers.clear();
     }
 
-    private static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END && !Minecraft.getInstance().isPaused()) {
-            Iterator<FloatingText> iterator = particles.iterator();
-            while (iterator.hasNext()) {
-                FloatingText particle = iterator.next();
-                particle.tick();
-                if (particle.isDead()) iterator.remove();
-            }
+    private static void onClientTick() {
+        if (KineticClientRuntime.paused()) return;
 
-            Minecraft minecraft = Minecraft.getInstance();
-            long now = System.currentTimeMillis();
-            cumulativeNumbers.entrySet().removeIf(entry -> {
-                Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(entry.getKey());
-                return entity == null || !entity.isAlive() || entry.getValue().isExpired(now);
-            });
-            activeHuds.entrySet().removeIf(entry -> now - entry.getValue().lastUpdate > 5000L);
+        Iterator<FloatingText> iterator = particles.iterator();
+        while (iterator.hasNext()) {
+            FloatingText particle = iterator.next();
+            particle.tick();
+            if (particle.isDead()) iterator.remove();
         }
+
+        var level = KineticClientRuntime.currentLevel();
+        long now = System.currentTimeMillis();
+        cumulativeNumbers.entrySet().removeIf(entry -> {
+            Entity entity = level == null ? null : level.getEntity(entry.getKey());
+            return entity == null || !entity.isAlive() || entry.getValue().isExpired(now);
+        });
+        activeHuds.entrySet().removeIf(entry -> now - entry.getValue().lastUpdate > 5000L);
     }
 
-    private static void onRenderLevel(RenderLevelStageEvent event) {
-        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_PARTICLES) {
-            PoseStack poseStack = event.getPoseStack();
-            Vec3 camPos = event.getCamera().getPosition();
+    private static void onRenderLevel(KineticClientEvents.LevelRenderContext event) {
+            PoseStack poseStack = event.poseStack();
+            Vec3 camPos = event.camera().getPosition();
 
-            Minecraft minecraft = Minecraft.getInstance();
-            if (minecraft.level == null || minecraft.player == null) return;
+            var level = KineticClientRuntime.currentLevel();
+            Player player = KineticClientRuntime.localPlayer();
+            if (level == null || player == null) return;
 
-            int screenWidth = minecraft.getWindow().getGuiScaledWidth();
-            int screenHeight = minecraft.getWindow().getGuiScaledHeight();
+            int screenWidth = KineticClientRuntime.guiScaledWidth();
+            int screenHeight = KineticClientRuntime.guiScaledHeight();
 
             MultiBufferSource.BufferSource immediate = MultiBufferSource.immediate(Tesselator.getInstance().getBuilder());
             boolean cumulativeMode = DummyClientConfig.accumulateDamage.get();
 
             Matrix4f viewMatrix = poseStack.last().pose();
-            Matrix4f projMatrix = event.getProjectionMatrix();
+            Matrix4f projMatrix = event.projectionMatrix();
 
             RenderSystem.backupProjectionMatrix();
             Matrix4f ortho = new Matrix4f().setOrtho(0, screenWidth, screenHeight, 0, -1000, 1000);
@@ -187,12 +188,12 @@ public class DummyTextManager {
             RenderSystem.disableDepthTest();
 
             for (Map.Entry<Integer, HudInstance> entry : activeHuds.entrySet()) {
-                Entity entity = minecraft.level.getEntity(entry.getKey());
+                Entity entity = level.getEntity(entry.getKey());
                 if (entity != null && entity.isAlive()) {
                     Vec3 origin = entity.position().add(0, entity.getBbHeight() + DummyClientConfig.overheadOffset.get(), 0);
 
-                    ClipContext context = new ClipContext(camPos, origin, ClipContext.Block.VISUAL, ClipContext.Fluid.NONE, minecraft.player);
-                    HitResult hit = minecraft.level.clip(context);
+                    ClipContext context = new ClipContext(camPos, origin, ClipContext.Block.VISUAL, ClipContext.Fluid.NONE, player);
+                    HitResult hit = level.clip(context);
 
                     if (hit.getType() != HitResult.Type.MISS) {
                         continue;
@@ -207,14 +208,14 @@ public class DummyTextManager {
 
             if (cumulativeMode) {
                 for (Map.Entry<Integer, CumulativeDamageNumber> entry : cumulativeNumbers.entrySet()) {
-                    Entity entity = minecraft.level.getEntity(entry.getKey());
-                    if (entity == null || !entity.isAlive() || minecraft.player.distanceToSqr(entity) > DAMAGE_RENDER_DISTANCE_SQR) {
+                    Entity entity = level.getEntity(entry.getKey());
+                    if (entity == null || !entity.isAlive() || player.distanceToSqr(entity) > DAMAGE_RENDER_DISTANCE_SQR) {
                         continue;
                     }
 
                     HudInstance hud = activeHuds.get(entry.getKey());
                     double worldOffset = hud == null ? 0.5D : DummyClientConfig.overheadOffset.get();
-                    Vec3 origin = entity.getPosition(event.getPartialTick()).add(0, entity.getBbHeight() + worldOffset, 0);
+                    Vec3 origin = entity.getPosition(event.partialTick()).add(0, entity.getBbHeight() + worldOffset, 0);
                     ScreenPosition position = projectPosition(origin, camPos, viewMatrix, projMatrix, screenWidth, screenHeight);
                     if (position == null) {
                         continue;
@@ -230,7 +231,7 @@ public class DummyTextManager {
                 for (FloatingText particle : particles) {
                     ScreenPosition position = projectPosition(particle.origin3d, camPos, viewMatrix, projMatrix, screenWidth, screenHeight);
                     if (position != null) {
-                        particle.render2D(pose, position.x(), position.y(), immediate, event.getPartialTick());
+                        particle.render2D(pose, position.x(), position.y(), immediate, event.partialTick());
                     }
                 }
             }
@@ -243,7 +244,6 @@ public class DummyTextManager {
             modelViewStack.popPose();
             RenderSystem.applyModelViewMatrix();
             RenderSystem.restoreProjectionMatrix();
-        }
     }
 
     private static ScreenPosition projectPosition(Vec3 origin, Vec3 camPos, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight) {
@@ -301,7 +301,7 @@ public class DummyTextManager {
         }
 
         void render2D(PoseStack pose, float screenX, float screenY, MultiBufferSource buffer) {
-            Font font = Minecraft.getInstance().font;
+            Font font = KineticClientRuntime.font();
             pose.pushPose();
 
             pose.translate(screenX, screenY, 0);
@@ -384,7 +384,7 @@ public class DummyTextManager {
         }
 
         void render2D(PoseStack pose, float screenX, float screenY, MultiBufferSource buffer) {
-            Font font = Minecraft.getInstance().font;
+            Font font = KineticClientRuntime.font();
             pose.pushPose();
             pose.translate(screenX, screenY, 0);
 
@@ -462,7 +462,7 @@ public class DummyTextManager {
             float scale = DummyClientConfig.particleScale.get().floatValue();
             pose.scale(scale, scale, 1.0f);
 
-            Font font = Minecraft.getInstance().font;
+            Font font = KineticClientRuntime.font();
             float x = -font.width(text) / 2f;
             Matrix4f matrix = pose.last().pose();
 

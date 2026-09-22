@@ -1,14 +1,16 @@
 package dev.xyat.entitycontrol.spawn.client.gui;
 
 import dev.xyat.kineticcore.api.client.search.KineticSearch;
-import dev.xyat.kineticcore.api.client.overlay.GuiOverlay;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.GridScrollController;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets.NumericEditBox;
+import dev.xyat.kineticcore.api.client.theme.GuiTheme;
+import dev.xyat.kineticcore.api.client.widget.KineticWidgets;
+import dev.xyat.kineticcore.api.client.widget.button.KineticButtons.StateButton;
+import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
+import dev.xyat.kineticcore.api.client.widget.input.KineticNumericFields.NumericEditBox;
+import dev.xyat.kineticcore.api.client.widget.input.KineticTextFields.KineticEditBox;
+import dev.xyat.kineticcore.api.client.widget.scroll.KineticScroll.GridScrollController;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import dev.xyat.entitycontrol.spawn.config.BiomeSpawnConfig;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 
@@ -24,11 +26,12 @@ public class BiomeTabModule implements ITabModule {
     private final List<String> visibleBiomes = new ArrayList<>();
     private final Map<String, String> biomeSearchData = new HashMap<>();
     private final GridScrollController biomeScroll = new GridScrollController();
+    private final Map<String, StateButton> deleteButtons = new HashMap<>();
 
     private NumericEditBox boxWeight;
     private NumericEditBox boxMin;
     private NumericEditBox boxMax;
-    private EditBox boxSearchBiome;
+    private KineticEditBox boxSearchBiome;
 
     private String selectedBiome;
     private String lastQuery;
@@ -42,7 +45,7 @@ public class BiomeTabModule implements ITabModule {
         this.s = s;
 
         try {
-            var level = Minecraft.getInstance().level;
+            var level = KineticClientRuntime.currentLevel();
             if (level != null) {
                 var biomeRegistry = level.registryAccess().registryOrThrow(Registries.BIOME);
                 biomeRegistry.keySet().forEach(location -> {
@@ -72,68 +75,36 @@ public class BiomeTabModule implements ITabModule {
         int labelOffset = 25;
         int sectionWidth = 90;
 
-        boxWeight = s.addTabWidget(NumericEditBox.integer(
-                s.getFont(),
-                s.rx + labelOffset,
-                inputY,
-                inputW,
-                20,
-                Component.empty(),
-                false,
-                0,
-                null
-        ));
+        boxWeight = s.addIntegerField(
+                s.rx + labelOffset, inputY, inputW, Component.empty(),
+                false, 0, null, null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.weight")
+        );
         boxWeight.setMaxLength(11);
-        boxWeight.setTooltip(Tooltip.create(Component.translatable(
-                "gui.entitycontrol.spawn.spawn.tooltip.weight"
-        )));
         boxWeight.setResponder(value -> updateSpawnerNumber(value, 0));
 
-        boxMin = s.addTabWidget(NumericEditBox.integer(
-                s.getFont(),
-                s.rx + sectionWidth + labelOffset,
-                inputY,
-                inputW,
-                20,
-                Component.empty(),
-                false,
-                0,
-                null
-        ));
+        boxMin = s.addIntegerField(
+                s.rx + sectionWidth + labelOffset, inputY, inputW, Component.empty(),
+                false, 0, null, null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.min")
+        );
         boxMin.setMaxLength(11);
-        boxMin.setTooltip(Tooltip.create(Component.translatable(
-                "gui.entitycontrol.spawn.spawn.tooltip.min"
-        )));
         boxMin.setResponder(value -> updateSpawnerNumber(value, 1));
 
-        boxMax = s.addTabWidget(NumericEditBox.integer(
-                s.getFont(),
-                s.rx + sectionWidth * 2 + labelOffset,
-                inputY,
-                inputW,
-                20,
-                Component.empty(),
-                false,
-                0,
-                null
-        ));
+        boxMax = s.addIntegerField(
+                s.rx + sectionWidth * 2 + labelOffset, inputY, inputW, Component.empty(),
+                false, 0, null, null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.max")
+        );
         boxMax.setMaxLength(11);
-        boxMax.setTooltip(Tooltip.create(Component.translatable(
-                "gui.entitycontrol.spawn.spawn.tooltip.max"
-        )));
         boxMax.setResponder(value -> updateSpawnerNumber(value, 2));
 
-        boxSearchBiome = s.addTabWidget(new EditBox(
-                s.getFont(),
-                s.rx,
-                listY - 23,
-                220,
-                18,
-                Component.empty()
-        ));
-        boxSearchBiome.setTooltip(Tooltip.create(Component.translatable(
-                "gui.entitycontrol.spawn.spawn.tooltip.biome_search"
-        )));
+        boxSearchBiome = s.addTextField(
+                s.rx, listY - 23, 220, Component.empty(),
+                null, null,
+                Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.biome_search")
+        );
+        boxSearchBiome.setPlaceholder(Component.translatable("gui.entitycontrol.spawn.spawn.biome.search_hint"));
         boxSearchBiome.setResponder(value -> invalidateVisibleBiomes(true));
     }
 
@@ -164,7 +135,7 @@ public class BiomeTabModule implements ITabModule {
         if (data == null) return;
 
         if (value == null) {
-            GuiOverlay.toast(Component.translatable(
+            KineticOverlays.toast(Component.translatable(
                     "msg.entitycontrol.spawn.invalid_number"
             ));
             restoreSpawnerBoxes(data);
@@ -251,7 +222,7 @@ public class BiomeTabModule implements ITabModule {
         if (boxSearchBiome == null) return;
 
         String query = boxSearchBiome.getValue().toLowerCase(Locale.ROOT).trim();
-        boolean searchMode = boxSearchBiome.isFocused() || !query.isEmpty();
+        boolean searchMode = s.isControlFocused(boxSearchBiome) || !query.isEmpty();
 
         if (query.equals(lastQuery) && searchMode == lastSearchMode) {
             return;
@@ -286,15 +257,50 @@ public class BiomeTabModule implements ITabModule {
     public void setVisible(boolean visible) {
         boolean active = visible && s.selectedId != null;
         if (boxSearchBiome != null) {
-            boxSearchBiome.visible = active;
+            boxSearchBiome.setVisible(active);
         }
 
         boolean showEdit = active && selectedBiome != null;
         if (boxWeight != null) {
-            boxWeight.visible = showEdit;
-            boxMin.visible = showEdit;
-            boxMax.visible = showEdit;
+            boxWeight.setVisible(showEdit);
+            boxMin.setVisible(showEdit);
+            boxMax.setVisible(showEdit);
         }
+    }
+
+    private StateButton deleteButton(String biome, int y) {
+        StateButton button = deleteButtons.computeIfAbsent(biome, id -> {
+            StateButton created = KineticWidgets.createCompactButton(
+                    0,
+                    0,
+                    16,
+                    Component.translatable("gui.entitycontrol.modifier.modifier.remove_mark"),
+                    null,
+                    () -> removeBiome(id)
+            );
+            created.setError(true);
+            return created;
+        });
+        button.setX(s.rx + s.rw - 21);
+        button.setY(y + 1);
+        button.setWidth(16);
+        button.setClipBounds(s.rx, listY, s.rx + s.rw, listY + listH);
+        return button;
+    }
+
+    private void removeBiome(String biome) {
+        BiomeSpawnConfig.EntityNode node = selectedNode();
+        if (node == null || !node.biomes.containsKey(biome)) return;
+        node.biomes.remove(biome);
+        if (!node.deleted_biomes.contains(biome)) {
+            node.deleted_biomes.add(biome);
+        }
+        s.markSelectedEntityEdited();
+        if (biome.equals(selectedBiome)) {
+            selectedBiome = null;
+            setVisible(true);
+        }
+        invalidateVisibleBiomes(false);
     }
 
     @Override
@@ -329,47 +335,36 @@ public class BiomeTabModule implements ITabModule {
             );
         }
 
-        if (boxSearchBiome.getValue().isEmpty() && !boxSearchBiome.isFocused()) {
-            g.drawString(
-                    s.getFont(),
-                    Component.translatable("gui.entitycontrol.spawn.spawn.biome.search_hint"),
-                    boxSearchBiome.getX() + 6,
-                    boxSearchBiome.getY() + 5,
-                    0xFFAAAAAA
-            );
-        }
-
-        g.fill(s.rx, listY, s.rx + s.rw, listY + listH, 0xFF111111);
-        g.renderOutline(s.rx, listY, s.rw, listH, 0xFF333333);
+        GuiTheme.panelAlt(g, s.rx, listY, s.rw, listH);
 
         biomeScroll.update(visibleBiomes.size(), listH / 18);
         int start = biomeScroll.smoothIndexOffset();
         int shift = biomeScroll.visualShift(18);
         int end = Math.min(start + listH / 18 + 1, visibleBiomes.size());
 
-        s.enableCanvasScissor(g, s.rx, listY, s.rx + s.rw, listY + listH);
+        s.enableUiScissor(g, s.rx, listY, s.rx + s.rw, listY + listH);
         for (int i = start; i < end; i++) {
             String biome = visibleBiomes.get(i);
             int y = listY + (i - start) * 18 - shift;
             BiomeSpawnConfig.SpawnerDataNode data = node.biomes.get(biome);
             boolean added = data != null;
 
-            g.fill(
-                    s.rx + 1,
-                    y,
-                    s.rx + s.rw - 1,
-                    y + 18,
-                    (i % 2 == 0) ? 0xFF2C2C2C : 0xFF181818
-            );
-
-            if (biome.equals(selectedBiome)) {
-                g.fill(s.rx + 1, y, s.rx + s.rw - 1, y + 18, 0xFF555555);
-            } else if (mx >= s.rx
+            boolean selected = biome.equals(selectedBiome);
+            boolean hovered = mx >= s.rx
                     && mx < s.rx + s.rw
                     && my >= y
-                    && my < y + 18) {
-                g.fill(s.rx + 1, y, s.rx + s.rw - 1, y + 18, 0x33FFFFFF);
-            }
+                    && my < y + 18;
+            GuiTheme.stateSurface(
+                    g,
+                    s.rx + 1,
+                    y,
+                    s.rw - 2,
+                    18,
+                    i % 2 == 0 ? GuiTheme.Surface.PANEL_ALT : GuiTheme.Surface.PANEL,
+                    selected,
+                    hovered,
+                    false
+            );
 
             g.drawString(
                     s.getFont(),
@@ -389,9 +384,8 @@ public class BiomeTabModule implements ITabModule {
                         0xAAAAAA
                 );
 
-                int deleteX = s.rx + s.rw - 20;
-                g.fill(deleteX, y + 2, deleteX + 14, y + 16, 0xFFAA0000);
-                g.drawCenteredString(s.getFont(), "X", deleteX + 7, y + 5, 0xFFFFFF);
+                StateButton deleteButton = deleteButton(biome, y);
+                KineticWidgets.renderControl(deleteButton, g, mx, my, pt);
             } else {
                 g.drawString(
                         s.getFont(),
@@ -403,7 +397,7 @@ public class BiomeTabModule implements ITabModule {
             }
         }
 
-        g.disableScissor();
+        s.disableUiScissor(g);
         biomeScroll.render(
                 g,
                 mx,
@@ -439,21 +433,12 @@ public class BiomeTabModule implements ITabModule {
                     node.deleted_biomes.remove(biome);
                     s.markSelectedEntityEdited();
                     boxSearchBiome.setValue("");
-                    boxSearchBiome.setFocused(false);
+                    s.blurControl(boxSearchBiome);
                     invalidateVisibleBiomes(true);
                     selectBiome(biome);
-                } else if (mx >= s.rx + s.rw - 25) {
-                    node.biomes.remove(biome);
-                    if (!node.deleted_biomes.contains(biome)) {
-                        node.deleted_biomes.add(biome);
-                    }
-                    s.markSelectedEntityEdited();
-                    if (biome.equals(selectedBiome)) {
-                        selectedBiome = null;
-                        setVisible(true);
-                    }
-                    invalidateVisibleBiomes(false);
                 } else {
+                    int rowY = listY + clickedRow * 18 - biomeScroll.visualShift(18);
+                    if (deleteButton(biome, rowY).mouseClicked(mx, my, btn)) return true;
                     selectBiome(biome);
                 }
 

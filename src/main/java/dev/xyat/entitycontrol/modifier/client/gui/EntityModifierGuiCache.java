@@ -1,16 +1,13 @@
 package dev.xyat.entitycontrol.modifier.client.gui;
 
-import dev.xyat.entitycontrol.modifier.ModifierModule;
-import net.minecraft.client.Minecraft;
+import dev.xyat.kineticcore.api.client.event.KineticClientEvents;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -18,21 +15,29 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-@Mod.EventBusSubscriber(modid = ModifierModule.MODID, value = Dist.CLIENT)
-public class EntityModifierGuiCache {
+public final class EntityModifierGuiCache {
     private static final long CACHE_EXPIRE_MS = TimeUnit.MINUTES.toMillis(15);
     private static final long CLEANUP_CHECK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(30);
 
     private static final List<EntityModifierScreen.EntityGuiInfo> cachedEntities = new ArrayList<>();
-    private static ClientLevel cachedLevel = null;
-    private static boolean cacheReady = false;
-    private static long lastAccessTime = 0L;
-    private static long nextCleanupCheckTime = 0L;
+    private static ClientLevel cachedLevel;
+    private static boolean cacheReady;
+    private static long lastAccessTime;
+    private static long nextCleanupCheckTime;
+    private static boolean registered;
+
+    private EntityModifierGuiCache() {
+    }
+
+    public static synchronized void register() {
+        if (registered) return;
+        KineticClientEvents.onTick(KineticClientEvents.TickPhase.END, EntityModifierGuiCache::cleanupIfExpired);
+        KineticClientEvents.onLogout(EntityModifierGuiCache::clear);
+        registered = true;
+    }
 
     public static synchronized List<EntityModifierScreen.EntityGuiInfo> getEntities() {
-        Minecraft minecraft = Minecraft.getInstance();
-        ClientLevel level = minecraft.level;
-
+        ClientLevel level = KineticClientRuntime.currentLevel();
         if (level == null) {
             clear();
             return Collections.emptyList();
@@ -60,13 +65,13 @@ public class EntityModifierGuiCache {
         if (now < nextCleanupCheckTime) return;
         nextCleanupCheckTime = now + CLEANUP_CHECK_INTERVAL_MS;
 
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null) {
+        ClientLevel level = KineticClientRuntime.currentLevel();
+        if (level == null) {
             clear();
             return;
         }
 
-        if (cacheReady && cachedLevel != null && cachedLevel != minecraft.level) {
+        if (cacheReady && cachedLevel != null && cachedLevel != level) {
             clear();
             return;
         }
@@ -86,27 +91,22 @@ public class EntityModifierGuiCache {
         cacheReady = true;
         lastAccessTime = now;
 
-        ForgeRegistries.ENTITY_TYPES.getEntries().stream()
-                .sorted(Comparator.comparing(e -> e.getKey().location().toString()))
-                .forEach(e -> {
-                    try {
-                        Entity entity = e.getValue().create(level);
-                        if (entity instanceof LivingEntity living) {
-                            cachedEntities.add(new EntityModifierScreen.EntityGuiInfo(e.getKey().location().toString(), e.getValue().getDescription().getString(), living));
-                        }
-                    } catch (Throwable ignored) {}
-                });
+        KineticRegistries.entityTypes().entries().entrySet().stream()
+                .sorted(Comparator.comparing(entry -> entry.getKey().toString()))
+                .forEach(entry -> addPreviewEntity(level, entry.getKey(), entry.getValue()));
     }
 
-    @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END) {
-            cleanupIfExpired();
+    private static void addPreviewEntity(ClientLevel level, ResourceLocation id, EntityType<?> type) {
+        try {
+            Entity entity = type.create(level);
+            if (entity instanceof LivingEntity living) {
+                cachedEntities.add(new EntityModifierScreen.EntityGuiInfo(
+                        id.toString(),
+                        type.getDescription().getString(),
+                        living
+                ));
+            }
+        } catch (Throwable ignored) {
         }
-    }
-
-    @SubscribeEvent
-    public static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
-        clear();
     }
 }

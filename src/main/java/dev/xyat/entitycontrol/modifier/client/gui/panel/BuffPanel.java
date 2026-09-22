@@ -3,17 +3,23 @@ package dev.xyat.entitycontrol.modifier.client.gui.panel;
 import net.minecraft.ChatFormatting;
 import dev.xyat.entitycontrol.modifier.client.gui.BuffEditScreen;
 import dev.xyat.entitycontrol.modifier.config.EntityModifierConfig;
-import net.minecraft.client.Minecraft;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
+import dev.xyat.kineticcore.api.client.theme.GuiTheme;
+import dev.xyat.kineticcore.api.client.widget.KineticWidgets;
+import dev.xyat.kineticcore.api.client.widget.button.KineticButtons.StateButton;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffect;
-import net.minecraftforge.registries.ForgeRegistries;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
 
 import java.util.Locale;
 import java.util.Objects;
+import java.util.HashMap;
+import java.util.Map;
 
 public class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
+    private final Map<String, StateButton> removeButtons = new HashMap<>();
 
     private boolean isBuffModified(String buffId) {
         return selectedEntityId != null && parent.getLocalData().containsKey(selectedEntityId) &&
@@ -37,16 +43,16 @@ public class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
     @Override
     protected void updateSearch(String query) {
         String q = query.toLowerCase(Locale.ROOT);
-        displayList = ForgeRegistries.MOB_EFFECTS.getValues().stream()
+        displayList = KineticRegistries.mobEffects().values().stream()
                 .filter(a -> {
-                    ResourceLocation rl = ForgeRegistries.MOB_EFFECTS.getKey(a);
+                    ResourceLocation rl = KineticRegistries.mobEffects().id(a);
                     if (rl == null) return false;
                     String readableName = getReadableName(a, rl).toLowerCase(Locale.ROOT);
                     return q.isEmpty() || rl.toString().contains(q) || readableName.contains(q);
                 })
                 .sorted((a, b) -> {
-                    String idA = Objects.requireNonNull(ForgeRegistries.MOB_EFFECTS.getKey(a)).toString();
-                    String idB = Objects.requireNonNull(ForgeRegistries.MOB_EFFECTS.getKey(b)).toString();
+                    String idA = Objects.requireNonNull(KineticRegistries.mobEffects().id(a)).toString();
+                    String idB = Objects.requireNonNull(KineticRegistries.mobEffects().id(b)).toString();
                     boolean modA = isBuffModified(idA);
                     boolean modB = isBuffModified(idB);
                     if (modA != modB) return modA ? -1 : 1;
@@ -60,12 +66,11 @@ public class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
 
     @Override
     protected void renderRow(GuiGraphics g, MobEffect effect, int rowY, int mx, int my) {
-        ResourceLocation rl = ForgeRegistries.MOB_EFFECTS.getKey(effect);
+        ResourceLocation rl = KineticRegistries.mobEffects().id(effect);
         String effectId = rl != null ? rl.toString() : "";
 
-        if (mx >= x && mx < x + w - 10 && my >= rowY && my < rowY + 20) {
-            g.fill(x, rowY, x + w - 10, rowY + 20, 0x33FFFFFF);
-        }
+        boolean hovered = mx >= x && mx < x + w - 10 && my >= rowY && my < rowY + 20;
+        GuiTheme.stateSurface(g, x, rowY, w - 10, 20, GuiTheme.Surface.PANEL_ALT, false, hovered, false);
 
         String namespace = rl != null ? rl.getNamespace() : "minecraft";
         Component namespaceText = Component.literal("[" + namespace + "]")
@@ -88,14 +93,27 @@ public class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
             ).withStyle(ChatFormatting.GRAY);
             g.drawString(parent.getFont(), info, x + w - 40 - parent.getFont().width(info), rowY + 6, 0xFFFFFF);
 
-            g.fill(x + w - 30, rowY + 2, x + w - 14, rowY + 18, 0xFFAA0000);
-            g.drawCenteredString(
-                    parent.getFont(),
-                    Component.translatable("gui.entitycontrol.modifier.modifier.remove_mark"),
-                    x + w - 22,
-                    rowY + 6,
-                    0xFFFFFF
-            );
+            StateButton removeButton = removeButtons.computeIfAbsent(effectId, id -> {
+                StateButton button = KineticWidgets.createCompactButton(
+                        0,
+                        0,
+                        16,
+                        Component.translatable("gui.entitycontrol.modifier.modifier.remove_mark"),
+                        null,
+                        () -> {
+                            if (selectedEntityId != null && parent.getLocalData().containsKey(selectedEntityId)) {
+                                parent.getLocalData().get(selectedEntityId).buffs.remove(id);
+                                updateSearch(searchBox.getValue());
+                            }
+                        }
+                );
+                button.setError(true);
+                return button;
+            });
+            removeButton.setX(x + w - 30);
+            removeButton.setY(rowY + 2);
+            removeButton.setWidth(16);
+            KineticWidgets.renderControl(removeButton, g, mx, my, 0.0F);
         } else {
             g.drawString(
                     parent.getFont(),
@@ -108,18 +126,15 @@ public class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
     }
 
     @Override
-    protected boolean onRowClicked(MobEffect effect, double mx, double my) {
-        String effectId = Objects.requireNonNull(ForgeRegistries.MOB_EFFECTS.getKey(effect)).toString();
+    protected boolean onRowClicked(MobEffect effect, double mx, double my, int button) {
+        String effectId = Objects.requireNonNull(KineticRegistries.mobEffects().id(effect)).toString();
         boolean hasBuff = isBuffModified(effectId);
 
-        if (hasBuff && mx >= x + w - 30 && mx <= x + w - 14) {
-            parent.getLocalData().get(selectedEntityId).buffs.remove(effectId);
-            updateSearch(searchBox.getValue());
-            return true;
-        }
+        StateButton removeButton = removeButtons.get(effectId);
+        if (hasBuff && removeButton != null && removeButton.mouseClicked(mx, my, button)) return true;
 
         EntityModifierConfig.PotionBuff buffData = hasBuff ? parent.getLocalData().get(selectedEntityId).buffs.get(effectId) : new EntityModifierConfig.PotionBuff();
-        Minecraft.getInstance().setScreen(new BuffEditScreen(parent, selectedEntityId, effectId, buffData));
+        KineticClientRuntime.openScreen(new BuffEditScreen(parent, selectedEntityId, effectId, buffData));
         return true;
     }
 }

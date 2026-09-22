@@ -1,9 +1,9 @@
 package dev.xyat.entitycontrol.breakspawn.config;
 
 import dev.xyat.entitycontrol.breakspawn.network.BreakSpawnNetwork;
-import dev.xyat.kineticcore.config.client.KTConfigApi;
-import dev.xyat.kineticcore.config.client.KTConfigPage;
-import dev.xyat.kineticcore.config.client.KTConfigScope;
+import dev.xyat.kineticcore.api.config.client.KTConfigApi;
+import dev.xyat.kineticcore.api.config.client.KTConfigPage;
+import dev.xyat.kineticcore.api.config.client.KTConfigScope;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 

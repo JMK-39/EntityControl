@@ -3,6 +3,7 @@ package dev.xyat.entitycontrol.spawn.client.jade;
 import net.minecraft.ChatFormatting;
 import dev.xyat.entitycontrol.spawn.api.SpawnerRuntimeAccessor;
 import dev.xyat.entitycontrol.spawn.config.SpawnerConfig;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -16,7 +17,7 @@ import snownee.jade.api.config.IPluginConfig;
 import java.util.Locale;
 
 public class SpawnProvider {
-    public static final ResourceLocation ID = new ResourceLocation(
+    public static final ResourceLocation ID = KineticResourceIds.of(
             "entitycontrol",
             "spawner_info"
     );

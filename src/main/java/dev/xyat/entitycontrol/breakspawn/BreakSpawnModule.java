@@ -3,11 +3,10 @@ package dev.xyat.entitycontrol.breakspawn;
 import com.mojang.logging.LogUtils;
 import dev.xyat.entitycontrol.breakspawn.config.BreakSpawnConfig;
 import dev.xyat.entitycontrol.breakspawn.config.BreakSpawnConfigGui;
+import dev.xyat.entitycontrol.breakspawn.event.BreakSpawnEventHandler;
 import dev.xyat.entitycontrol.breakspawn.network.BreakSpawnNetwork;
-import dev.xyat.kineticcore.config.server.KTServerConfigApi;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.fml.common.Mod;
+import dev.xyat.kineticcore.api.config.server.KTServerConfigApi;
+import dev.xyat.kineticcore.api.runtime.KineticPlatform;
 import org.slf4j.Logger;
 
 public final class BreakSpawnModule {
@@ -18,6 +17,7 @@ public final class BreakSpawnModule {
         BreakSpawnConfig.load();
         KTServerConfigApi.registerActionPage(BreakSpawnConfigGui.PAGE_ID);
         BreakSpawnNetwork.register();
-        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> BreakSpawnConfigGui.load());
+        BreakSpawnEventHandler.register();
+        KineticPlatform.runOnClient(() -> BreakSpawnConfigGui::load);
     }
 }

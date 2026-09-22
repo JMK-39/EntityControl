@@ -4,10 +4,7 @@ import dev.xyat.entitycontrol.dummy.client.DeathSummaryOverlay;
 import dev.xyat.entitycontrol.dummy.client.DummyTextManager;
 import dev.xyat.entitycontrol.dummy.client.NotifyManager;
 import dev.xyat.entitycontrol.dummy.config.DummyClientConfig;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 
-@OnlyIn(Dist.CLIENT)
 public class DummyNetworkClient {
     public static void handleSync(DummyNetwork.Sync packet) {
         if (packet.type == DummyNetwork.Sync.Type.REALTIME) {
