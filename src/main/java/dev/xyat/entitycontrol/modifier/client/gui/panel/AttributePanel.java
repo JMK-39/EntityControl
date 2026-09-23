@@ -312,6 +312,7 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
     }
 
     @Override protected int getListHeight() { return h - 75; }
+    @Override protected int rowStride() { return ROW_HEIGHT + 2; }
     @Override protected Component getSearchHint() { return Component.translatable("gui.entitycontrol.modifier.modifier.search_attr"); }
 
     @Override

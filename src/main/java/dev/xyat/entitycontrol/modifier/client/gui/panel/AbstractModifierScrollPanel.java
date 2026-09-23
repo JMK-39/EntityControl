@@ -69,7 +69,7 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
 
     protected void refreshScroll() {
         int listH = getListHeight();
-        int visibleRows = listH / ROW_HEIGHT;
+        int visibleRows = listH / rowStride();
         maxScroll = Math.max(0, displayList.size() - visibleRows);
         scroll = Math.max(0, Math.min(scroll, maxScroll));
     }
@@ -78,28 +78,33 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
         return h - 30;
     }
 
+    protected int rowStride() {
+        return ROW_HEIGHT;
+    }
+
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         if (selectedEntityId == null) return;
 
         int listY = y + 28;
         int listH = getListHeight();
+        int stride = rowStride();
         GuiTheme.surface(graphics, x + 2, listY, w - 4, listH, GuiTheme.Surface.PANEL_ALT);
 
-        int visibleRows = listH / ROW_HEIGHT;
+        int visibleRows = listH / stride;
         scroll = Math.max(0, Math.min(scroll, maxScroll));
         double smoothScroll = scrollState.follow(scroll, maxScroll, isDraggingScroll);
         int start = (int) Math.floor(smoothScroll + 1.0E-6D);
-        int shift = (int) Math.round((smoothScroll - start) * ROW_HEIGHT);
+        int shift = (int) Math.round((smoothScroll - start) * stride);
 
         parent.enableUiScissor(graphics, x + 2, listY, x + w - 2, listY + listH);
         try {
             // A partial bottom row also needs its successor pre-rendered so it slides in smoothly.
-            int renderedRows = (listH + ROW_HEIGHT - 1) / ROW_HEIGHT + 1;
+            int renderedRows = (listH + stride - 1) / stride + 1;
             for (int i = 0; i < renderedRows; i++) {
                 int index = start + i;
                 if (index >= displayList.size()) break;
-                int rowY = listY + i * ROW_HEIGHT - shift;
+                int rowY = listY + i * stride - shift;
                 renderRow(graphics, displayList.get(index), rowY, mouseX, mouseY);
             }
         } finally {
@@ -153,8 +158,11 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
                 && mouseY >= listY && mouseY < listY + listH) {
             double smoothScroll = scrollState.follow(scroll, maxScroll, isDraggingScroll);
             int start = (int) Math.floor(smoothScroll + 1.0E-6D);
-            int shift = (int) Math.round((smoothScroll - start) * ROW_HEIGHT);
-            int index = start + (int) Math.floor((mouseY - listY + shift) / ROW_HEIGHT);
+            int stride = rowStride();
+            int shift = (int) Math.round((smoothScroll - start) * stride);
+            int offset = (int) Math.floor(mouseY - listY + shift);
+            if (offset % stride >= ROW_HEIGHT) return false;
+            int index = start + offset / stride;
             if (index >= 0 && index < displayList.size()) {
                 return onRowClicked(displayList.get(index), mouseX, mouseY, button);
             }
@@ -168,7 +176,7 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (isDraggingScroll && maxScroll > 0) {
             int listH = getListHeight();
-            int visibleRows = listH / ROW_HEIGHT;
+            int visibleRows = listH / rowStride();
             int thumbHeight = KineticScroll.stateThumbHeight(listH, visibleRows, displayList.size(), 15);
             scroll = KineticScroll.stateOffsetFromPointer(mouseY, y + 28, listH, thumbHeight, maxScroll);
             scrollState.snap(scroll, maxScroll);
