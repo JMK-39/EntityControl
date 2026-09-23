@@ -311,7 +311,8 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         refreshScroll();
     }
 
-    @Override protected int getListHeight() { return h - 75; }
+    @Override protected int getListHeight() { return h - 72; }
+    @Override protected int listTopOffset() { return 25; }
     @Override protected int rowStride() { return ROW_HEIGHT + 2; }
     @Override protected Component getSearchHint() { return Component.translatable("gui.entitycontrol.modifier.modifier.search_attr"); }
 
@@ -321,7 +322,7 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         String attrId = rl != null ? rl.toString() : "";
 
         boolean selected = attrId.equals(selectedAttribute);
-        int listTop = y + 28;
+        int listTop = y + listTopOffset();
         int listBottom = listTop + getListHeight();
         boolean hovered = mx >= x + 4 && mx < x + w - 12
                 && my >= listTop && my < listBottom
@@ -397,7 +398,8 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
     @Override
     protected void renderExtra(GuiGraphics g, int mx, int my) {
         Component editValComp = Component.translatable("gui.entitycontrol.modifier.modifier.edit_val");
-        g.drawString(parent.getFont(), editValComp, x + 4, y + h - 14, 0xFFFFFF);
+        g.drawString(parent.getFont(), editValComp,
+                x + w - 142 - parent.getFont().width(editValComp), y + h - 14, 0xFFFFFF);
     }
 
     @Override

@@ -646,8 +646,8 @@
   "gui.entitycontrol.modifier.global.targets.all": "选择生物",
   "gui.entitycontrol.modifier.global.targets.selected": "生物：%s 个",
   "gui.entitycontrol.modifier.global.targets.tooltip": "先选择属性和运算方式，再点击打开 3D 生物筛选。默认适用于全部生物；分类和模组筛选只缩小搜索范围，不会修改已选名单。",
-  "gui.entitycontrol.modifier.global.expand": "展开全局属性 ▼",
-  "gui.entitycontrol.modifier.global.collapse": "收起全局属性 ▲",
+  "gui.entitycontrol.modifier.global.expand": "展开全局 ▼",
+  "gui.entitycontrol.modifier.global.collapse": "收起全局 ▲",
   "gui.entitycontrol.modifier.global.expand_tooltip": "在当前编辑器中展开或收起全局属性；保留已选中的单体生物",
   "gui.entitycontrol.modifier.global.targets.choose_attribute": "先选属性",
   "gui.entitycontrol.modifier.global.targets.choose_operation": "先选算法"

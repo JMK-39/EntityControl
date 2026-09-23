@@ -646,8 +646,8 @@
   "gui.entitycontrol.modifier.global.targets.all": "Choose Mobs",
   "gui.entitycontrol.modifier.global.targets.selected": "Mobs: %s",
   "gui.entitycontrol.modifier.global.targets.tooltip": "Choose an attribute and operation first, then click to open the 3D mob selector. All mobs are selected by default; category and mod filters only narrow the search and do not change the saved selection.",
-  "gui.entitycontrol.modifier.global.expand": "Expand Global Attributes ▼",
-  "gui.entitycontrol.modifier.global.collapse": "Collapse Global Attributes ▲",
+  "gui.entitycontrol.modifier.global.expand": "Expand Global ▼",
+  "gui.entitycontrol.modifier.global.collapse": "Collapse Global ▲",
   "gui.entitycontrol.modifier.global.expand_tooltip": "Expand or collapse global attributes without losing the selected individual entity",
   "gui.entitycontrol.modifier.global.targets.choose_attribute": "Pick Attribute",
   "gui.entitycontrol.modifier.global.targets.choose_operation": "Pick Operation"

@@ -36,7 +36,11 @@ import java.util.Map;
 import java.util.TreeMap;
 
 public class EntityModifierScreen extends KineticScreen {
-    private static final int CELL_SIZE = 48;
+    private static final int CELL_SIZE = 68;
+    private static final int CELL_GAP = 2;
+    private static final int CELL_STRIDE = CELL_SIZE + CELL_GAP;
+    private static final int GRID_LEFT_INSET = 7;
+    private static final int GRID_RIGHT_GAP = 26;
     private static final int PANEL_W = 640;
     private static final int PANEL_H = 360;
 
@@ -89,6 +93,35 @@ public class EntityModifierScreen extends KineticScreen {
     private String selectedGlobalAttribute;
     private String selectedIndividualAttribute;
     private int individualPanelIdx;
+
+    private int gridX() { return startX + GRID_LEFT_INSET; }
+    private int gridY() { return startY + 30; }
+    private int gridHeight() { return gridRowsVisible * CELL_STRIDE - CELL_GAP; }
+    private int rightPanelX() { return startX + gridActualWidth + GRID_RIGHT_GAP; }
+    private int rightPanelWidth() { return PANEL_W - (rightPanelX() - startX) - 15; }
+
+    private int tabWidth(String key) {
+        return font.width(Component.translatable(key).getString()) + 16;
+    }
+
+    public int panelSearchWidth(int panelWidth) {
+        int attributeTabWidth = tabWidth("gui.entitycontrol.modifier.modifier.tab.attributes");
+        int effectTabWidth = tabWidth("gui.entitycontrol.modifier.modifier.tab.buffs");
+        return Math.max(80, panelWidth - attributeTabWidth - effectTabWidth - 22);
+    }
+
+    private int gridIndexAt(double mouseX, double mouseY) {
+        int gridX = gridX();
+        int gridY = gridY();
+        if (mouseX < gridX || mouseX >= gridX + gridActualWidth
+                || mouseY < gridY || mouseY >= gridY + gridHeight()) return -1;
+        int columnOffset = (int) (mouseX - gridX);
+        int rowOffset = (int) (mouseY - gridY + gridScroll.visualShift(CELL_STRIDE));
+        if (columnOffset % CELL_STRIDE >= CELL_SIZE || rowOffset % CELL_STRIDE >= CELL_SIZE) return -1;
+        int column = columnOffset / CELL_STRIDE;
+        int row = rowOffset / CELL_STRIDE;
+        return (gridScroll.smoothIndexOffset() + row) * gridCols + column;
+    }
 
     public EntityModifierScreen(String serverSnapshotJson) {
         this(null, serverSnapshotJson);
@@ -296,15 +329,15 @@ public class EntityModifierScreen extends KineticScreen {
         startX = (canvasWidth() - PANEL_W) / 2;
         startY = (canvasHeight() - PANEL_H) / 2;
 
-        gridCols = 5;
-        gridActualWidth = gridCols * CELL_SIZE;
-        gridRowsVisible = 6;
+        gridCols = 4;
+        gridActualWidth = gridCols * CELL_STRIDE - CELL_GAP;
+        gridRowsVisible = 4;
 
-        int rightX = startX + gridActualWidth + 30;
-        int rightWidth = PANEL_W - (rightX - startX) - 15;
+        int rightX = rightPanelX();
+        int rightWidth = rightPanelWidth();
 
         searchBox = addTextField(
-                startX + 17,
+                gridX() + 2,
                 startY + 5,
                 gridActualWidth - 4,
                 Component.empty(),
@@ -317,7 +350,7 @@ public class EntityModifierScreen extends KineticScreen {
         // The global editor expands inside this screen; the individual selection is retained
         // so collapsing it restores exactly the entity that was being edited.
         globalExpandButton = addButton(
-                startX + 17, startY + PANEL_H - 29, gridActualWidth - 5,
+                rightX + 8, startY + PANEL_H - 60, 100,
                 Component.translatable(globalMode
                         ? "gui.entitycontrol.modifier.global.collapse"
                         : "gui.entitycontrol.modifier.global.expand"),
@@ -333,9 +366,9 @@ public class EntityModifierScreen extends KineticScreen {
             panel.init(
                     this,
                     rightX + 4,
-                    startY + 95,
+                    startY + 30,
                     rightWidth - 8,
-                    PANEL_H - 135
+                    PANEL_H - 70
             );
         }
 
@@ -352,16 +385,12 @@ public class EntityModifierScreen extends KineticScreen {
             }
         }
 
-        int tabY = startY + 70;
-        int attrWidth = font.width(Component.translatable(
-                "gui.entitycontrol.modifier.modifier.tab.attributes"
-        ).getString()) + 16;
-        int buffWidth = font.width(Component.translatable(
-                "gui.entitycontrol.modifier.modifier.tab.buffs"
-        ).getString()) + 16;
+        int tabY = startY + 34;
+        int attrWidth = tabWidth("gui.entitycontrol.modifier.modifier.tab.attributes");
+        int buffWidth = tabWidth("gui.entitycontrol.modifier.modifier.tab.buffs");
 
         attrTabBtn = addButton(
-                rightX + 4,
+                rightX + 8 + panelSearchWidth(rightWidth - 8) + 6,
                 tabY,
                 attrWidth,
                 Component.translatable("gui.entitycontrol.modifier.modifier.tab.attributes"),
@@ -370,7 +399,7 @@ public class EntityModifierScreen extends KineticScreen {
         );
 
         buffTabBtn = addButton(
-                rightX + 4 + attrWidth + 6,
+                rightX + 8 + panelSearchWidth(rightWidth - 8) + 12 + attrWidth,
                 tabY,
                 buffWidth,
                 Component.translatable("gui.entitycontrol.modifier.modifier.tab.buffs"),
@@ -378,7 +407,7 @@ public class EntityModifierScreen extends KineticScreen {
                 () -> setActivePanel(panels.get(1), 1)
         );
 
-        int actionButtonY = startY + PANEL_H - 30;
+        int actionButtonY = startY + PANEL_H - 24;
 
         saveBtn = addButton(
                 rightX + rightWidth - 215,
@@ -540,12 +569,10 @@ public class EntityModifierScreen extends KineticScreen {
 
         GuiTheme.panelAlt(
                 graphics,
-                startX + gridActualWidth + 30,
-                startY + 92,
-                PANEL_W
-                        - (gridActualWidth + 30)
-                        - 17,
-                PANEL_H - 128
+                rightPanelX(),
+                startY + 27,
+                rightPanelWidth() - 2,
+                PANEL_H - 63
         );
     }
 
@@ -558,21 +585,20 @@ public class EntityModifierScreen extends KineticScreen {
     ) {
         deferredEntityTooltip = null;
         refreshSelectedEditedState();
-        int gridX = startX + 15;
-        int gridY = startY + 30;
-        int gridHeight =
-                gridRowsVisible * CELL_SIZE;
+        int gridX = gridX();
+        int gridY = gridY();
+        int gridHeight = gridHeight();
 
         GuiTheme.panelAlt(
                 graphics, gridX - 2, gridY - 2,
-                gridActualWidth + 6, gridHeight + 6
+                gridActualWidth + 14, gridHeight + 6
         );
 
         List<EntityGuiInfo> displayEntities =
                 entityModel.items();
 
         int firstRow = gridScroll.smoothIndexOffset();
-        int shift = gridScroll.visualShift(CELL_SIZE);
+        int shift = gridScroll.visualShift(CELL_STRIDE);
         int startIndex = firstRow * gridCols;
 
         int endIndex = Math.min(
@@ -595,15 +621,16 @@ for (int i = startIndex;
             int cellX =
                     gridX
                             + localIndex % gridCols
-                            * CELL_SIZE;
+                            * CELL_STRIDE;
 
             int cellY =
                     gridY
                             + localIndex / gridCols
-                            * CELL_SIZE
+                            * CELL_STRIDE
                             - shift;
 
-            boolean selected = globalMode ? globalTargetSelected(info) : selectedEntity == info;
+            boolean selected = !globalMode && selectedEntity == info;
+            boolean applies = globalMode && globalTargetSelected(info);
 
             boolean edited =
                     editedEntities.isEdited(info);
@@ -622,14 +649,21 @@ for (int i = startIndex;
                     CELL_SIZE - 2
             );
 
-            if (selected || hovered) {
+            if (selected) {
                 GuiTheme.stateOutline(
-                        graphics, cellX, cellY, CELL_SIZE, CELL_SIZE,
-                        selected, hovered, false
+                        graphics, cellX, cellY, CELL_SIZE, CELL_SIZE, true, false, false
+                );
+            } else if (applies) {
+                GuiTheme.indicatorOutline(
+                        graphics, cellX, cellY, CELL_SIZE, CELL_SIZE, GuiTheme.Indicator.SUCCESS
+                );
+            } else if (hovered) {
+                GuiTheme.stateOutline(
+                        graphics, cellX, cellY, CELL_SIZE, CELL_SIZE, false, true, false
                 );
             } else if (edited) {
                 GuiTheme.indicatorOutline(
-                        graphics, cellX, cellY, CELL_SIZE, CELL_SIZE, GuiTheme.Indicator.WARNING
+                        graphics, cellX, cellY, CELL_SIZE, CELL_SIZE, GuiTheme.Indicator.SUCCESS
                 );
             } else {
                 GuiTheme.stateOutline(
@@ -674,24 +708,17 @@ for (int i = startIndex;
         );
 
 
-        int rightX =
-                gridX + gridActualWidth + 30;
-
-        int rightWidth =
-                PANEL_W
-                        - (rightX - startX)
-                        - 15;
+        int rightX = rightPanelX() + 15;
+        int rightWidth = rightPanelWidth() - 15;
 
         if (selectedEntity != null || globalMode) {
             if (globalMode) {
                 graphics.drawString(font, Component.translatable("gui.entitycontrol.modifier.global.title"),
-                        rightX, startY + 27, 0xFFFFFF);
-            } else renderSelectedEntity(
+                        rightX, startY + 9, 0xFFFFFF);
+            } else renderSelectedEntityHeader(
                     graphics,
                     rightX,
-                    rightWidth,
-                    mouseX,
-                    mouseY
+                    rightWidth
             );
 
             if (currentPanel != null) {
@@ -768,72 +795,26 @@ for (int i = startIndex;
         }
     }
 
-    private void renderSelectedEntity(
+    private void renderSelectedEntityHeader(
             GuiGraphics graphics,
             int rightX,
-            int rightWidth,
-            int mouseX,
-            int mouseY
+            int rightWidth
     ) {
-        int boxSize = 86;
-        int boxX =
-                rightX + rightWidth - boxSize - 4;
-
-        int boxY =
-                startY + 5;
-
-        EntityPreviewRenderer.drawCheckerboard(
-                graphics,
-                boxX,
-                boxY,
-                boxSize,
-                boxSize
-        );
-
-        GuiTheme.stateOutline(graphics, boxX, boxY, boxSize, boxSize, false, false, false);
-
-        entityPreviewRenderer.renderCanvas(
-                graphics,
-                selectedEntity.entity(),
-                "modifier:detail:" + selectedEntity.id(),
-                boxX + 2,
-                boxY + 2,
-                boxSize - 4,
-                boxSize - 4,
-                mouseX >= boxX && mouseX < boxX + boxSize
-                        && mouseY >= boxY && mouseY < boxY + boxSize
-        );
-        registerPreviewWheelTarget(entityPreviewRenderer, "modifier:detail:" + selectedEntity.id(),
-                boxX, boxY, boxSize, boxSize);
-        if (mouseX >= boxX && mouseX < boxX + boxSize
-                && mouseY >= boxY && mouseY < boxY + boxSize) {
-            deferredEntityTooltip = previewTooltip(selectedEntity, "modifier:detail:" + selectedEntity.id());
+        int textWidth = rightWidth - 8;
+        String id = selectedEntity.id();
+        int idLimit = textWidth / 2;
+        if (font.width(id) > idLimit) {
+            id = font.plainSubstrByWidth(id, idLimit - font.width("…")) + "…";
         }
-
-        int textRightEdge =
-                boxX - 12;
-
-        graphics.drawString(
-                font,
-                Component.translatable("gui.entitycontrol.modifier.modifier.entity_name", Component.literal(selectedEntity.translatedName()).withStyle(ChatFormatting.GOLD)),
-                textRightEdge
-                        - font.width(
-                        selectedEntity.translatedName()
-                ),
-                boxY + 30,
-                0xFFFFFF
-        );
-
-        graphics.drawString(
-                font,
-                Component.translatable("gui.entitycontrol.modifier.modifier.entity_id", Component.literal(selectedEntity.id()).withStyle(ChatFormatting.AQUA)),
-                textRightEdge
-                        - font.width(
-                        selectedEntity.id()
-                ),
-                boxY + 45,
-                0xFFFFFF
-        );
+        String name = selectedEntity.translatedName();
+        int nameLimit = textWidth - font.width(id) - 8;
+        if (font.width(name) > nameLimit) {
+            name = font.plainSubstrByWidth(name, nameLimit - font.width("…")) + "…";
+        }
+        graphics.drawString(font, Component.literal(name).withStyle(ChatFormatting.GOLD),
+                rightX + 4, startY + 9, 0xFFFFFF);
+        graphics.drawString(font, Component.literal(id).withStyle(ChatFormatting.AQUA),
+                rightX + rightWidth - font.width(id) - 4, startY + 9, 0xFFFFFF);
     }
 
     private List<Component> previewTooltip(EntityGuiInfo info, String stateKey) {
@@ -866,10 +847,9 @@ for (int i = startIndex;
                         button
                 );
 
-        int gridX = startX + 15;
-        int gridY = startY + 30;
-        int gridHeight =
-                gridRowsVisible * CELL_SIZE;
+        int gridX = gridX();
+        int gridY = gridY();
+        int gridHeight = gridHeight();
 
         if (KineticMouseButtons.isPrimary(button)
                 && gridScroll.beginDrag(
@@ -885,26 +865,12 @@ for (int i = startIndex;
             return true;
         }
 
-        if (mouseX >= gridX
-                && mouseX < gridX + gridActualWidth
-                && mouseY >= gridY
-                && mouseY < gridY + gridHeight) {
-            int row =
-                    (int) ((mouseY - gridY + gridScroll.visualShift(CELL_SIZE)) / CELL_SIZE);
-
-            int column =
-                    (int) ((mouseX - gridX) / CELL_SIZE);
-
-            int index =
-                    gridScroll.smoothIndexOffset() * gridCols
-                            + row * gridCols
-                            + column;
-
+        int index = gridIndexAt(mouseX, mouseY);
+        if (index >= 0) {
             List<EntityGuiInfo> displayEntities =
                     entityModel.items();
 
-            if (index >= 0
-                    && index < displayEntities.size()) {
+            if (index < displayEntities.size()) {
                 if (globalMode) {
                     if (KineticMouseButtons.isPrimary(button)
                             && currentPanel instanceof AttributePanel attributes) {
@@ -947,8 +913,8 @@ for (int i = startIndex;
     ) {
         if (gridScroll.drag(
                 mouseY,
-                startY + 30,
-                gridRowsVisible * CELL_SIZE,
+                gridY(),
+                gridHeight(),
                 20
         )) {
             return true;
@@ -1005,37 +971,15 @@ for (int i = startIndex;
             double delta
     ) {
         if (delta != 0D) {
-            int gridX = startX + 15;
-            int gridY = startY + 30;
-            int gridHeight = gridRowsVisible * CELL_SIZE;
-            if (mouseX >= gridX && mouseX < gridX + gridActualWidth
-                    && mouseY >= gridY && mouseY < gridY + gridHeight) {
-                int row = (int) ((mouseY - gridY + gridScroll.visualShift(CELL_SIZE)) / CELL_SIZE);
-                int column = (int) ((mouseX - gridX) / CELL_SIZE);
-                int index = gridScroll.smoothIndexOffset() * gridCols + row * gridCols + column;
-                List<EntityGuiInfo> visible = entityModel.items();
-                if (index >= 0 && index < visible.size()) {
-                    if (entityPreviewRenderer.handleControlWheel(
-                            "modifier:grid:" + visible.get(index).id(), true, delta)) return true;
-                }
-            }
-            if (!globalMode && selectedEntity != null) {
-                int rightX = startX + gridActualWidth + 30;
-                int rightWidth = PANEL_W - (rightX - startX) - 15;
-                int boxSize = 86;
-                int boxX = rightX + rightWidth - boxSize - 4;
-                int boxY = startY + 5;
-                if (mouseX >= boxX && mouseX < boxX + boxSize
-                        && mouseY >= boxY && mouseY < boxY + boxSize) {
-                    if (entityPreviewRenderer.handleControlWheel(
-                            "modifier:detail:" + selectedEntity.id(), true, delta)) return true;
-                }
+            int index = gridIndexAt(mouseX, mouseY);
+            List<EntityGuiInfo> visible = entityModel.items();
+            if (index >= 0 && index < visible.size()) {
+                if (entityPreviewRenderer.handleControlWheel(
+                        "modifier:grid:" + visible.get(index).id(), true, delta)) return true;
             }
         }
         if (mouseX
-                < startX
-                + gridActualWidth
-                + 30) {
+                < rightPanelX()) {
             return gridScroll.scroll(delta)
                     || super.canvasMouseScrolled(
                             mouseX,

@@ -21,6 +21,12 @@ import java.util.Map;
 public class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
     private final Map<String, StateButton> removeButtons = new HashMap<>();
 
+    @Override
+    protected int getListHeight() { return h - 53; }
+
+    @Override
+    protected int rowStride() { return ROW_HEIGHT + 2; }
+
     private boolean isBuffModified(String buffId) {
         return selectedEntityId != null && parent.getLocalData().containsKey(selectedEntityId) &&
                 parent.getLocalData().get(selectedEntityId).buffs.containsKey(buffId);
@@ -69,17 +75,21 @@ public class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
         ResourceLocation rl = KineticRegistries.mobEffects().id(effect);
         String effectId = rl != null ? rl.toString() : "";
 
-        boolean hovered = mx >= x && mx < x + w - 10 && my >= rowY && my < rowY + 20;
-        GuiTheme.stateSurface(g, x, rowY, w - 10, 20, GuiTheme.Surface.PANEL_ALT, false, hovered, false);
+        int listTop = y + listTopOffset();
+        boolean hovered = mx >= x + 4 && mx < x + w - 12
+                && my >= listTop && my < listTop + getListHeight()
+                && my >= rowY && my < rowY + ROW_HEIGHT;
+        GuiTheme.stateSurface(g, x + 4, rowY, w - 16, ROW_HEIGHT,
+                GuiTheme.Surface.PANEL_ALT, false, hovered, false);
 
         String namespace = rl != null ? rl.getNamespace() : "minecraft";
         Component namespaceText = Component.literal("[" + namespace + "]")
                 .withStyle(namespace.equals("minecraft") ? ChatFormatting.GREEN : ChatFormatting.BLUE);
-        g.drawString(parent.getFont(), namespaceText, x + 5, rowY + 6, 0xFFFFFF);
+        g.drawString(parent.getFont(), namespaceText, x + 8, rowY + 6, 0xFFFFFF);
 
         String name = getReadableName(effect, rl);
         Component nameText = Component.translatable("gui.entitycontrol.modifier.modifier.name", Component.literal(name).withStyle(ChatFormatting.GOLD));
-        int nameX = x + 5 + parent.getFont().width("[" + namespace + "] ");
+        int nameX = x + 8 + parent.getFont().width("[" + namespace + "] ");
         g.drawString(parent.getFont(), nameText, nameX, rowY + 6, 0xFFFFFF);
 
         boolean hasBuff = isBuffModified(effectId);

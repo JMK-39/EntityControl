@@ -39,7 +39,7 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
                 parent.getFont(),
                 x + 4,
                 y + 4,
-                w - 80,
+                parent.panelSearchWidth(w),
                 Component.empty(),
                 getSearchHint(),
                 null,
@@ -78,6 +78,10 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
         return h - 30;
     }
 
+    protected int listTopOffset() {
+        return 28;
+    }
+
     protected int rowStride() {
         return ROW_HEIGHT;
     }
@@ -86,7 +90,7 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         if (selectedEntityId == null) return;
 
-        int listY = y + 28;
+        int listY = y + listTopOffset();
         int listH = getListHeight();
         int stride = rowStride();
         GuiTheme.surface(graphics, x + 2, listY, w - 4, listH, GuiTheme.Surface.PANEL_ALT);
@@ -144,7 +148,7 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
             parent.clearControlFocus();
         }
 
-        int listY = y + 28;
+        int listY = y + listTopOffset();
         int listH = getListHeight();
         if (KineticMouseButtons.isPrimary(button) && maxScroll > 0
                 && mouseX >= x + w - 8 && mouseX <= x + w - 2
@@ -178,7 +182,7 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
             int listH = getListHeight();
             int visibleRows = listH / rowStride();
             int thumbHeight = KineticScroll.stateThumbHeight(listH, visibleRows, displayList.size(), 15);
-            scroll = KineticScroll.stateOffsetFromPointer(mouseY, y + 28, listH, thumbHeight, maxScroll);
+            scroll = KineticScroll.stateOffsetFromPointer(mouseY, y + listTopOffset(), listH, thumbHeight, maxScroll);
             scrollState.snap(scroll, maxScroll);
             return true;
         }
