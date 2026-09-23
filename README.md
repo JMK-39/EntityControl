@@ -55,7 +55,7 @@ Configure a global default or an entity-specific rule; entity rules take priorit
 
 ### Entity modifiers and encounter resets
 
-The modifier editor provides individual entity attributes and global attribute rules. Global rules support **fixed value, multiplication, addition, and subtraction**, with entity targets and category filters. Status-effect rules include effect level ranges, probability, and dimension conditions.
+The modifier editor puts common attributes first. Select an attribute, then choose its operation and enter a value. Individual entities support **fixed value, multiplication, addition, and subtraction**; global rules offer multiplication, addition, and subtraction with entity targets and category filters. The target selector shows the active attribute and operation below its grid. Status-effect rules include effect level ranges, probability, and dimension conditions.
 
 Saved modifier rules apply when entities join or reload. They do not automatically recalculate entities already present. Adding attributes absent from an entity's original attribute set requires a restart.
 
@@ -80,7 +80,7 @@ Global settings include the master switch, creative-player triggering, and playe
 
 - `/kt dummy spawn` places a dummy at the block you are looking at, or in front of you, and loads your saved preset.
 - **Sneak + right-click with an empty main hand** opens the dummy editor. Configure equipment, attributes, creature type, and whether hits reduce health; Curios adds accessory editing when installed.
-- Combat displays include floating damage numbers, damage source/type, total damage, hit count, DPS, average DPS, and a death summary. Their visibility, scale, colors, and duration are configurable.
+- Combat displays include floating damage numbers, damage source/type, total damage, hit count, DPS, average DPS, and a death summary. A shared damage-text size setting (0.1–3.0×, default 1.0×) scales both the dummy overhead panel and damage numbers on other mobs; other visibility, scale, color, and duration options remain available.
 - Dummies enter standby when no players are nearby; server options control detection range, data broadcast range, update intervals, and disallowed equipment.
 - `/kt dummy help` shows the commands. `/kt dummy clear` removes **all loaded testing dummies in the command's current dimension**.
 
@@ -163,7 +163,7 @@ Entity Control 为整合包作者和服务器管理员提供生物生成、遭�
 
 ### 实体属性与战斗重置
 
-属性编辑器同时提供单实体设置和全局属性规则。全局规则支持**固定值、乘法、加法、减法**，并可指定目标实体、使用分类筛选。状态效果规则支持等级范围、概率和维度条件。
+属性编辑器将常用属性置顶。先选择属性，再选择运算方式并输入数值。单个生物支持**固定值、乘法、加法、减法**；全局规则支持乘法、加法、减法，并可指定目标生物、使用分类筛选。目标筛选界面的列表下方会显示当前属性和运算方式。状态效果规则支持等级范围、概率和维度条件。
 
 保存的属性规则在实体加入或重新加载时应用，不会自动重算已经存在的实体。为实体加入原始属性集合中没有的属性需要重启。
 
@@ -188,7 +188,7 @@ Entity Control 为整合包作者和服务器管理员提供生物生成、遭�
 
 - `/kt dummy spawn` 在视线指向的方块上方或玩家前方生成假人，并加载玩家保存的预设。
 - **主手空手时潜行并右键假人**打开编辑器；可配置装备、属性、生物类型及是否扣血，安装 Curios 后还可编辑饰品。
-- 战斗显示包含飘字、伤害来源与类型、总伤害、命中次数、DPS、平均 DPS 和死亡总结，可调整显示开关、缩放、颜色与持续时间。
+- 战斗显示包含飘字、伤害来源与类型、总伤害、命中次数、DPS、平均 DPS 和死亡总结。新增统一的伤害文本显示大小设置（默认 1.0 倍，范围 0.1–3.0 倍），同时影响假人头顶面板与攻击其他生物时的伤害数字；其他显示开关、缩放、颜色和持续时间设置仍可使用。
 - 附近没有玩家时假人进入待机；服务端可设置检测范围、数据广播范围、更新间隔与禁止装备。
 - `/kt dummy help` 查看命令；`/kt dummy clear` 删除**命令所在维度中全部已加载的测试假人**。
 

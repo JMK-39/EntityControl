@@ -13,6 +13,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.entitycontrol.modifier.client.gui.AttributeSelectionOverlay;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 
 import java.util.Locale;
 import java.util.Objects;
@@ -25,8 +28,18 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
     private KineticEditBox attrValueBox;
     private String selectedAttribute = null;
     private StateButton modeButton;
-    private static final java.util.List<String> MODES = java.util.List.of("SET", "MULTIPLY", "ADD", "SUBTRACT");
-    private String selectedMode = "SET";
+    private static final List<String> MODES = List.of("SET", "MULTIPLY", "ADD", "SUBTRACT");
+    private static final List<String> COMMON_ATTRIBUTES = List.of(
+            "minecraft:generic.max_health",
+            "minecraft:generic.attack_damage",
+            "minecraft:generic.movement_speed",
+            "minecraft:generic.armor",
+            "minecraft:generic.armor_toughness",
+            "minecraft:generic.attack_speed",
+            "minecraft:generic.follow_range",
+            "minecraft:generic.knockback_resistance"
+    );
+    private String selectedMode;
     private boolean loadingValue;
     private StateButton deleteButton;
     private StateButton targetsButton;
@@ -43,7 +56,7 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
     }
 
     private EntityModifierConfig.AttributeRule ensureCurrentRule() {
-        if (selectedAttribute == null || selectedEntityId == null) return null;
+        if (selectedAttribute == null || selectedEntityId == null || selectedMode == null) return null;
         Double value = attrValueBox instanceof dev.xyat.kineticcore.api.client.widget.input.KineticNumericFields.NumericEditBox box
                 ? box.getDoubleValue() : null;
         if (value == null) return null;
@@ -59,7 +72,7 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         updateTargetsButton();
     }
 
-    public void restoreGlobalSelection(String id) {
+    public void restoreSelection(String id) {
         ResourceLocation key = dev.xyat.kineticcore.api.resource.KineticResourceIds.tryParse(id);
         Attribute attr = key == null ? null : KineticRegistries.attributes().get(key);
         if (attr != null) onRowClicked(attr, 0, 0, 0);
@@ -73,11 +86,13 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
                 ? null : data.attributeRules.get(selectedAttribute);
         Component label = selectedAttribute == null
                 ? Component.translatable("gui.entitycontrol.modifier.global.targets.choose_attribute")
+                : selectedMode == null
+                ? Component.translatable("gui.entitycontrol.modifier.global.targets.choose_operation")
                 : rule == null || rule.targetEntities == null
                 ? Component.translatable("gui.entitycontrol.modifier.global.targets.all")
                 : Component.translatable("gui.entitycontrol.modifier.global.targets.selected", rule.targetEntities.size());
         targetsButton.setMessage(label);
-        targetsButton.setEnabled(parent.isGlobalMode() && selectedAttribute != null);
+        targetsButton.setEnabled(parent.isGlobalMode() && selectedAttribute != null && selectedMode != null);
     }
 
     private void chooseGlobalTargets() {
@@ -101,35 +116,82 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
                         updateTargetsButton();
                     }
                 });
+        ResourceLocation attributeId = KineticResourceIds.tryParse(selectedAttribute);
+        Attribute attribute = attributeId == null ? null : KineticRegistries.attributes().get(attributeId);
+        Component name = attribute == null ? Component.literal(selectedAttribute)
+                : Component.literal(getReadableName(attribute, attributeId));
+        AttributeSelectionOverlay.show(KineticClientRuntime.currentScreen(), name, selectedAttribute,
+                modeLabel(), Component.translatable("gui.entitycontrol.modifier.global.mode."
+                        + selectedMode.toLowerCase(Locale.ROOT) + ".tooltip"));
     }
 
     private Component modeLabel() {
+        if (selectedMode == null) {
+            return Component.translatable("gui.entitycontrol.modifier.global.mode.choose");
+        }
         return Component.translatable("gui.entitycontrol.modifier.global.mode." + selectedMode.toLowerCase(java.util.Locale.ROOT));
     }
 
     /** Opens the four available operations as a standard API menu instead of silently cycling. */
     private void showModeMenu() {
+        if (selectedAttribute == null) return;
         List<KineticOverlays.MenuItem> entries = new ArrayList<>();
         for (String mode : MODES) {
+            if (parent.isGlobalMode() && "SET".equals(mode)) continue;
             Component label = Component.translatable(
                     "gui.entitycontrol.modifier.global.mode." + mode.toLowerCase(Locale.ROOT));
-            entries.add(KineticOverlays.MenuItem.toggle(label, label,
+            Component help = Component.translatable(
+                    "gui.entitycontrol.modifier.global.mode." + mode.toLowerCase(Locale.ROOT) + ".tooltip");
+            entries.add(KineticOverlays.MenuItem.toggle(label, help,
                     mode.equals(selectedMode), () -> selectMode(mode)));
         }
-        parent.openContextMenu(x + 4, y + h - 20, entries);
+        parent.openContextMenu(x + 4, y + h - 44, entries);
     }
 
     private void selectMode(String mode) {
-        if (!MODES.contains(mode)) return;
+        if (selectedEntityId == null || selectedAttribute == null || !MODES.contains(mode)
+                || (parent.isGlobalMode() && "SET".equals(mode))) return;
+        boolean changed = !mode.equals(selectedMode);
         selectedMode = mode;
-        if (modeButton != null) modeButton.setMessage(modeLabel());
-        if (selectedAttribute == null || selectedEntityId == null) return;
-        Double value = attrValueBox instanceof dev.xyat.kineticcore.api.client.widget.input.KineticNumericFields.NumericEditBox box
-                ? box.getDoubleValue() : null;
-        if (value != null) {
+        if (changed) {
+            double value = switch (mode) {
+                case "MULTIPLY" -> 1.0D;
+                case "ADD", "SUBTRACT" -> 0.0D;
+                default -> selectedBaseValue();
+            };
+            loadingValue = true;
+            try { attrValueBox.setValue(String.valueOf(value)); }
+            finally { loadingValue = false; }
             putRule(value);
-            updateSearch(searchBox.getValue());
         }
+        updateControls();
+        updateSearch(searchBox.getValue());
+    }
+
+    private double selectedBaseValue() {
+        ResourceLocation id = KineticResourceIds.tryParse(selectedAttribute);
+        Attribute attribute = id == null ? null : KineticRegistries.attributes().get(id);
+        if (attribute == null) return 0.0D;
+        return previewEntity != null && previewEntity.getAttributes().hasAttribute(attribute)
+                ? previewEntity.getAttributes().getBaseValue(attribute) : attribute.getDefaultValue();
+    }
+
+    private void updateControls() {
+        if (modeButton != null) {
+            modeButton.setMessage(modeLabel());
+            modeButton.setEnabled(selectedEntityId != null && selectedAttribute != null);
+        }
+        if (attrValueBox != null) {
+            attrValueBox.setEnabled(selectedEntityId != null && selectedAttribute != null && selectedMode != null);
+        }
+        if (deleteButton != null) {
+            EntityModifierConfig.EntityEditData data = selectedEntityId == null ? null
+                    : parent.getLocalData().get(selectedEntityId);
+            deleteButton.setEnabled(selectedAttribute != null && data != null
+                    && (data.attributes.containsKey(selectedAttribute)
+                    || data.attributeRules.containsKey(selectedAttribute)));
+        }
+        updateTargetsButton();
     }
 
     private void removeSelectedRule() {
@@ -141,29 +203,28 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         selectedAttribute = null;
         if (parent.isGlobalMode()) parent.selectedGlobalAttribute(null);
         else parent.selectedIndividualAttribute(null);
-        selectedMode = "SET";
-        modeButton.setMessage(modeLabel());
+        selectedMode = null;
         loadingValue = true;
         try { attrValueBox.setValue(""); } finally { loadingValue = false; }
         updateSearch(searchBox.getValue());
-        updateTargetsButton();
+        updateControls();
     }
 
     @Override
     protected void initExtra() {
-        modeButton = parent.addCompactButton(x + 4, y + h - 20, 92,
+        modeButton = parent.addCompactButton(x + 4, y + h - 44, 120,
                 modeLabel(), Component.translatable("gui.entitycontrol.modifier.global.mode.tooltip"),
                 this::showModeMenu);
-        deleteButton = parent.addCompactButton(x + 100, y + h - 20, 92,
+        deleteButton = parent.addCompactButton(x + 130, y + h - 44, 100,
                 Component.translatable("gui.entitycontrol.modifier.global.delete_rule"),
                 Component.translatable("gui.entitycontrol.modifier.global.delete_rule.tooltip"),
                 this::removeSelectedRule);
-        targetsButton = parent.addCompactButton(x + 4, y + h - 43, w - 8,
+        targetsButton = parent.addCompactButton(x + 4, y + h - 68, w - 8,
                 Component.translatable("gui.entitycontrol.modifier.global.targets.all"),
                 Component.translatable("gui.entitycontrol.modifier.global.targets.tooltip"),
                 this::chooseGlobalTargets);
         attrValueBox = KineticWidgets.createDecimalField(
-                parent.getFont(), x + w - 75, y + h - 20, 70,
+                parent.getFont(), x + 94, y + h - 20, w - 100,
                 Component.empty(), true, -1.0E9D, 1.0E9D,
                 number -> Double.isFinite(number.doubleValue()), null
         );
@@ -172,14 +233,14 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
                 var box = (dev.xyat.kineticcore.api.client.widget.input.KineticNumericFields.NumericEditBox) attrValueBox;
                 Double value = box.getDoubleValue();
                 if (value != null) {
-                    EntityModifierConfig.EntityEditData data = parent.getLocalData().computeIfAbsent(
-                            selectedEntityId, k -> new EntityModifierConfig.EntityEditData());
                     putRule(value);
                     updateSearch(searchBox.getValue());
+                    updateControls();
                 }
             }
         });
         parent.addControl(attrValueBox, null);
+        updateControls();
     }
 
     @Override
@@ -189,20 +250,19 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         if (modeButton != null) modeButton.setVisible(visible);
         if (deleteButton != null) deleteButton.setVisible(visible);
         if (targetsButton != null) targetsButton.setVisible(visible && parent.isGlobalMode());
-        updateTargetsButton();
+        updateControls();
     }
 
     @Override
     public void onEntitySelected(String entityId, net.minecraft.world.entity.LivingEntity previewEntity) {
         this.selectedAttribute = null;
-        this.selectedMode = "SET";
-        if (modeButton != null) modeButton.setMessage(modeLabel());
+        this.selectedMode = null;
         if (attrValueBox != null) {
             loadingValue = true;
             try { attrValueBox.setValue(""); } finally { loadingValue = false; }
         }
         super.onEntitySelected(entityId, previewEntity);
-        updateTargetsButton();
+        updateControls();
     }
 
     private boolean isAttrModified(String attrId, Attribute attr) {
@@ -236,6 +296,13 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
             ResourceLocation rl = KineticRegistries.attributes().id(a);
             return rl != null && (q.isEmpty() || rl.toString().contains(q) || getReadableName(a, rl).toLowerCase(Locale.ROOT).contains(q));
         }).sorted((a, b) -> {
+            int rankA = COMMON_ATTRIBUTES.indexOf(Objects.requireNonNull(KineticRegistries.attributes().id(a)).toString());
+            int rankB = COMMON_ATTRIBUTES.indexOf(Objects.requireNonNull(KineticRegistries.attributes().id(b)).toString());
+            if (rankA >= 0 || rankB >= 0) {
+                if (rankA < 0) return 1;
+                if (rankB < 0) return -1;
+                return Integer.compare(rankA, rankB);
+            }
             boolean modA = isAttrModified(Objects.requireNonNull(KineticRegistries.attributes().id(a)).toString(), a);
             boolean modB = isAttrModified(Objects.requireNonNull(KineticRegistries.attributes().id(b)).toString(), b);
             if (modA != modB) return modA ? -1 : 1;
@@ -244,7 +311,7 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         refreshScroll();
     }
 
-    @Override protected int getListHeight() { return parent.isGlobalMode() ? h - 75 : h - 50; }
+    @Override protected int getListHeight() { return parent.isGlobalMode() ? h - 100 : h - 75; }
     @Override protected Component getSearchHint() { return Component.translatable("gui.entitycontrol.modifier.modifier.search_attr"); }
 
     @Override
@@ -290,7 +357,17 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
             displayVal = parent.getLocalData().get(selectedEntityId).attributeRules.get(attrId).value;
         }
 
-        String valStr = String.format("%.2f", displayVal);
+        String operation = "";
+        if (selectedEntityId != null && parent.getLocalData().containsKey(selectedEntityId)) {
+            EntityModifierConfig.AttributeRule rule = parent.getLocalData().get(selectedEntityId).attributeRules.get(attrId);
+            if (rule != null) operation = switch (rule.mode) {
+                case "MULTIPLY" -> "×";
+                case "ADD" -> "+";
+                case "SUBTRACT" -> "−";
+                default -> "=";
+            };
+        }
+        String valStr = operation + String.format(Locale.ROOT, "%.2f", displayVal);
         Component valueText = Component.translatable(
                 isTrulyModified
                         ? "gui.entitycontrol.modifier.modifier.value.modified"
@@ -304,12 +381,17 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
                 rowY + 6,
                 0xFFFFFF
         );
+        if (hovered) {
+            Component detail = Component.translatable("gui.entitycontrol.modifier.global.attribute.tooltip",
+                    attr.getDescriptionId() == null ? attrId : getReadableName(attr, rl), attrId);
+            KineticOverlays.requestFormattedTooltip(parent.getFont().split(detail, 260), mx, my);
+        }
     }
 
     @Override
     protected void renderExtra(GuiGraphics g, int mx, int my) {
         Component editValComp = Component.translatable("gui.entitycontrol.modifier.modifier.edit_val");
-        g.drawString(parent.getFont(), editValComp, attrValueBox.getX() - parent.getFont().width(editValComp) - 5, y + h - 14, 0xFFFFFF);
+        g.drawString(parent.getFont(), editValComp, x + 4, y + h - 14, 0xFFFFFF);
     }
 
     @Override
@@ -322,27 +404,27 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         selectedAttribute = Objects.requireNonNull(KineticRegistries.attributes().id(attr)).toString();
         if (parent.isGlobalMode()) parent.selectedGlobalAttribute(selectedAttribute);
         else parent.selectedIndividualAttribute(selectedAttribute);
+        selectedMode = null;
         double displayVal = previewEntity != null && previewEntity.getAttributes().hasAttribute(attr) ? previewEntity.getAttributes().getBaseValue(attr) : attr.getDefaultValue();
         if (selectedEntityId != null && parent.getLocalData().containsKey(selectedEntityId)) {
             EntityModifierConfig.EntityEditData data = parent.getLocalData().get(selectedEntityId);
             if (data.attributes.containsKey(selectedAttribute)) {
                 displayVal = data.attributes.get(selectedAttribute);
-                selectedMode = "SET";
+                if (!parent.isGlobalMode()) selectedMode = "SET";
             }
             EntityModifierConfig.AttributeRule rule = data.attributeRules.get(selectedAttribute);
             if (rule != null) {
                 displayVal = rule.value;
-                selectedMode = rule.mode;
+                if (!parent.isGlobalMode() || !"SET".equals(rule.mode)) selectedMode = rule.mode;
             }
         }
-        modeButton.setMessage(modeLabel());
         loadingValue = true;
         try {
-            attrValueBox.setValue(String.valueOf(displayVal));
+            attrValueBox.setValue(selectedMode == null ? "" : String.valueOf(displayVal));
         } finally {
             loadingValue = false;
         }
-        updateTargetsButton();
+        updateControls();
         return true;
     }
 }

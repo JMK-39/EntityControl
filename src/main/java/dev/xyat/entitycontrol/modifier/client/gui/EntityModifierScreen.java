@@ -346,8 +346,9 @@ public class EntityModifierScreen extends KineticScreen {
                 panel.onEntitySelected(globalMode ? EntityModifierConfig.GLOBAL_KEY : selectedEntity.id(),
                         globalMode ? null : selectedEntity.entity());
             }
-            if (globalMode && selectedGlobalAttribute != null && panels.get(0) instanceof AttributePanel attributes) {
-                attributes.restoreGlobalSelection(selectedGlobalAttribute);
+            String restoreId = globalMode ? selectedGlobalAttribute : selectedIndividualAttribute;
+            if (restoreId != null && panels.get(0) instanceof AttributePanel attributes) {
+                attributes.restoreSelection(restoreId);
             }
         }
 
@@ -422,6 +423,7 @@ public class EntityModifierScreen extends KineticScreen {
             return;
         }
 
+        selectedIndividualAttribute = null;
         localData.remove(
                 selectedEntity.id()
         );
@@ -498,14 +500,14 @@ public class EntityModifierScreen extends KineticScreen {
                 globalMode ? 0 : Math.min(individualPanelIdx, panels.size() - 1));
         String restoreId = globalMode ? selectedGlobalAttribute : selectedIndividualAttribute;
         if (restoreId != null && panels.get(0) instanceof AttributePanel attributes) {
-            attributes.restoreGlobalSelection(restoreId);
+            attributes.restoreSelection(restoreId);
         }
     }
 
     private boolean globalTargetSelected(EntityGuiInfo info) {
         if (!globalMode || selectedGlobalAttribute == null) return false;
         EntityModifierConfig.AttributeRule rule = globalData().attributeRules.get(selectedGlobalAttribute);
-        return rule == null || rule.appliesTo(info.id());
+        return rule != null && rule.appliesTo(info.id());
     }
 
     private void updateGridScrollRange() {

@@ -297,7 +297,8 @@ public class DummyTextManager {
         }
 
         float getRenderedHeight() {
-            return lines.size() * 10.0F * DummyClientConfig.overheadScale.get().floatValue() * 0.8F;
+            return lines.size() * 10.0F * DummyClientConfig.overheadScale.get().floatValue()
+                    * DummyClientConfig.damageTextScale.get().floatValue() * 0.8F;
         }
 
         void render2D(PoseStack pose, float screenX, float screenY, MultiBufferSource buffer) {
@@ -306,7 +307,8 @@ public class DummyTextManager {
 
             pose.translate(screenX, screenY, 0);
 
-            float scale = DummyClientConfig.overheadScale.get().floatValue() * 0.8f;
+            float scale = DummyClientConfig.overheadScale.get().floatValue()
+                    * DummyClientConfig.damageTextScale.get().floatValue() * 0.8f;
             pose.scale(scale, scale, 1.0f);
 
             Matrix4f matrix = pose.last().pose();
@@ -388,7 +390,8 @@ public class DummyTextManager {
             pose.pushPose();
             pose.translate(screenX, screenY, 0);
 
-            float scale = DummyClientConfig.particleScale.get().floatValue();
+            float scale = DummyClientConfig.particleScale.get().floatValue()
+                    * DummyClientConfig.damageTextScale.get().floatValue();
             pose.scale(scale, scale, 1.0F);
 
             float x = -font.width(displayText) / 2.0F;
@@ -459,7 +462,8 @@ public class DummyTextManager {
             pose.pushPose();
             pose.translate(screenX + currentOffsetX, screenY + currentOffsetY, 0);
 
-            float scale = DummyClientConfig.particleScale.get().floatValue();
+            float scale = DummyClientConfig.particleScale.get().floatValue()
+                    * DummyClientConfig.damageTextScale.get().floatValue();
             pose.scale(scale, scale, 1.0f);
 
             Font font = KineticClientRuntime.font();

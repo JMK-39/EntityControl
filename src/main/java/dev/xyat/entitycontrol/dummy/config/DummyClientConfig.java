@@ -9,6 +9,7 @@ public class DummyClientConfig {
     public static final KTClientConfigSpec.BooleanValue showDamageParticles;
     public static final KTClientConfigSpec.BooleanValue accumulateDamage;
     public static final KTClientConfigSpec.DoubleValue particleScale;
+    public static final KTClientConfigSpec.DoubleValue damageTextScale;
     public static final KTClientConfigSpec.DoubleValue particleSpread;
     public static final KTClientConfigSpec.IntValue colorNormal;
     public static final KTClientConfigSpec.IntValue colorCrit;
@@ -53,6 +54,12 @@ public class DummyClientConfig {
                 "伤害数字粒子的整体缩放比例。",
                 "Overall scale multiplier for damage number particles."
         ).translation("cfg.entitycontrol.dummy.dummy.particleScale").defineDouble("scale", 1.0, 0.1, 5.0);
+
+        damageTextScale = builder.comment(
+                "假人头顶伤害面板与攻击其他生物时伤害数字的共同文字缩放倍率。",
+                "Shared text scale for the dummy damage panel and damage numbers on other mobs."
+        ).translation("cfg.entitycontrol.dummy.dummy.damageTextScale")
+                .defineDouble("textScale", 1.0, 0.1, 3.0);
 
         particleSpread = builder.comment(
                 "伤害数字粒子的随机散布范围（防止数字重叠）。",
