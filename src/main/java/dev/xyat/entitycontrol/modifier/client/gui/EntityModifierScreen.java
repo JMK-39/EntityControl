@@ -25,16 +25,25 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.entity.MobType;
+import net.minecraft.world.entity.NeutralMob;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 public class EntityModifierScreen extends KineticScreen {
+    private enum CategoryFilter { FRIENDLY, AQUATIC, NEUTRAL, MONSTER, UNDEAD, MISC }
+
     private static final int CELL_SIZE = 68;
     private static final int CELL_GAP = 2;
     private static final int CELL_STRIDE = CELL_SIZE + CELL_GAP;
@@ -42,6 +51,8 @@ public class EntityModifierScreen extends KineticScreen {
     private static final int GRID_RIGHT_GAP = 26;
     private static final int PANEL_W = 640;
     private static final int PANEL_H = 360;
+    private static final int FILTER_BUTTON_WIDTH = 60;
+    private static final int MODS_PER_PAGE = 8;
 
     private final Map<String, EntityModifierConfig.EntityEditData> localData =
             new TreeMap<>();
@@ -55,6 +66,9 @@ public class EntityModifierScreen extends KineticScreen {
 
     private final List<EntityGuiInfo> allEntities =
             new ArrayList<>();
+    private final List<String> availableMods = new ArrayList<>();
+    private final EnumSet<CategoryFilter> selectedCategories = EnumSet.noneOf(CategoryFilter.class);
+    private final Set<String> selectedMods = new TreeSet<>();
 
     private final EditedEntryTracker<EntityGuiInfo> editedEntities =
             new EditedEntryTracker<>();
@@ -87,6 +101,7 @@ public class EntityModifierScreen extends KineticScreen {
     private StateButton attrTabBtn;
     private StateButton buffTabBtn;
     private StateButton globalExpandButton;
+    private StateButton filterButton;
     private boolean globalMode;
     private String entityQuery = "";
     private String selectedGlobalAttribute;
@@ -157,6 +172,13 @@ public class EntityModifierScreen extends KineticScreen {
         allEntities.addAll(
                 EntityModifierGuiCache.getEntities()
         );
+        allEntities.stream()
+                .map(info -> KineticResourceIds.tryParse(info.id()))
+                .filter(java.util.Objects::nonNull)
+                .map(ResourceLocation::getNamespace)
+                .distinct()
+                .sorted(String::compareToIgnoreCase)
+                .forEach(availableMods::add);
 
         editedEntities.refresh(
                 allEntities,
@@ -180,7 +202,7 @@ public class EntityModifierScreen extends KineticScreen {
                 )
         );
 
-        entityModel.refresh("");
+        refreshEntityModel("");
         configureStandaloneDraft(
                 this::copyLocalData,
                 this::restoreLocalData
@@ -208,7 +230,7 @@ public class EntityModifierScreen extends KineticScreen {
         }
         localData.computeIfAbsent("__global__", key -> new EntityModifierConfig.EntityEditData());
         editedEntities.refresh(allEntities, this::isTrulyModified);
-        entityModel.refresh(searchBox == null ? "" : searchBox.getValue());
+        refreshEntityModel(searchBox == null ? "" : searchBox.getValue());
         updateGridScrollRange();
         rebuildUi();
     }
@@ -230,6 +252,32 @@ public class EntityModifierScreen extends KineticScreen {
                 + KineticSearch.pinyin(
                         info.translatedName()
                 );
+    }
+
+    private CategoryFilter categoryOf(EntityGuiInfo info) {
+        LivingEntity entity = info.entity();
+        MobCategory category = entity.getType().getCategory();
+        if (category == MobCategory.WATER_CREATURE || category == MobCategory.WATER_AMBIENT
+                || category == MobCategory.UNDERGROUND_WATER_CREATURE || category == MobCategory.AXOLOTLS) {
+            return CategoryFilter.AQUATIC;
+        }
+        if (entity.getMobType() == MobType.UNDEAD) return CategoryFilter.UNDEAD;
+        if (entity instanceof NeutralMob) return CategoryFilter.NEUTRAL;
+        if (category == MobCategory.MONSTER) return CategoryFilter.MONSTER;
+        if (category == MobCategory.CREATURE) return CategoryFilter.FRIENDLY;
+        return CategoryFilter.MISC;
+    }
+
+    private boolean matchesEntityFilters(EntityGuiInfo info) {
+        if (!selectedCategories.isEmpty() && !selectedCategories.contains(categoryOf(info))) return false;
+        if (selectedMods.isEmpty()) return true;
+        ResourceLocation id = KineticResourceIds.tryParse(info.id());
+        return id != null && selectedMods.contains(id.getNamespace());
+    }
+
+    private void refreshEntityModel(String query) {
+        entityModel.setSource(allEntities.stream().filter(this::matchesEntityFilters).toList());
+        entityModel.refresh(query);
     }
 
     private boolean isTrulyModified(EntityGuiInfo info) {
@@ -287,7 +335,7 @@ public class EntityModifierScreen extends KineticScreen {
             return;
         }
 
-        entityModel.refresh(
+        refreshEntityModel(
                 searchBox == null
                         ? ""
                         : searchBox.getValue()
@@ -334,11 +382,12 @@ public class EntityModifierScreen extends KineticScreen {
 
         int rightX = rightPanelX();
         int rightWidth = rightPanelWidth();
+        int actionButtonY = startY + PANEL_H - 24;
 
         searchBox = addTextField(
                 rightX + 8,
                 startY + 5,
-                rightWidth - 16,
+                rightWidth - 82,
                 Component.empty(),
                 Component.translatable("gui.entitycontrol.modifier.modifier.search_entity"),
                 null,
@@ -346,10 +395,18 @@ public class EntityModifierScreen extends KineticScreen {
         );
         searchBox.setResponder(this::updateSearch);
         if (!entityQuery.isEmpty()) searchBox.setValue(entityQuery);
+        filterButton = addCompactButton(
+                rightX + rightWidth - FILTER_BUTTON_WIDTH - 8,
+                startY + 5,
+                FILTER_BUTTON_WIDTH,
+                Component.translatable("gui.kineticcore.entity_selector.filter"),
+                Component.translatable("gui.entitycontrol.modifier.modifier.filter.tooltip"),
+                this::showEntityFilterMenu);
+        filterButton.setSelected(!selectedCategories.isEmpty() || !selectedMods.isEmpty());
         // The global editor expands inside this screen; the individual selection is retained
         // so collapsing it restores exactly the entity that was being edited.
         globalExpandButton = addButton(
-                rightX + 8, startY + PANEL_H - 60, 100,
+                rightX + 8, actionButtonY, 92,
                 Component.translatable(globalMode
                         ? "gui.entitycontrol.modifier.global.collapse"
                         : "gui.entitycontrol.modifier.global.expand"),
@@ -405,8 +462,6 @@ public class EntityModifierScreen extends KineticScreen {
                 null,
                 () -> setActivePanel(panels.get(1), 1)
         );
-
-        int actionButtonY = startY + PANEL_H - 24;
 
         saveBtn = addButton(
                 rightX + rightWidth - 215,
@@ -468,7 +523,7 @@ public class EntityModifierScreen extends KineticScreen {
                 false
         );
 
-        entityModel.refresh(
+        refreshEntityModel(
                 searchBox.getValue()
         );
 
@@ -477,9 +532,85 @@ public class EntityModifierScreen extends KineticScreen {
 
     private void updateSearch(String query) {
         entityQuery = query == null ? "" : query;
-        entityModel.refresh(entityQuery);
+        refreshEntityModel(entityQuery);
         gridScroll.reset();
         updateGridScrollRange();
+        if (filterButton != null) {
+            filterButton.setSelected(!selectedCategories.isEmpty() || !selectedMods.isEmpty());
+        }
+    }
+
+    private void showEntityFilterMenu() {
+        List<KineticOverlays.MenuItem> entries = new ArrayList<>();
+        entries.add(KineticOverlays.MenuItem.action(
+                Component.translatable("gui.kineticcore.entity_selector.filter.reset"), () -> {
+                    selectedCategories.clear();
+                    selectedMods.clear();
+                    updateSearch(searchBox.getValue());
+                    showEntityFilterMenu();
+                }));
+        entries.add(KineticOverlays.MenuItem.separator());
+        Component allCategories = Component.translatable("gui.kineticcore.entity_selector.category.all");
+        entries.add(KineticOverlays.MenuItem.toggle(allCategories, allCategories,
+                selectedCategories.isEmpty(), () -> {
+                    selectedCategories.clear();
+                    updateSearch(searchBox.getValue());
+                    showEntityFilterMenu();
+                }));
+        for (CategoryFilter category : CategoryFilter.values()) {
+            Component name = Component.translatable("gui.kineticcore.entity_selector.category."
+                    + category.name().toLowerCase(Locale.ROOT));
+            entries.add(KineticOverlays.MenuItem.toggle(name, name,
+                    selectedCategories.contains(category), () -> {
+                        if (!selectedCategories.add(category)) selectedCategories.remove(category);
+                        updateSearch(searchBox.getValue());
+                        showEntityFilterMenu();
+                    }));
+        }
+        entries.add(KineticOverlays.MenuItem.separator());
+        entries.add(KineticOverlays.MenuItem.action(
+                Component.translatable("gui.kineticcore.entity_selector.filter.mods", selectedMods.size()),
+                () -> showModMenu(0)));
+        openContextMenu(filterButton.getX(), filterButton.getY() + 20, entries, 140);
+    }
+
+    private void showModMenu(int requestedPage) {
+        int lastPage = Math.max(0, (availableMods.size() - 1) / MODS_PER_PAGE);
+        int page = Math.max(0, Math.min(requestedPage, lastPage));
+        List<KineticOverlays.MenuItem> entries = new ArrayList<>();
+        entries.add(KineticOverlays.MenuItem.action(
+                Component.translatable("gui.kineticcore.entity_selector.filter.back"),
+                this::showEntityFilterMenu));
+        Component allMods = Component.translatable("gui.kineticcore.entity_selector.filter.mod_all");
+        entries.add(KineticOverlays.MenuItem.toggle(allMods, allMods, selectedMods.isEmpty(), () -> {
+            selectedMods.clear();
+            updateSearch(searchBox.getValue());
+            showModMenu(page);
+        }));
+        entries.add(KineticOverlays.MenuItem.separator());
+        int from = page * MODS_PER_PAGE;
+        int to = Math.min(availableMods.size(), from + MODS_PER_PAGE);
+        for (int i = from; i < to; i++) {
+            String mod = availableMods.get(i);
+            Component name = Component.literal(mod);
+            entries.add(KineticOverlays.MenuItem.toggle(name, name, selectedMods.contains(mod), () -> {
+                if (!selectedMods.add(mod)) selectedMods.remove(mod);
+                updateSearch(searchBox.getValue());
+                showModMenu(page);
+            }));
+        }
+        entries.add(KineticOverlays.MenuItem.separator());
+        if (page > 0) {
+            entries.add(KineticOverlays.MenuItem.action(
+                    Component.translatable("gui.kineticcore.entity_selector.filter.previous"),
+                    () -> showModMenu(page - 1)));
+        }
+        if (page < lastPage) {
+            entries.add(KineticOverlays.MenuItem.action(
+                    Component.translatable("gui.kineticcore.entity_selector.filter.next"),
+                    () -> showModMenu(page + 1)));
+        }
+        openContextMenu(filterButton.getX(), filterButton.getY() + 20, entries, 140);
     }
 
     private EntityModifierConfig.EntityEditData globalData() {
@@ -589,7 +720,7 @@ public class EntityModifierScreen extends KineticScreen {
         int gridHeight = gridHeight();
 
         GuiTheme.panelAlt(
-                graphics, gridX - 2, gridY - 2,
+                graphics, gridX - 2, gridY - 3,
                 gridActualWidth + 14, gridHeight + 6
         );
 

@@ -4,7 +4,6 @@ import net.minecraft.ChatFormatting;
 import dev.xyat.entitycontrol.modifier.config.EntityModifierConfig;
 import net.minecraft.client.gui.GuiGraphics;
 import dev.xyat.kineticcore.api.client.theme.GuiTheme;
-import dev.xyat.kineticcore.api.client.selector.KineticSelectors;
 import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
 import dev.xyat.kineticcore.api.client.widget.KineticWidgets;
 import dev.xyat.kineticcore.api.client.widget.input.KineticTextFields.KineticEditBox;
@@ -14,8 +13,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
-import dev.xyat.entitycontrol.modifier.client.gui.AttributeSelectionOverlay;
-import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 
 import java.util.Locale;
 import java.util.Objects;
@@ -42,7 +39,6 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
     private String selectedMode;
     private boolean loadingValue;
     private StateButton deleteButton;
-    private StateButton targetsButton;
 
     private EntityModifierConfig.AttributeRule putRule(double value) {
         EntityModifierConfig.EntityEditData data = parent.getLocalData().computeIfAbsent(
@@ -69,60 +65,15 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         if (rule == null) return;
         if (rule.targetEntities == null) rule.targetEntities = new TreeSet<>(allowedIds);
         if (!rule.targetEntities.add(id)) rule.targetEntities.remove(id);
-        updateTargetsButton();
+        if (rule.targetEntities.containsAll(allowedIds) && allowedIds.containsAll(rule.targetEntities)) {
+            rule.targetEntities = null;
+        }
     }
 
     public void restoreSelection(String id) {
         ResourceLocation key = dev.xyat.kineticcore.api.resource.KineticResourceIds.tryParse(id);
         Attribute attr = key == null ? null : KineticRegistries.attributes().get(key);
         if (attr != null) onRowClicked(attr, 0, 0, 0);
-    }
-
-    private void updateTargetsButton() {
-        if (targetsButton == null) return;
-        EntityModifierConfig.EntityEditData data = selectedEntityId == null
-                ? null : parent.getLocalData().get(selectedEntityId);
-        EntityModifierConfig.AttributeRule rule = data == null || selectedAttribute == null
-                ? null : data.attributeRules.get(selectedAttribute);
-        Component label = selectedAttribute == null
-                ? Component.translatable("gui.entitycontrol.modifier.global.targets.choose_attribute")
-                : selectedMode == null
-                ? Component.translatable("gui.entitycontrol.modifier.global.targets.choose_operation")
-                : rule == null || rule.targetEntities == null
-                ? Component.translatable("gui.entitycontrol.modifier.global.targets.all")
-                : Component.translatable("gui.entitycontrol.modifier.global.targets.selected", rule.targetEntities.size());
-        targetsButton.setMessage(label);
-        targetsButton.setEnabled(parent.isGlobalMode() && selectedAttribute != null && selectedMode != null);
-    }
-
-    private void chooseGlobalTargets() {
-        if (!parent.isGlobalMode() || selectedAttribute == null) return;
-        EntityModifierConfig.AttributeRule rule = ensureCurrentRule();
-        if (rule == null) return;
-        List<String> allowed = parent.selectableLivingEntityIds();
-        List<String> current = rule.targetEntities == null ? allowed : new ArrayList<>(rule.targetEntities);
-        KineticSelectors.openEntitySelector(parent,
-                Component.translatable("gui.entitycontrol.modifier.global.targets"), current, allowed,
-                selected -> {
-                    EntityModifierConfig.EntityEditData data = parent.getLocalData().get(EntityModifierConfig.GLOBAL_KEY);
-                    EntityModifierConfig.AttributeRule latest = data == null ? null
-                            : data.attributeRules.get(selectedAttribute);
-                    if (latest != null) {
-                        latest.targetEntities = new TreeSet<>(selected);
-                        // Selecting every available entity is the stable all-entities mode.
-                        if (latest.targetEntities.containsAll(allowed) && allowed.containsAll(latest.targetEntities)) {
-                            latest.targetEntities = null;
-                        }
-                        updateTargetsButton();
-                    }
-                });
-        ResourceLocation attributeId = KineticResourceIds.tryParse(selectedAttribute);
-        Attribute attribute = attributeId == null ? null : KineticRegistries.attributes().get(attributeId);
-        Component name = attribute == null ? Component.literal(selectedAttribute)
-                : Component.literal(getReadableName(attribute, attributeId));
-        AttributeSelectionOverlay.show(KineticClientRuntime.currentScreen(), name, selectedAttribute,
-                modeLabel(), Component.translatable("gui.entitycontrol.modifier.global.mode."
-                        + selectedMode.toLowerCase(Locale.ROOT) + ".tooltip"));
     }
 
     private Component modeLabel() {
@@ -191,7 +142,6 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
                     && (data.attributes.containsKey(selectedAttribute)
                     || data.attributeRules.containsKey(selectedAttribute)));
         }
-        updateTargetsButton();
     }
 
     private void removeSelectedRule() {
@@ -212,17 +162,13 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
 
     @Override
     protected void initExtra() {
-        modeButton = parent.addCompactButton(x + 4, y + h - 44, 120,
+        modeButton = parent.addCompactButton(x + 4, y + h - 44, 140,
                 modeLabel(), Component.translatable("gui.entitycontrol.modifier.global.mode.tooltip"),
                 this::showModeMenu);
-        deleteButton = parent.addCompactButton(x + 130, y + h - 44, 100,
+        deleteButton = parent.addCompactButton(x + 150, y + h - 44, w - 154,
                 Component.translatable("gui.entitycontrol.modifier.global.delete_rule"),
                 Component.translatable("gui.entitycontrol.modifier.global.delete_rule.tooltip"),
                 this::removeSelectedRule);
-        targetsButton = parent.addCompactButton(x + 234, y + h - 44, w - 238,
-                Component.translatable("gui.entitycontrol.modifier.global.targets.all"),
-                Component.translatable("gui.entitycontrol.modifier.global.targets.tooltip"),
-                this::chooseGlobalTargets);
         attrValueBox = KineticWidgets.createDecimalField(
                 parent.getFont(), x + w - 136, y + h - 20, 130,
                 Component.empty(), true, -1.0E9D, 1.0E9D,
@@ -249,7 +195,6 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         if (attrValueBox != null) attrValueBox.setVisible(visible);
         if (modeButton != null) modeButton.setVisible(visible);
         if (deleteButton != null) deleteButton.setVisible(visible);
-        if (targetsButton != null) targetsButton.setVisible(visible && parent.isGlobalMode());
         updateControls();
     }
 
@@ -296,17 +241,22 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
             ResourceLocation rl = KineticRegistries.attributes().id(a);
             return rl != null && (q.isEmpty() || rl.toString().contains(q) || getReadableName(a, rl).toLowerCase(Locale.ROOT).contains(q));
         }).sorted((a, b) -> {
-            int rankA = COMMON_ATTRIBUTES.indexOf(Objects.requireNonNull(KineticRegistries.attributes().id(a)).toString());
-            int rankB = COMMON_ATTRIBUTES.indexOf(Objects.requireNonNull(KineticRegistries.attributes().id(b)).toString());
+            ResourceLocation idA = Objects.requireNonNull(KineticRegistries.attributes().id(a));
+            ResourceLocation idB = Objects.requireNonNull(KineticRegistries.attributes().id(b));
+            int rankA = COMMON_ATTRIBUTES.indexOf(idA.toString());
+            int rankB = COMMON_ATTRIBUTES.indexOf(idB.toString());
             if (rankA >= 0 || rankB >= 0) {
                 if (rankA < 0) return 1;
                 if (rankB < 0) return -1;
                 return Integer.compare(rankA, rankB);
             }
-            boolean modA = isAttrModified(Objects.requireNonNull(KineticRegistries.attributes().id(a)).toString(), a);
-            boolean modB = isAttrModified(Objects.requireNonNull(KineticRegistries.attributes().id(b)).toString(), b);
+            boolean vanillaA = "minecraft".equals(idA.getNamespace());
+            boolean vanillaB = "minecraft".equals(idB.getNamespace());
+            if (vanillaA != vanillaB) return vanillaA ? -1 : 1;
+            boolean modA = isAttrModified(idA.toString(), a);
+            boolean modB = isAttrModified(idB.toString(), b);
             if (modA != modB) return modA ? -1 : 1;
-            return Objects.requireNonNull(KineticRegistries.attributes().id(a)).toString().compareTo(Objects.requireNonNull(KineticRegistries.attributes().id(b)).toString());
+            return idA.toString().compareTo(idB.toString());
         }).toList();
         refreshScroll();
     }

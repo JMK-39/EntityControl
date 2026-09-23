@@ -22,9 +22,6 @@ public class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
     private final Map<String, StateButton> removeButtons = new HashMap<>();
 
     @Override
-    protected int getListHeight() { return h - 53; }
-
-    @Override
     protected int rowStride() { return ROW_HEIGHT + 2; }
 
     private boolean isBuffModified(String buffId) {

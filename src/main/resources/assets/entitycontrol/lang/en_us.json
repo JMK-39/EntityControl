@@ -14,6 +14,7 @@
   "gui.entitycontrol.modifier.modifier.edit_val": "§bEdit Value",
   "gui.entitycontrol.modifier.modifier.entity_id": "§f%s",
   "gui.entitycontrol.modifier.modifier.entity_name": "§6%s",
+  "gui.entitycontrol.modifier.modifier.filter.tooltip": "Filter the mob grid only. In global mode, choose an attribute and operation, then click mobs to toggle where the rule applies. Filtering does not change the selection.",
   "gui.entitycontrol.modifier.modifier.preview_zoom_hint": "§eCtrl + Mouse Wheel: §aZoom model §f(Current: %s%%)",
   "gui.entitycontrol.modifier.modifier.name": "§6%s",
   "gui.entitycontrol.modifier.modifier.namespace.minecraft": "§a[%s]",
@@ -642,13 +643,7 @@
   "gui.entitycontrol.modifier.global.category.undead.off": "☐ Undead",
   "gui.entitycontrol.modifier.global.category.misc.on": "☑ Misc",
   "gui.entitycontrol.modifier.global.category.misc.off": "☐ Misc",
-  "gui.entitycontrol.modifier.global.targets": "Select entities for this attribute",
-  "gui.entitycontrol.modifier.global.targets.all": "Choose Mobs",
-  "gui.entitycontrol.modifier.global.targets.selected": "Mobs: %s",
-  "gui.entitycontrol.modifier.global.targets.tooltip": "Choose an attribute and operation first, then click to open the 3D mob selector. All mobs are selected by default; category and mod filters only narrow the search and do not change the saved selection.",
-  "gui.entitycontrol.modifier.global.expand": "Expand Global ▼",
-  "gui.entitycontrol.modifier.global.collapse": "Collapse Global ▲",
-  "gui.entitycontrol.modifier.global.expand_tooltip": "Expand or collapse global attributes without losing the selected individual entity",
-  "gui.entitycontrol.modifier.global.targets.choose_attribute": "Pick Attribute",
-  "gui.entitycontrol.modifier.global.targets.choose_operation": "Pick Operation"
+  "gui.entitycontrol.modifier.global.expand": "Expand ▼",
+  "gui.entitycontrol.modifier.global.collapse": "Collapse ▲",
+  "gui.entitycontrol.modifier.global.expand_tooltip": "Expand or collapse global attributes without losing the selected individual entity"
 }
