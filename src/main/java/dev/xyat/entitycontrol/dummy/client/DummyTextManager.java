@@ -390,8 +390,7 @@ public class DummyTextManager {
             pose.pushPose();
             pose.translate(screenX, screenY, 0);
 
-            float scale = DummyClientConfig.particleScale.get().floatValue()
-                    * DummyClientConfig.damageTextScale.get().floatValue();
+            float scale = DummyClientConfig.particleScale.get().floatValue();
             pose.scale(scale, scale, 1.0F);
 
             float x = -font.width(displayText) / 2.0F;
@@ -462,8 +461,7 @@ public class DummyTextManager {
             pose.pushPose();
             pose.translate(screenX + currentOffsetX, screenY + currentOffsetY, 0);
 
-            float scale = DummyClientConfig.particleScale.get().floatValue()
-                    * DummyClientConfig.damageTextScale.get().floatValue();
+            float scale = DummyClientConfig.particleScale.get().floatValue();
             pose.scale(scale, scale, 1.0f);
 
             Font font = KineticClientRuntime.font();

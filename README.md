@@ -80,7 +80,7 @@ Global settings include the master switch, creative-player triggering, and playe
 
 - `/kt dummy spawn` places a dummy at the block you are looking at, or in front of you, and loads your saved preset.
 - **Sneak + right-click with an empty main hand** opens the dummy editor. Configure equipment, attributes, creature type, and whether hits reduce health; Curios adds accessory editing when installed.
-- Combat displays include floating damage numbers, damage source/type, total damage, hit count, DPS, average DPS, and a death summary. A shared damage-text size setting (0.1–3.0×, default 1.0×) scales both the dummy overhead panel and damage numbers on other mobs; other visibility, scale, color, and duration options remain available.
+- Combat displays include floating damage numbers, damage source/type, total damage, hit count, DPS, average DPS, and a death summary. Dummy panel text size (0.1–3.0×, default 1.0×) affects only the dummy overhead panel. Floating damage numbers on other mobs retain their separate Particle Scale setting.
 - Dummies enter standby when no players are nearby; server options control detection range, data broadcast range, update intervals, and disallowed equipment.
 - `/kt dummy help` shows the commands. `/kt dummy clear` removes **all loaded testing dummies in the command's current dimension**.
 
@@ -188,7 +188,7 @@ Entity Control 为整合包作者和服务器管理员提供生物生成、遭�
 
 - `/kt dummy spawn` 在视线指向的方块上方或玩家前方生成假人，并加载玩家保存的预设。
 - **主手空手时潜行并右键假人**打开编辑器；可配置装备、属性、生物类型及是否扣血，安装 Curios 后还可编辑饰品。
-- 战斗显示包含飘字、伤害来源与类型、总伤害、命中次数、DPS、平均 DPS 和死亡总结。新增统一的伤害文本显示大小设置（默认 1.0 倍，范围 0.1–3.0 倍），同时影响假人头顶面板与攻击其他生物时的伤害数字；其他显示开关、缩放、颜色和持续时间设置仍可使用。
+- 战斗显示包含飘字、伤害来源与类型、总伤害、命中次数、DPS、平均 DPS 和死亡总结。假人面板文本大小设置（默认 1.0 倍，范围 0.1–3.0 倍）只影响假人头顶面板；攻击其他生物时的伤害飘字继续使用独立的“飘字大小缩放”设置。
 - 附近没有玩家时假人进入待机；服务端可设置检测范围、数据广播范围、更新间隔与禁止装备。
 - `/kt dummy help` 查看命令；`/kt dummy clear` 删除**命令所在维度中全部已加载的测试假人**。
 

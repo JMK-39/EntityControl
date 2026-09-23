@@ -56,8 +56,8 @@ public class DummyClientConfig {
         ).translation("cfg.entitycontrol.dummy.dummy.particleScale").defineDouble("scale", 1.0, 0.1, 5.0);
 
         damageTextScale = builder.comment(
-                "假人头顶伤害面板与攻击其他生物时伤害数字的共同文字缩放倍率。",
-                "Shared text scale for the dummy damage panel and damage numbers on other mobs."
+                "仅调整假人头顶伤害面板的文字缩放，不影响其他生物的伤害飘字。",
+                "Text scale for the dummy overhead damage panel only; floating damage numbers use their own scale."
         ).translation("cfg.entitycontrol.dummy.dummy.damageTextScale")
                 .defineDouble("textScale", 1.0, 0.1, 3.0);
 
