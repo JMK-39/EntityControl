@@ -1,7 +1,6 @@
 package dev.xyat.entitycontrol.modifier.client.gui;
 
 import dev.xyat.kineticcore.api.client.input.KineticMouseButtons;
-import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import dev.xyat.kineticcore.api.client.search.KineticSearch;
 import dev.xyat.kineticcore.api.client.theme.GuiTheme;
 import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
@@ -43,6 +42,8 @@ import java.util.TreeSet;
 
 public class EntityModifierScreen extends KineticScreen {
     private enum CategoryFilter { FRIENDLY, AQUATIC, NEUTRAL, MONSTER, UNDEAD, MISC }
+
+    private static final Comparator<EntityGuiInfo> ENTITY_ID_ORDER = Comparator.comparing(EntityGuiInfo::id);
 
     private static final int CELL_SIZE = 68;
     private static final int CELL_GAP = 2;
@@ -162,7 +163,7 @@ public class EntityModifierScreen extends KineticScreen {
                 throw new IllegalArgumentException("Server entity-modifier snapshot is malformed");
             }
         }
-        if (snapshot != null) localData.putAll(snapshot);
+        localData.putAll(snapshot);
 
         localData.computeIfAbsent(
                 "__global__",
@@ -194,13 +195,7 @@ public class EntityModifierScreen extends KineticScreen {
                         )
         );
 
-        entityModel.setComparator(
-                editedEntities.comparator(
-                        Comparator.comparing(
-                                EntityGuiInfo::id
-                        )
-                )
-        );
+        updateEntityComparator();
 
         refreshEntityModel("");
         configureStandaloneDraft(
@@ -280,6 +275,11 @@ public class EntityModifierScreen extends KineticScreen {
         entityModel.refresh(query);
     }
 
+    private void updateEntityComparator() {
+        entityModel.setComparator(globalMode
+                ? ENTITY_ID_ORDER : editedEntities.comparator(ENTITY_ID_ORDER));
+    }
+
     private boolean isTrulyModified(EntityGuiInfo info) {
         if (!localData.containsKey(info.id())) {
             return false;
@@ -321,7 +321,7 @@ public class EntityModifierScreen extends KineticScreen {
     }
 
     private void refreshSelectedEditedState() {
-        if (selectedEntity == null) {
+        if (globalMode || selectedEntity == null) {
             return;
         }
 
@@ -648,6 +648,8 @@ public class EntityModifierScreen extends KineticScreen {
                 ? "gui.entitycontrol.modifier.global.collapse"
                 : "gui.entitycontrol.modifier.global.expand"));
         toggle.setSelected(globalMode);
+        updateEntityComparator();
+        updateSearch(searchBox.getValue());
         if (panels.isEmpty()) return;
         for (IModifierPanel panel : panels) {
             panel.onEntitySelected(globalMode ? EntityModifierConfig.GLOBAL_KEY
@@ -664,9 +666,16 @@ public class EntityModifierScreen extends KineticScreen {
     }
 
     private boolean globalTargetSelected(EntityGuiInfo info) {
-        if (!globalMode || selectedGlobalAttribute == null) return false;
-        EntityModifierConfig.AttributeRule rule = globalData().attributeRules.get(selectedGlobalAttribute);
-        return rule != null && rule.appliesTo(info.id());
+        if (!globalMode) return false;
+        EntityModifierConfig.EntityEditData data = globalData();
+        if (selectedGlobalAttribute != null) {
+            EntityModifierConfig.AttributeRule rule = data.attributeRules.get(selectedGlobalAttribute);
+            return rule != null && rule.appliesTo(info.id());
+        }
+        for (EntityModifierConfig.AttributeRule rule : data.attributeRules.values()) {
+            if (rule != null && rule.appliesTo(info.id())) return true;
+        }
+        return false;
     }
 
     private void updateGridScrollRange() {
@@ -762,8 +771,7 @@ for (int i = startIndex;
             boolean selected = !globalMode && selectedEntity == info;
             boolean applies = globalMode && globalTargetSelected(info);
 
-            boolean edited =
-                    editedEntities.isEdited(info);
+            boolean edited = !globalMode && editedEntities.isEdited(info);
 
             boolean hovered =
                     mouseX >= gridX && mouseX < gridX + gridActualWidth

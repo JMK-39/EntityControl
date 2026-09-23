@@ -73,12 +73,14 @@ public class SpawnControlScreen extends KineticScreen {
 
     public final int COLS = 4;
     public final int CELL_SIZE = 72;
+    public final int CELL_GAP = 2;
+    public final int CELL_PITCH = CELL_SIZE + CELL_GAP;
 
     public int gridX = 12;
     public int gridY = 45;
-    public int gridW = COLS * CELL_SIZE;
+    public int gridW = COLS * CELL_SIZE + (COLS - 1) * CELL_GAP;
     public int visibleRows = 4;
-    public int gridH = visibleRows * CELL_SIZE;
+    public int gridH = visibleRows * CELL_SIZE + (visibleRows - 1) * CELL_GAP;
 
     private final GridScrollController gridScroll = new GridScrollController();
     private int maxScroll;
@@ -93,8 +95,6 @@ public class SpawnControlScreen extends KineticScreen {
     private StateButton profileDecreaseButton;
     private StateButton profileIncreaseButton;
     private final Map<Integer, StateButton> profileButtons = new HashMap<>();
-    private int profileMenuMouseX;
-    private int profileMenuMouseY;
 
     private final EntityPreviewRenderer entityPreviewRenderer =
             KineticWidgets.createEntityPreviewRenderer();
@@ -222,7 +222,7 @@ public class SpawnControlScreen extends KineticScreen {
                 saveButtonW,
                 Component.translatable("gui.entitycontrol.spawn.spawn.save"),
                 Component.translatable("gui.entitycontrol.spawn.spawn.tooltip.save"),
-                this::saveAndClose
+                this::save
         );
 
         addButton(
@@ -593,7 +593,7 @@ public class SpawnControlScreen extends KineticScreen {
         ));
     }
 
-    private void saveAndClose() {
+    private void save() {
         applyRotationSpeedFromBox(true);
         String profileJson = BiomeSpawnConfig.GSON.toJson(profile);
         SpawnNetwork.saveSpawnSettings(
@@ -606,7 +606,6 @@ public class SpawnControlScreen extends KineticScreen {
                 currentEditIndex
         );
         commitDraft();
-        navigateBack();
     }
 
     @Override
@@ -1018,8 +1017,6 @@ public class SpawnControlScreen extends KineticScreen {
             float pt
     ) {
         deferredTooltip = null;
-        profileMenuMouseX = mx;
-        profileMenuMouseY = my;
 
         if (isSelectedEntityInvalid()) {
             g.drawString(
@@ -1043,7 +1040,7 @@ public class SpawnControlScreen extends KineticScreen {
         List<Component> tooltip = null;
 
         int firstRow = gridScroll.smoothIndexOffset();
-        int visualShift = gridScroll.visualShift(CELL_SIZE);
+        int visualShift = gridScroll.visualShift(CELL_PITCH);
         int startIndex = firstRow * COLS;
         int endIndex = Math.min(
                 startIndex + (visibleRows + 1) * COLS,
@@ -1054,8 +1051,8 @@ public class SpawnControlScreen extends KineticScreen {
         for (int i = startIndex; i < endIndex; i++) {
             int column = (i - startIndex) % COLS;
             int row = (i - startIndex) / COLS;
-            int x = gridX + column * CELL_SIZE;
-            int y = gridY + row * CELL_SIZE - visualShift;
+            int x = gridX + column * CELL_PITCH;
+            int y = gridY + row * CELL_PITCH - visualShift;
 
             String id =
                     displayList.get(i);
@@ -1087,16 +1084,16 @@ public class SpawnControlScreen extends KineticScreen {
 
             if (invalidEntity) {
                 GuiTheme.indicatorOutline(
-                        g, x, y, CELL_SIZE, CELL_SIZE, GuiTheme.Indicator.DANGER, 3
+                        g, x, y, CELL_SIZE, CELL_SIZE, GuiTheme.Indicator.DANGER, 1
                 );
             } else if (hoveringCell) {
-                GuiTheme.stateOutline(g, x, y, CELL_SIZE, CELL_SIZE, false, true, false, 3);
+                GuiTheme.stateOutline(g, x, y, CELL_SIZE, CELL_SIZE, false, true, false, 1);
             } else if (selected) {
-                GuiTheme.stateOutline(g, x, y, CELL_SIZE, CELL_SIZE, true, false, false, 3);
+                GuiTheme.stateOutline(g, x, y, CELL_SIZE, CELL_SIZE, true, false, false, 1);
             } else if (modified) {
-                GuiTheme.indicatorOutline(g, x, y, CELL_SIZE, CELL_SIZE, GuiTheme.Indicator.SUCCESS, 3);
+                GuiTheme.indicatorOutline(g, x, y, CELL_SIZE, CELL_SIZE, GuiTheme.Indicator.SUCCESS, 1);
             } else {
-                GuiTheme.stateOutline(g, x, y, CELL_SIZE, CELL_SIZE, false, false, false);
+                GuiTheme.stateOutline(g, x, y, CELL_SIZE, CELL_SIZE, false, false, false, 1);
             }
 
             renderAdaptiveEntity(
@@ -1172,8 +1169,8 @@ public class SpawnControlScreen extends KineticScreen {
         }
 
         if (showProfileMenu) {
-            int menuMouseX = profileMenuMouseX;
-            int menuMouseY = profileMenuMouseY;
+            int menuMouseX = mx;
+            int menuMouseY = my;
             g.pose().pushPose();
             g.pose().translate(
                     0,
@@ -1476,7 +1473,7 @@ public class SpawnControlScreen extends KineticScreen {
                     && my < gridY + gridH) {
                 int index = getIndex(mx, my);
 
-                if (index < displayList.size()) {
+                if (index >= 0 && index < displayList.size()) {
                     updateSelection(
                             displayList.get(
                                     index
@@ -1493,9 +1490,14 @@ public class SpawnControlScreen extends KineticScreen {
     }
 
     private int getIndex(double mx, double my) {
-        int column = (int) ((mx - gridX) / CELL_SIZE);
-        int visualShift = gridScroll.visualShift(CELL_SIZE);
-        int row = (int) Math.floor((my - gridY + visualShift) / CELL_SIZE);
+        double localX = mx - gridX;
+        int column = (int) (localX / CELL_PITCH);
+        if (column < 0 || column >= COLS || localX - column * CELL_PITCH >= CELL_SIZE) return -1;
+
+        int visualShift = gridScroll.visualShift(CELL_PITCH);
+        double localY = my - gridY + visualShift;
+        int row = (int) Math.floor(localY / CELL_PITCH);
+        if (row < 0 || localY - row * CELL_PITCH >= CELL_SIZE) return -1;
         return (gridScroll.smoothIndexOffset() + row) * COLS + column;
     }
 

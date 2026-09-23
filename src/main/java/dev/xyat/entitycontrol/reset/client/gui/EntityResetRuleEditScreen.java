@@ -243,7 +243,6 @@ public final class EntityResetRuleEditScreen extends KineticScreen {
             commitDraft();
             parent.onRuleSaved();
             KTConfigApi.notifySaved(EntityReseConfigGui.PAGE_ID);
-            closeToParent();
             return;
         }
 
@@ -251,7 +250,6 @@ public final class EntityResetRuleEditScreen extends KineticScreen {
             commitDraft();
             parent.onRuleSaved();
             KTConfigApi.notifySaved(EntityReseConfigGui.PAGE_ID);
-            closeToParent();
             return;
         }
 

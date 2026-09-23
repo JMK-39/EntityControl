@@ -69,7 +69,6 @@ public class SpawnerControlScreen extends KineticScreen {
     private String pendingSaveJson;
     private long nextSaveRequestId;
     private long pendingSaveRequestId = -1L;
-    private boolean closeAfterPendingSave;
 
     private StateButton btnTabTuning;
     private StateButton btnTabBreaker;
@@ -260,7 +259,7 @@ public class SpawnerControlScreen extends KineticScreen {
                 topW,
                 Component.translatable("gui.entitycontrol.spawn.spawner.save"),
                 Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.save"),
-                () -> saveAndApply(true)
+                () -> saveAndApply()
         );
 
         addButton(
@@ -1237,11 +1236,8 @@ public class SpawnerControlScreen extends KineticScreen {
         return super.canvasMouseScrolled(mouseX, mouseY, delta);
     }
 
-    private void saveAndApply(boolean force) {
+    private void saveAndApply() {
         String currentJson = SpawnerConfig.GSON.toJson(data);
-        if (!force && Objects.equals(currentJson, lastSavedJson)) {
-            return;
-        }
 
         long requestId = ++nextSaveRequestId;
         pendingSaveJson = currentJson;
@@ -1259,12 +1255,6 @@ public class SpawnerControlScreen extends KineticScreen {
         }
         pendingSaveJson = null;
         pendingSaveRequestId = -1L;
-        if (success && closeAfterPendingSave) {
-            closeAfterPendingSave = false;
-            navigateBack();
-        } else if (!success) {
-            closeAfterPendingSave = false;
-        }
     }
 
     private boolean hasUnsavedChanges() {

@@ -44,8 +44,10 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         EntityModifierConfig.EntityEditData data = parent.getLocalData().computeIfAbsent(
                 selectedEntityId, key -> new EntityModifierConfig.EntityEditData());
         data.attributes.remove(selectedAttribute);
+        boolean newRule = !data.attributeRules.containsKey(selectedAttribute);
         EntityModifierConfig.AttributeRule rule = data.attributeRules.computeIfAbsent(selectedAttribute,
                 key -> new EntityModifierConfig.AttributeRule(selectedMode, value));
+        if (newRule && parent.isGlobalMode()) rule.targetEntities = new TreeSet<>();
         rule.mode = selectedMode;
         rule.value = value;
         return rule;
@@ -63,11 +65,8 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         if (!parent.isGlobalMode() || selectedAttribute == null || id == null) return;
         EntityModifierConfig.AttributeRule rule = ensureCurrentRule();
         if (rule == null) return;
-        if (rule.targetEntities == null) rule.targetEntities = new TreeSet<>(allowedIds);
+        if (rule.targetEntities == null) rule.targetEntities = new TreeSet<>();
         if (!rule.targetEntities.add(id)) rule.targetEntities.remove(id);
-        if (rule.targetEntities.containsAll(allowedIds) && allowedIds.containsAll(rule.targetEntities)) {
-            rule.targetEntities = null;
-        }
     }
 
     public void restoreSelection(String id) {
@@ -340,7 +339,7 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         );
         if (hovered) {
             Component detail = Component.translatable("gui.entitycontrol.modifier.global.attribute.tooltip",
-                    attr.getDescriptionId() == null ? attrId : getReadableName(attr, rl), attrId);
+                    getReadableName(attr, rl), attrId);
             KineticOverlays.requestFormattedTooltip(parent.getFont().split(detail, 260), mx, my);
         }
     }

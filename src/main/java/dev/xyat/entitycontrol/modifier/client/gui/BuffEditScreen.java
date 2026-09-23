@@ -174,7 +174,7 @@ public class BuffEditScreen extends KineticScreen {
                 65,
                 Component.translatable("gui.entitycontrol.modifier.modifier.save"),
                 null,
-                this::saveAndBack
+                this::save
         );
 
         addButton(
@@ -187,7 +187,7 @@ public class BuffEditScreen extends KineticScreen {
         );
     }
 
-    private void saveAndBack() {
+    private void save() {
         Double chance =
                 chanceBox.getDoubleValue();
 
@@ -226,8 +226,6 @@ public class BuffEditScreen extends KineticScreen {
                         effectId,
                         buff
                 );
-
-        navigateBack();
     }
 
     private StateButton dimensionButton(String dimension, int x, int y, int width, int clipTop, int clipBottom) {
