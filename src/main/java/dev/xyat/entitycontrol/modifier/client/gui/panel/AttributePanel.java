@@ -219,7 +219,7 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
                 Component.translatable("gui.entitycontrol.modifier.global.delete_rule"),
                 Component.translatable("gui.entitycontrol.modifier.global.delete_rule.tooltip"),
                 this::removeSelectedRule);
-        targetsButton = parent.addCompactButton(x + 4, y + h - 68, w - 8,
+        targetsButton = parent.addCompactButton(x + 234, y + h - 44, w - 238,
                 Component.translatable("gui.entitycontrol.modifier.global.targets.all"),
                 Component.translatable("gui.entitycontrol.modifier.global.targets.tooltip"),
                 this::chooseGlobalTargets);
@@ -311,7 +311,7 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         refreshScroll();
     }
 
-    @Override protected int getListHeight() { return parent.isGlobalMode() ? h - 100 : h - 75; }
+    @Override protected int getListHeight() { return h - 75; }
     @Override protected Component getSearchHint() { return Component.translatable("gui.entitycontrol.modifier.modifier.search_attr"); }
 
     @Override
@@ -322,15 +322,16 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         boolean selected = attrId.equals(selectedAttribute);
         int listTop = y + 28;
         int listBottom = listTop + getListHeight();
-        boolean hovered = mx >= x && mx < x + w - 10
+        boolean hovered = mx >= x + 4 && mx < x + w - 12
                 && my >= listTop && my < listBottom
                 && my >= rowY && my < rowY + ROW_HEIGHT;
-        GuiTheme.stateSurface(g, x, rowY, w - 10, 20, GuiTheme.Surface.PANEL_ALT, selected, hovered, false);
+        GuiTheme.stateSurface(g, x + 4, rowY, w - 16, ROW_HEIGHT,
+                GuiTheme.Surface.PANEL_ALT, selected, hovered, false);
 
         String namespace = rl != null ? rl.getNamespace() : "minecraft";
         Component namespaceText = Component.literal("[" + namespace + "]")
                 .withStyle(namespace.equals("minecraft") ? ChatFormatting.GREEN : ChatFormatting.BLUE);
-        g.drawString(parent.getFont(), namespaceText, x + 5, rowY + 6, 0xFFFFFF);
+        g.drawString(parent.getFont(), namespaceText, x + 8, rowY + 6, 0xFFFFFF);
 
         String attrName = getReadableName(attr, rl);
         int maxW = w - 95 - parent.getFont().width("[" + namespace + "] ");
@@ -341,7 +342,7 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         g.drawString(
                 parent.getFont(),
                 attrNameText,
-                x + 5 + parent.getFont().width("[" + namespace + "] "),
+                x + 8 + parent.getFont().width("[" + namespace + "] "),
                 rowY + 6,
                 0xFFFFFF
         );

@@ -94,7 +94,9 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
 
         parent.enableUiScissor(graphics, x + 2, listY, x + w - 2, listY + listH);
         try {
-            for (int i = 0; i <= visibleRows; i++) {
+            // A partial bottom row also needs its successor pre-rendered so it slides in smoothly.
+            int renderedRows = (listH + ROW_HEIGHT - 1) / ROW_HEIGHT + 1;
+            for (int i = 0; i < renderedRows; i++) {
                 int index = start + i;
                 if (index >= displayList.size()) break;
                 int rowY = listY + i * ROW_HEIGHT - shift;
