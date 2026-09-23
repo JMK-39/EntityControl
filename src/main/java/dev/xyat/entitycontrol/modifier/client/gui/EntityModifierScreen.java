@@ -1,6 +1,5 @@
 package dev.xyat.entitycontrol.modifier.client.gui;
 
-import net.minecraft.ChatFormatting;
 import dev.xyat.kineticcore.api.client.input.KineticMouseButtons;
 import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import dev.xyat.kineticcore.api.client.search.KineticSearch;
@@ -95,7 +94,7 @@ public class EntityModifierScreen extends KineticScreen {
     private int individualPanelIdx;
 
     private int gridX() { return startX + GRID_LEFT_INSET; }
-    private int gridY() { return startY + 30; }
+    private int gridY() { return startY + 6; }
     private int gridHeight() { return gridRowsVisible * CELL_STRIDE - CELL_GAP; }
     private int rightPanelX() { return startX + gridActualWidth + GRID_RIGHT_GAP; }
     private int rightPanelWidth() { return PANEL_W - (rightPanelX() - startX) - 15; }
@@ -331,15 +330,15 @@ public class EntityModifierScreen extends KineticScreen {
 
         gridCols = 4;
         gridActualWidth = gridCols * CELL_STRIDE - CELL_GAP;
-        gridRowsVisible = 4;
+        gridRowsVisible = 5;
 
         int rightX = rightPanelX();
         int rightWidth = rightPanelWidth();
 
         searchBox = addTextField(
-                gridX() + 2,
+                rightX + 8,
                 startY + 5,
-                gridActualWidth - 4,
+                rightWidth - 16,
                 Component.empty(),
                 Component.translatable("gui.entitycontrol.modifier.modifier.search_entity"),
                 null,
@@ -712,15 +711,6 @@ for (int i = startIndex;
         int rightWidth = rightPanelWidth() - 15;
 
         if (selectedEntity != null || globalMode) {
-            if (globalMode) {
-                graphics.drawString(font, Component.translatable("gui.entitycontrol.modifier.global.title"),
-                        rightX, startY + 9, 0xFFFFFF);
-            } else renderSelectedEntityHeader(
-                    graphics,
-                    rightX,
-                    rightWidth
-            );
-
             if (currentPanel != null) {
                 currentPanel.render(
                         graphics,
@@ -793,28 +783,6 @@ for (int i = startIndex;
                             220
                     ), mouseX, mouseY);
         }
-    }
-
-    private void renderSelectedEntityHeader(
-            GuiGraphics graphics,
-            int rightX,
-            int rightWidth
-    ) {
-        int textWidth = rightWidth - 8;
-        String id = selectedEntity.id();
-        int idLimit = textWidth / 2;
-        if (font.width(id) > idLimit) {
-            id = font.plainSubstrByWidth(id, idLimit - font.width("…")) + "…";
-        }
-        String name = selectedEntity.translatedName();
-        int nameLimit = textWidth - font.width(id) - 8;
-        if (font.width(name) > nameLimit) {
-            name = font.plainSubstrByWidth(name, nameLimit - font.width("…")) + "…";
-        }
-        graphics.drawString(font, Component.literal(name).withStyle(ChatFormatting.GOLD),
-                rightX + 4, startY + 9, 0xFFFFFF);
-        graphics.drawString(font, Component.literal(id).withStyle(ChatFormatting.AQUA),
-                rightX + rightWidth - font.width(id) - 4, startY + 9, 0xFFFFFF);
     }
 
     private List<Component> previewTooltip(EntityGuiInfo info, String stateKey) {
