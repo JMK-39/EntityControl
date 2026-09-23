@@ -224,7 +224,7 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
                 Component.translatable("gui.entitycontrol.modifier.global.targets.tooltip"),
                 this::chooseGlobalTargets);
         attrValueBox = KineticWidgets.createDecimalField(
-                parent.getFont(), x + 94, y + h - 20, w - 100,
+                parent.getFont(), x + w - 136, y + h - 20, 130,
                 Component.empty(), true, -1.0E9D, 1.0E9D,
                 number -> Double.isFinite(number.doubleValue()), null
         );
@@ -320,7 +320,11 @@ public class AttributePanel extends AbstractModifierScrollPanel<Attribute> {
         String attrId = rl != null ? rl.toString() : "";
 
         boolean selected = attrId.equals(selectedAttribute);
-        boolean hovered = mx >= x && mx < x + w - 10 && my >= rowY && my < rowY + 20;
+        int listTop = y + 28;
+        int listBottom = listTop + getListHeight();
+        boolean hovered = mx >= x && mx < x + w - 10
+                && my >= listTop && my < listBottom
+                && my >= rowY && my < rowY + ROW_HEIGHT;
         GuiTheme.stateSurface(g, x, rowY, w - 10, 20, GuiTheme.Surface.PANEL_ALT, selected, hovered, false);
 
         String namespace = rl != null ? rl.getNamespace() : "minecraft";
