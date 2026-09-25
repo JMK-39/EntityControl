@@ -109,7 +109,7 @@ repositories {
 
     ivy {
         name = 'KineticCoreGitHubReleases'
-        url = 'https://github.com/JMK-39/kineticCore/releases/download'
+        url = 'https://github.com/JMK-39/KineticCore/releases/download'
         patternLayout { artifact 'v[revision]/[artifact]-[revision].[ext]' }
         metadataSources { artifact() }
         content { includeModule 'dev.xyat.kineticcore', 'kineticcore' }

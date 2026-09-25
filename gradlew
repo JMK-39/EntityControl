@@ -88,7 +88,7 @@ APP_HOME=$( cd "${APP_HOME:-./}" && pwd -P ) || exit
 WRAPPER_JAR="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
 if [ ! -f "$WRAPPER_JAR" ]; then
     mkdir -p "$APP_HOME/gradle/wrapper"
-    WRAPPER_URL="https://raw.githubusercontent.com/gradle/gradle/v8.1.1/gradle/wrapper/gradle-wrapper.jar"
+    WRAPPER_URL="https://raw.githubusercontent.com/gradle/gradle/v8.8/gradle/wrapper/gradle-wrapper.jar"
     if command -v curl >/dev/null 2>&1; then
         curl -fL --retry 3 --connect-timeout 15 -o "$WRAPPER_JAR" "$WRAPPER_URL" || exit 1
     elif command -v wget >/dev/null 2>&1; then
