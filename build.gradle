@@ -3,12 +3,10 @@ import java.text.SimpleDateFormat
 
 buildscript {
     repositories {
-        maven { url = 'https://litesy.bmclapi2.bangbang93.com/maven/' }
-        maven { url = 'https://maven.aliyun.com/repository/public/' }
+        mavenCentral()
         maven { url = 'https://maven.minecraftforge.net/' }
         maven { url = 'https://repo.spongepowered.org/maven/' }
         maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
-        mavenCentral()
     }
     dependencies {
         classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '6.0.24'
@@ -92,62 +90,41 @@ mixin {
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 repositories {
-    maven { url = 'https://litesy.bmclapi2.bangbang93.com/maven/' }
-    maven { url = 'https://maven.aliyun.com/repository/public/' }
+    mavenCentral()
     maven { url = 'https://maven.minecraftforge.net/' }
     maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
     maven { url = 'https://maven.blamejared.com' }
-    mavenCentral()
 
-    flatDir {
-        dir project.findProperty('local_libs_dir') ?: 'libs'
+    maven {
+        name = 'Modrinth'
+        url = 'https://api.modrinth.com/maven'
+        content { includeGroup 'maven.modrinth' }
+    }
+
+    maven {
+        name = 'CurseMaven'
+        url = 'https://cursemaven.com'
+        content { includeGroup 'curse.maven' }
+    }
+
+    ivy {
+        name = 'KineticCoreGitHubReleases'
+        url = 'https://github.com/JMK-39/kineticCore/releases/download'
+        patternLayout { artifact 'v[revision]/[artifact]-[revision].[ext]' }
+        metadataSources { artifact() }
+        content { includeModule 'dev.xyat.kineticcore', 'kineticcore' }
     }
 }
 
-def localMod = { String artifactName ->
-    File libsDir = file(project.findProperty('local_libs_dir') ?: 'libs')
-    if (!libsDir.exists() || !libsDir.isDirectory()) {
-        throw new GradleException("Local libs directory does not exist: ${libsDir.absolutePath}")
-    }
-    File[] jars = libsDir.listFiles()
-    if (jars == null) {
-        throw new GradleException("Cannot read local libs directory: ${libsDir.absolutePath}")
-    }
-    String exactName = "${artifactName}.jar"
-    String versionPrefix = "${artifactName}-"
-    File exactMatch = jars.find { File candidate ->
-        candidate.isFile() && candidate.name.equalsIgnoreCase(exactName)
-    }
-    if (exactMatch != null) {
-        return "blank:${artifactName}:local"
-    }
-    def matches = jars.findAll { File candidate ->
-        candidate.isFile()
-                && candidate.name.toLowerCase().endsWith('.jar')
-                && candidate.name.regionMatches(true, 0, versionPrefix, 0, versionPrefix.length())
-    }
-    if (matches.isEmpty()) {
-        throw new GradleException("Cannot find local mod '${artifactName}' in ${libsDir.absolutePath}")
-    }
-    if (matches.size() > 1) {
-        throw new GradleException("Multiple versions found for '${artifactName}': ${matches.collect { it.name }.join(', ')}")
-    }
-    File selected = matches[0]
-    String version = selected.name.substring(versionPrefix.length(), selected.name.length() - 4)
-    if (version.isBlank()) {
-        throw new GradleException("Cannot determine local mod version from ${selected.name}")
-    }
-    return "blank:${artifactName}:${version}"
-}
 
 dependencies {
     minecraft "net.minecraftforge:forge:${project.findProperty('minecraft_version')?.toString()}-${project.findProperty('forge_version')?.toString()}"
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     compileOnly annotationProcessor("io.github.llamalad7:mixinextras-common:0.3.5")
     implementation fg.deobf("io.github.llamalad7:mixinextras-forge:0.3.5")
-    implementation fg.deobf(localMod('kineticcore'))
-    implementation fg.deobf(localMod('Jade'))
-    implementation fg.deobf(localMod('curios'))
+    implementation fg.deobf("dev.xyat.kineticcore:kineticcore:${project.findProperty('kineticcore_version')}")
+    implementation fg.deobf("curse.maven:jade-324717:6855440")
+    implementation fg.deobf("maven.modrinth:curios:IPQlZkz1")
 }
 
 tasks.named('jar', Jar).configure {

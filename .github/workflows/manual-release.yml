@@ -1,0 +1,79 @@
+name: Manual Mod Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      mod_version:
+        description: Release version in YY.M.D format (for example, 26.9.25)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.8
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.8'
+
+      - name: Validate version and reject duplicate release
+        env:
+          VERSION: ${{ inputs.mod_version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          from datetime import datetime
+          import os
+          import re
+          version = os.environ["VERSION"]
+          if not re.fullmatch(r"\d{2}\.(?:[1-9]|1[0-2])\.(?:[1-9]|[12]\d|3[01])", version):
+              raise SystemExit("Version must use YY.M.D without leading zeroes, such as 26.9.25")
+          datetime.strptime(version, "%y.%m.%d")
+          PY
+          tag="v$VERSION"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $tag already exists" >&2
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists" >&2
+            exit 1
+          fi
+
+      - name: Build mod JAR
+        env:
+          VERSION: ${{ inputs.mod_version }}
+        run: >-
+          gradle build --no-daemon --stacktrace
+          -Puse_auto_version=false
+          -Pmod_version="$VERSION"
+          -Poutput_mods_dir=build/release
+
+      - name: Check release artifact
+        env:
+          VERSION: ${{ inputs.mod_version }}
+        run: test -s "build/release/entitycontrol-$VERSION.jar"
+
+      - name: Publish GitHub Release
+        env:
+          VERSION: ${{ inputs.mod_version }}
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "v$VERSION"
+          "build/release/entitycontrol-$VERSION.jar"
+          --repo "$GITHUB_REPOSITORY"
+          --title "EntityControl $VERSION"
+          --generate-notes
