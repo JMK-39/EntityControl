@@ -106,10 +106,6 @@ Paths below are relative to the game/server directory. Use the visual editors to
 
 For file authors, reset entries use `EntityID;Threshold;RealDeath;PreventedDeath;CancelledDeath`, for example `minecraft:wither;1;true;true;true`. Invalid reset entries and unknown entity IDs are removed when loaded.
 
-### Project
-
-Mod ID: `entitycontrol`. Author: **XYAT**. License: [LGPLv3](LICENSE.txt). See [source](src/main/java/dev/xyat/entitycontrol) and [dependency metadata](src/main/resources/META-INF/mods.toml) for the implementation and declared requirements.
-
 <a id="chinese"></a>
 
 ## 简体中文
@@ -213,7 +209,3 @@ Entity Control 为整合包作者和服务器管理员提供生物生成、遭�
 `/kt reload` 需要 2 级权限，可重载已注册的生成、属性与重置配置。破坏生成规则通过对应编辑器保存并应用。重载不会绕过新增属性的重启要求，也不会追溯修改已存在实体。
 
 手动编写重置规则时，格式为 `实体ID;阈值;正常死亡;免死触发;取消死亡`，例如 `minecraft:wither;1;true;true;true`。无效条目与未注册实体 ID 会在加载时清理。
-
-### 项目信息
-
-模组 ID：`entitycontrol`。作者：**XYAT**。许可证：[LGPLv3](LICENSE.txt)。实现与依赖声明见[源码](src/main/java/dev/xyat/entitycontrol)和[依赖元数据](src/main/resources/META-INF/mods.toml)。
