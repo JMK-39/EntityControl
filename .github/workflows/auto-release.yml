@@ -1,0 +1,96 @@
+name: Build and publish mod
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/auto-release.yml'
+      - 'build.gradle'
+      - 'gradle.properties'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - 'settings.gradle'
+      - 'src/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mod-release-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.8
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.8'
+
+      - name: Set release version and artifact name
+        id: release
+        run: |
+          mod_id="$(awk -F= '$1 == "mod_id" { print $2; exit }' gradle.properties)"
+          mod_name="$(awk -F= '$1 == "mod_name" { print substr($0, index($0, "=") + 1); exit }' gradle.properties)"
+          if [ -z "$mod_id" ]; then
+            echo "gradle.properties must define mod_id" >&2
+            exit 1
+          fi
+          if [ -z "$mod_name" ]; then
+            mod_name="${GITHUB_REPOSITORY##*/}"
+          fi
+          version="$(TZ=Asia/Shanghai date +'%y.%-m.%-d')"
+          {
+            echo "mod_id=$mod_id"
+            echo "mod_name=$mod_name"
+            echo "version=$version"
+            echo "artifact=build/release/$mod_id-$version.jar"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build mod JAR
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          TZ: Asia/Shanghai
+        run: >-
+          gradle build --no-daemon --stacktrace
+          -Puse_auto_version=false
+          -Pmod_version="$VERSION"
+          -Poutput_mods_dir=build/release
+
+      - name: Check release artifact
+        env:
+          ARTIFACT: ${{ steps.release.outputs.artifact }}
+        run: test -s "$ARTIFACT"
+
+      - name: Publish GitHub Release
+        env:
+          ARTIFACT: ${{ steps.release.outputs.artifact }}
+          MOD_NAME: ${{ steps.release.outputs.mod_name }}
+          VERSION: ${{ steps.release.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$VERSION"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" "$ARTIFACT" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$tag" "$ARTIFACT" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "$MOD_NAME $VERSION" \
+              --generate-notes
+          fi

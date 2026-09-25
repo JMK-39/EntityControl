@@ -130,7 +130,19 @@ dependencies {
 tasks.named('jar', Jar).configure {
     def customOutputDir = project.findProperty('output_mods_dir')
     if (customOutputDir) {
-        destinationDirectory = file(customOutputDir)
+        def outputPath = customOutputDir.toString()
+        def windowsAbsolutePath = outputPath.length() >= 3
+                && Character.isLetter(outputPath.charAt(0))
+                && outputPath.charAt(1) == ':'
+                && (outputPath.charAt(2) == '/' || outputPath.charAt(2) == '\\')
+        def runningOnWindows = System.getProperty('os.name').toLowerCase().contains('windows')
+
+        // Use the shared Windows output folder locally and Gradle's normal output folder on Linux CI.
+        if (windowsAbsolutePath && !runningOnWindows) {
+            destinationDirectory = layout.buildDirectory.dir('libs').get().asFile
+        } else {
+            destinationDirectory = file(outputPath)
+        }
     }
     archiveFileName.set("${pModId}-${project.version}.jar")
 
