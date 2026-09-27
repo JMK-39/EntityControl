@@ -122,7 +122,61 @@ dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     compileOnly annotationProcessor("io.github.llamalad7:mixinextras-common:0.3.5")
     implementation fg.deobf("io.github.llamalad7:mixinextras-forge:0.3.5")
-    implementation fg.deobf("dev.xyat.kineticcore:kineticcore:${project.findProperty('kineticcore_version')}")
+    def kineticCoreMinimumVersion = project.findProperty('kineticcore_min_version')?.toString() ?: '26.9.25'
+    def kineticCoreVersion = project.findProperty('kineticcore_version')?.toString()
+    def parseKineticCoreVersion = { String value ->
+        def parts = value.replaceFirst(/^v/, '').tokenize('.')
+        if (parts.size() < 3 || parts.any { part -> !(part ==~ /\d+/) }) {
+            throw new org.gradle.api.GradleException("Invalid KineticCore version '${value}'.")
+        }
+        parts.collect { it.toBigInteger() }
+    }
+    def compareKineticCoreVersions = { String left, String right ->
+        def leftParts = parseKineticCoreVersion(left)
+        def rightParts = parseKineticCoreVersion(right)
+        for (int index = 0; index < Math.max(leftParts.size(), rightParts.size()); index++) {
+            int comparison = (index < leftParts.size() ? leftParts[index] : 0) <=>
+                    (index < rightParts.size() ? rightParts[index] : 0)
+            if (comparison != 0) return comparison
+        }
+        return 0
+    }
+
+    if (!kineticCoreVersion) {
+        def connection = (java.net.HttpURLConnection) new java.net.URL(
+                'https://api.github.com/repos/JMK-39/KineticCore/releases/latest').openConnection()
+        connection.connectTimeout = 10000
+        connection.readTimeout = 10000
+        connection.setRequestProperty('Accept', 'application/vnd.github+json')
+        connection.setRequestProperty('User-Agent', 'KineticCore-Gradle-Version-Resolver')
+        try {
+            if (connection.responseCode != 200) {
+                throw new org.gradle.api.GradleException("GitHub returned HTTP ${connection.responseCode}.")
+            }
+            def latestRelease = connection.inputStream.withCloseable {
+                new groovy.json.JsonSlurper().parse(it)
+            }
+            kineticCoreVersion = latestRelease.tag_name.toString().replaceFirst(/^v/, '')
+            if (!(latestRelease.assets ?: []).any { asset ->
+                asset.name == "kineticcore-${kineticCoreVersion}.jar"
+            }) {
+                throw new org.gradle.api.GradleException(
+                        "KineticCore release ${kineticCoreVersion} has no matching JAR asset.")
+            }
+        } catch (Exception exception) {
+            throw new org.gradle.api.GradleException(
+                    'Could not resolve the latest stable KineticCore release from GitHub. Check network/API availability or set -Pkineticcore_version=<version>.',
+                    exception)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    if (compareKineticCoreVersions(kineticCoreVersion, kineticCoreMinimumVersion) <= 0) {
+        throw new org.gradle.api.GradleException(
+                "KineticCore build dependency ${kineticCoreVersion} must be newer than ${kineticCoreMinimumVersion}.")
+    }
+    implementation fg.deobf("dev.xyat.kineticcore:kineticcore:${kineticCoreVersion}")
     implementation fg.deobf("curse.maven:jade-324717:6855440")
     implementation fg.deobf("maven.modrinth:curios:IPQlZkz1")
 }
