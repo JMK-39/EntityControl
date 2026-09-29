@@ -1,576 +1,220 @@
 package dev.xyat.entitycontrol.modifier.client.gui;
 
-import net.minecraft.ChatFormatting;
-import dev.xyat.kineticcore.api.client.input.KineticMouseButtons;
-import dev.xyat.kineticcore.api.client.theme.GuiTheme;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets;
-import dev.xyat.kineticcore.api.client.widget.button.KineticButtons.StateButton;
-import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
-import dev.xyat.kineticcore.api.client.screen.KineticScreen;
-import dev.xyat.kineticcore.api.client.widget.input.KineticNumericFields.NumericEditBox;
-import dev.xyat.kineticcore.api.client.widget.scroll.KineticScroll.GridScrollController;
-import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import dev.xyat.entitycontrol.modifier.config.EntityModifierConfig;
-import net.minecraft.client.gui.GuiGraphics;
+import dev.xyat.kineticcore.api.client.gui.input.MouseInput;
+import dev.xyat.kineticcore.api.client.gui.overlay.KineticOverlays;
+import dev.xyat.kineticcore.api.client.gui.page.KineticPage;
+import dev.xyat.kineticcore.api.client.gui.render.KineticGraphics;
+import dev.xyat.kineticcore.api.client.gui.text.KineticText;
+import dev.xyat.kineticcore.api.client.gui.theme.KineticTheme;
+import dev.xyat.kineticcore.api.client.gui.ui.KineticUi;
+import dev.xyat.kineticcore.api.client.gui.ui.NumberType;
+import dev.xyat.kineticcore.api.client.gui.widget.KineticNumberField;
+import dev.xyat.kineticcore.api.client.gui.widget.list.KineticRowList;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 import net.minecraft.network.chat.Component;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-public class BuffEditScreen extends KineticScreen {
-    private static final int VISIBLE_DIMENSIONS = 6;
+public final class BuffEditScreen extends KineticPage {
+    private static final int LIST_WIDTH = 330;
+    private static final int LIST_HEIGHT = 132;
+    private static final int ROW_HEIGHT = 22;
+    private static final int INLINE_BUTTON_WIDTH = 44;
 
     private final EntityModifierScreen parent;
     private final String entityId;
     private final String effectId;
     private final EntityModifierConfig.PotionBuff buff;
+    private final List<String> addedDimensions = new ArrayList<>();
+    private final List<String> allDims = new ArrayList<>();
 
-    private final List<String> addedDimensions =
-            new ArrayList<>();
+    private KineticNumberField chanceBox;
+    private KineticNumberField minBox;
+    private KineticNumberField maxBox;
+    private DimensionList dimensionList;
 
-    private final List<String> allDims =
-            new ArrayList<>();
-
-    private final GridScrollController dimensionScroll =
-            new GridScrollController();
-    private final Map<String, StateButton> dimensionButtons = new HashMap<>();
-
-    private NumericEditBox chanceBox;
-    private NumericEditBox minBox;
-    private NumericEditBox maxBox;
-
-    public BuffEditScreen(
-            EntityModifierScreen parent,
-            String entityId,
-            String effectId,
-            EntityModifierConfig.PotionBuff buff
-    ) {
-        super(Component.translatable(
-                "gui.entitycontrol.modifier.modifier.buff_edit"
-        ));
-
+    public BuffEditScreen(EntityModifierScreen parent, String entityId, String effectId,
+                          EntityModifierConfig.PotionBuff buff) {
+        super(KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff_edit"));
         this.parent = parent;
-        setParentScreen(parent);
         this.entityId = entityId;
         this.effectId = effectId;
         this.buff = buff;
 
-        if (buff.dimensions != null
-                && !buff.dimensions.isEmpty()) {
-            addedDimensions.addAll(
-                    Arrays.asList(
-                            buff.dimensions.split(",")
-                    )
-            );
+        if (buff.dimensions != null && !buff.dimensions.isEmpty()) {
+            addedDimensions.addAll(Arrays.asList(buff.dimensions.split(",")));
         }
     }
 
     private void refreshDimList() {
         allDims.clear();
-
-        KineticClientRuntime.knownLevels().forEach(key ->
-                allDims.add(key.location().toString())
-        );
-
+        KineticClientRuntime.knownLevels().forEach(key -> allDims.add(key.location().toString()));
         for (String dimension : addedDimensions) {
-            if (!allDims.contains(dimension)) {
-                allDims.add(dimension);
-            }
+            if (!allDims.contains(dimension)) allDims.add(dimension);
         }
-
         allDims.sort((left, right) -> {
-            boolean leftAdded =
-                    addedDimensions.contains(left);
-
-            boolean rightAdded =
-                    addedDimensions.contains(right);
-
-            if (leftAdded != rightAdded) {
-                return leftAdded ? -1 : 1;
-            }
-
+            boolean leftAdded = addedDimensions.contains(left);
+            boolean rightAdded = addedDimensions.contains(right);
+            if (leftAdded != rightAdded) return leftAdded ? -1 : 1;
             return left.compareTo(right);
         });
-
-        dimensionScroll.update(
-                allDims.size(),
-                VISIBLE_DIMENSIONS
-        );
+        if (dimensionList != null) dimensionList.setItems(allDims);
     }
 
     @Override
-    protected void buildUi() {
-        int centerX = canvasWidth() / 2;
-        int centerY = canvasHeight() / 2;
+    protected void build(KineticUi ui) {
+        int centerX = width() / 2;
+        int centerY = height() / 2;
+        Component chanceLabel = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.chance");
+        Component minLabel = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.min");
+        Component maxLabel = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.max");
 
-        int chanceLabelWidth = font.width(Component.translatable(
-                "gui.entitycontrol.modifier.modifier.buff.chance"
-        ));
-        int minLabelWidth = font.width(Component.translatable(
-                "gui.entitycontrol.modifier.modifier.buff.min"
-        ));
-        int maxLabelWidth = font.width(Component.translatable(
-                "gui.entitycontrol.modifier.modifier.buff.max"
-        ));
-
+        int chanceLabelWidth = KineticText.width(chanceLabel);
+        int minLabelWidth = KineticText.width(minLabel);
+        int maxLabelWidth = KineticText.width(maxLabel);
         int totalRowWidth = chanceLabelWidth + 5 + 40 + 15
                 + minLabelWidth + 5 + 30 + 15
                 + maxLabelWidth + 5 + 30;
         int currentX = centerX - totalRowWidth / 2;
         int topRowY = centerY - 70;
 
-        chanceBox = addDecimalField(
-                currentX + chanceLabelWidth + 5,
-                topRowY,
-                40,
-                Component.empty(),
-                false,
-                0D,
-                1D,
-                null,
-                null
-        );
-        chanceBox.setDoubleValue(buff.chance);
+        chanceBox = ui.numberField(currentX + chanceLabelWidth + 5, topRowY, 40, NumberType.DECIMAL)
+                .label(chanceLabel)
+                .allowNegative(false)
+                .range(0D, 1D)
+                .value(buff.chance)
+                .firstShownTextAsDefault().build();
 
         currentX += chanceLabelWidth + 5 + 40 + 15;
-
-        minBox = addIntegerField(
-                currentX + minLabelWidth + 5,
-                topRowY,
-                30,
-                Component.empty(),
-                false,
-                0,
-                null,
-                null,
-                null
-        );
-        minBox.setIntValue(buff.minLevel);
+        minBox = ui.numberField(currentX + minLabelWidth + 5, topRowY, 30, NumberType.INT)
+                .label(minLabel)
+                .allowNegative(false)
+                .range(0, null)
+                .value(buff.minLevel)
+                .firstShownTextAsDefault().build();
 
         currentX += minLabelWidth + 5 + 30 + 15;
-
-        maxBox = addIntegerField(
-                currentX + maxLabelWidth + 5,
-                topRowY,
-                30,
-                Component.empty(),
-                false,
-                0,
-                null,
-                null,
-                null
-        );
-        maxBox.setIntValue(buff.maxLevel);
+        maxBox = ui.numberField(currentX + maxLabelWidth + 5, topRowY, 30, NumberType.INT)
+                .label(maxLabel)
+                .allowNegative(false)
+                .range(0, null)
+                .value(buff.maxLevel)
+                .firstShownTextAsDefault().build();
 
         refreshDimList();
+        int listX = centerX - 165;
+        int listY = centerY - 35;
+        dimensionList = ui.add(new DimensionList(listX, listY, LIST_WIDTH, LIST_HEIGHT));
+        dimensionList.setItems(allDims);
 
-        addButton(
-                centerX - 75,
-                centerY + 115,
-                65,
-                Component.translatable("gui.entitycontrol.modifier.modifier.save"),
-                null,
-                this::save
-        );
-
-        addButton(
-                centerX + 10,
-                centerY + 115,
-                65,
-                Component.translatable("gui.entitycontrol.modifier.config.back"),
-                null,
-                this::navigateBack
-        );
+        ui.button(centerX - 75, centerY + 115, 65)
+                .text(KineticI18n.translatable("gui.entitycontrol.modifier.modifier.save"))
+                .onClick(this::save)
+                .build();
+        ui.button(centerX + 10, centerY + 115, 65)
+                .text(KineticI18n.translatable("gui.entitycontrol.modifier.config.back"))
+                .onClick(this::navigateBack)
+                .build();
     }
 
     private void save() {
-        Double chance =
-                chanceBox.getDoubleValue();
-
-        Integer minLevel =
-                minBox.getIntValue();
-
-        Integer maxLevel =
-                maxBox.getIntValue();
-
-        if (chance == null
-                || minLevel == null
-                || maxLevel == null
-                || maxLevel < minLevel) {
-            KineticOverlays.toast(
-                    Component.translatable(
-                            "msg.entitycontrol.modifier.invalid_number"
-                    )
-            );
+        Double chance = chanceBox == null ? null : chanceBox.getDoubleValue();
+        Integer minLevel = minBox == null ? null : minBox.getIntValue();
+        Integer maxLevel = maxBox == null ? null : maxBox.getIntValue();
+        if (chance == null || minLevel == null || maxLevel == null || maxLevel < minLevel) {
+            KineticOverlays.toast(KineticI18n.translatable("msg.entitycontrol.modifier.invalid_number"));
+            if (maxBox != null) maxBox.flashValidationError();
             return;
         }
 
         buff.chance = chance;
         buff.minLevel = minLevel;
         buff.maxLevel = maxLevel;
-        buff.dimensions =
-                String.join(",", addedDimensions);
-
+        buff.dimensions = String.join(",", addedDimensions);
         parent.getLocalData()
-                .computeIfAbsent(
-                        entityId,
-                        key ->
-                                new EntityModifierConfig.EntityEditData()
-                )
+                .computeIfAbsent(entityId, key -> new EntityModifierConfig.EntityEditData())
                 .buffs
-                .put(
-                        effectId,
-                        buff
-                );
-    }
-
-    private StateButton dimensionButton(String dimension, int x, int y, int width, int clipTop, int clipBottom) {
-        StateButton button = dimensionButtons.computeIfAbsent(dimension, id -> KineticWidgets.createCompactButton(
-                0, 0, width, Component.empty(), null, () -> toggleDimension(id)
-        ));
-        boolean added = addedDimensions.contains(dimension);
-        button.setX(x);
-        button.setY(y);
-        button.setWidth(width);
-        button.setText(Component.translatable(
-                added
-                        ? "gui.entitycontrol.modifier.modifier.buff.dim_remove_btn"
-                        : "gui.entitycontrol.modifier.modifier.buff.dim_add_btn"
-        ));
-        button.setError(added);
-        button.setSelected(false);
-        button.setClipBounds(x, clipTop, x + width, clipBottom);
-        return button;
+                .put(effectId, buff);
     }
 
     private void toggleDimension(String dimension) {
-        if (addedDimensions.contains(dimension)) {
-            addedDimensions.remove(dimension);
-        } else {
-            addedDimensions.add(dimension);
-        }
+        if (!addedDimensions.remove(dimension)) addedDimensions.add(dimension);
         refreshDimList();
     }
 
     @Override
-    protected void renderCanvasBackground(
-            @NotNull GuiGraphics graphics,
-            int mouseX,
-            int mouseY,
-            float partialTick
-    ) {
-        int centerX = canvasWidth() / 2;
-        int centerY = canvasHeight() / 2;
+    protected void renderBackground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        int centerX = width() / 2;
+        int centerY = height() / 2;
+        KineticTheme.panel(graphics, centerX - 180, centerY - 120, 360, 265);
+        graphics.centeredText(title(), centerX, centerY - 110, KineticTheme.current().text(), false);
+        graphics.centeredText(effectId, centerX, centerY - 95, KineticTheme.current().text(), false);
 
-        GuiTheme.panel(
-                graphics,
-                centerX - 180,
-                centerY - 120,
-                360,
-                265
-        );
+        Component chanceLabel = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.chance");
+        Component minLabel = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.min");
+        Component maxLabel = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.max");
+        int chanceLabelWidth = KineticText.width(chanceLabel);
+        int minLabelWidth = KineticText.width(minLabel);
+        int maxLabelWidth = KineticText.width(maxLabel);
+        int totalRowWidth = chanceLabelWidth + 5 + 40 + 15
+                + minLabelWidth + 5 + 30 + 15
+                + maxLabelWidth + 5 + 30;
+        int currentX = centerX - totalRowWidth / 2;
 
-        graphics.drawCenteredString(
-                font,
-                title,
-                centerX,
-                centerY - 110,
-                0xFFFFFF
-        );
+        graphics.text(chanceLabel, currentX, centerY - 64, KineticTheme.current().text());
+        currentX += chanceLabelWidth + 5 + 40 + 15;
+        graphics.text(minLabel, currentX, centerY - 64, KineticTheme.current().text());
+        currentX += minLabelWidth + 5 + 30 + 15;
+        graphics.text(maxLabel, currentX, centerY - 64, KineticTheme.current().text());
 
-        graphics.drawCenteredString(
-                font,
-                Component.literal(effectId),
-                centerX,
-                centerY - 95,
-                0xFFFFFF
-        );
-
-        int chanceLabelWidth =
-                font.width(
-                        Component.translatable(
-                                "gui.entitycontrol.modifier.modifier.buff.chance"
-                        )
-                );
-
-        int minLabelWidth =
-                font.width(
-                        Component.translatable(
-                                "gui.entitycontrol.modifier.modifier.buff.min"
-                        )
-                );
-
-        int maxLabelWidth =
-                font.width(
-                        Component.translatable(
-                                "gui.entitycontrol.modifier.modifier.buff.max"
-                        )
-                );
-
-        int totalRowWidth =
-                chanceLabelWidth
-                        + 5
-                        + 40
-                        + 15
-                        + minLabelWidth
-                        + 5
-                        + 30
-                        + 15
-                        + maxLabelWidth
-                        + 5
-                        + 30;
-
-        int currentX =
-                centerX - totalRowWidth / 2;
-
-        graphics.drawString(
-                font,
-                Component.translatable(
-                        "gui.entitycontrol.modifier.modifier.buff.chance"
-                ),
-                currentX,
-                centerY - 64,
-                0xAAAAAA
-        );
-
-        currentX +=
-                chanceLabelWidth + 5 + 40 + 15;
-
-        graphics.drawString(
-                font,
-                Component.translatable(
-                        "gui.entitycontrol.modifier.modifier.buff.min"
-                ),
-                currentX,
-                centerY - 64,
-                0xAAAAAA
-        );
-
-        currentX +=
-                minLabelWidth + 5 + 30 + 15;
-
-        graphics.drawString(
-                font,
-                Component.translatable(
-                        "gui.entitycontrol.modifier.modifier.buff.max"
-                ),
-                currentX,
-                centerY - 64,
-                0xAAAAAA
-        );
-
-        int listX = centerX - 165;
-        int listY = centerY - 35;
-        int listW = 330;
-        int listH = 132;
-
-        GuiTheme.panelAlt(graphics, listX, listY, listW, listH);
+        KineticTheme.panelAlt(graphics, centerX - 165, centerY - 35, LIST_WIDTH, LIST_HEIGHT);
     }
 
-    @Override
-    protected void renderCanvasForeground(
-            @NotNull GuiGraphics graphics,
-            int mouseX,
-            int mouseY,
-            float partialTick
-    ) {
-        int centerX = canvasWidth() / 2;
-        int centerY = canvasHeight() / 2;
+    private final class DimensionList extends KineticRowList<String> {
+        private DimensionList(int x, int y, int width, int height) {
+            super(x, y, width, height, ROW_HEIGHT);
+        }
 
-        int listX = centerX - 165;
-        int listY = centerY - 35;
-        int listW = 330;
-        int listH = 132;
-
-        dimensionScroll.update(
-                allDims.size(),
-                VISIBLE_DIMENSIONS
-        );
-
-        int first = dimensionScroll.smoothIndexOffset();
-        int shift = dimensionScroll.visualShift(22);
-        int visibleCount = Math.min(
-                VISIBLE_DIMENSIONS + 1,
-                allDims.size() - first
-        );
-
-        enableUiScissor(graphics, listX, listY, listX + listW - 8, listY + listH);
-        for (int row = 0; row < visibleCount; row++) {
-            int drawY =
-                    listY + row * 22 - shift;
-
-            String dimension =
-                    allDims.get(first + row);
-
-            boolean added =
-                    addedDimensions.contains(dimension);
-
-            boolean hovered =
-                    mouseX >= listX + 1
-                            && mouseX < listX + listW - 8
-                            && mouseY >= drawY
-                            && mouseY < drawY + 22;
-
-            GuiTheme.stateSurface(
-                    graphics, listX + 1, drawY, listW - 9, 22,
-                    GuiTheme.Surface.PANEL_ALT, false, hovered, false
+        @Override
+        protected void renderRow(KineticGraphics graphics, String dimension, int index, int x, int y, int width,
+                                 int height, boolean hovered, boolean selected) {
+            Component label = KineticI18n.translatable(
+                    "gui.entitycontrol.modifier.modifier.dimension_name",
+                    KineticText.ellipsize(dimension, Math.max(30, width - INLINE_BUTTON_WIDTH - 18))
             );
+            graphics.text(label, x + 6, y + 7, KineticTheme.current().text());
 
-            graphics.drawString(
-                    font,
-                    Component.translatable("gui.entitycontrol.modifier.modifier.dimension_name", Component.literal(dimension).withStyle(ChatFormatting.GOLD)),
-                    listX + 6,
-                    drawY + 7,
-                    0xFFFFFF
+            boolean added = addedDimensions.contains(dimension);
+            int buttonX = x + width - INLINE_BUTTON_WIDTH - 5;
+            boolean buttonHovered = mouseX() >= buttonX && mouseX() < buttonX + INLINE_BUTTON_WIDTH
+                    && mouseY() >= y + 3 && mouseY() < y + height - 3;
+            KineticTheme.button(
+                    graphics,
+                    buttonX,
+                    y + 3,
+                    INLINE_BUTTON_WIDTH,
+                    height - 6,
+                    KineticI18n.translatable(added
+                            ? "gui.entitycontrol.modifier.modifier.buff.dim_remove_btn"
+                            : "gui.entitycontrol.modifier.modifier.buff.dim_add_btn"),
+                    buttonHovered,
+                    true,
+                    added
             );
-
-            int buttonWidth = 44;
-            int buttonX =
-                    listX + listW - 10 - buttonWidth;
-
-            int buttonY =
-                    drawY + 3;
-
-            StateButton dimensionButton = dimensionButton(
-                    dimension, buttonX, buttonY, buttonWidth, listY, listY + listH
-            );
-            KineticWidgets.renderControl(dimensionButton, graphics, mouseX, mouseY, partialTick);
         }
 
-        disableUiScissor(graphics);
-
-        dimensionScroll.render(
-                graphics,
-                mouseX,
-                mouseY,
-                listX + listW - 7,
-                listY + 1,
-                4,
-                listH - 2,
-                15
-        );
-    }
-
-    @Override
-    protected boolean canvasMouseClicked(
-            double mouseX,
-            double mouseY,
-            int button
-    ) {
-        int centerX = canvasWidth() / 2;
-        int centerY = canvasHeight() / 2;
-
-        int listX = centerX - 165;
-        int listY = centerY - 35;
-        int listW = 330;
-        int listH = 132;
-
-        if (KineticMouseButtons.isPrimary(button)
-                && dimensionScroll.beginDrag(
-                        mouseX,
-                        mouseY,
-                        listX + listW - 7,
-                        listY + 1,
-                        4,
-                        listH - 2,
-                        15,
-                        0
-                )) {
+        @Override
+        protected boolean onRowClick(String dimension, int index, MouseInput input) {
+            if (!input.isLeft()) return false;
+            int rowY = rowTop(index);
+            int buttonX = controlX() + rowsWidth() - INLINE_BUTTON_WIDTH - 5;
+            if (!input.inside(buttonX, rowY + 3, INLINE_BUTTON_WIDTH, rowHeight() - 6)) return false;
+            toggleDimension(dimension);
             return true;
         }
-
-        if (mouseX >= listX + 1
-                && mouseX < listX + listW - 8
-                && mouseY >= listY
-                && mouseY < listY + listH) {
-            int index =
-                    dimensionScroll.smoothIndexOffset()
-                            + (int) ((mouseY - listY + dimensionScroll.visualShift(22)) / 22);
-
-            if (index >= 0 && index < allDims.size()) {
-                String dimension =
-                        allDims.get(index);
-
-                int buttonWidth = 44;
-                int buttonX = listX + listW - 10 - buttonWidth;
-                int drawY = listY
-                        + (index - dimensionScroll.smoothIndexOffset()) * 22
-                        - dimensionScroll.visualShift(22);
-                StateButton dimensionButton = dimensionButton(
-                        dimension, buttonX, drawY + 3, buttonWidth, listY, listY + listH
-                );
-                if (dimensionButton.mouseClicked(mouseX, mouseY, button)) return true;
-            }
-        }
-
-        return super.canvasMouseClicked(
-                mouseX,
-                mouseY,
-                button
-        );
-    }
-
-    @Override
-    protected boolean canvasMouseDragged(
-            double mouseX,
-            double mouseY,
-            int button,
-            double dragX,
-            double dragY
-    ) {
-        if (dimensionScroll.drag(
-                mouseY,
-                canvasHeight() / 2 - 34,
-                130,
-                15
-        )) {
-            return true;
-        }
-
-        return super.canvasMouseDragged(
-                mouseX,
-                mouseY,
-                button,
-                dragX,
-                dragY
-        );
-    }
-
-    @Override
-    protected boolean canvasMouseReleased(
-            double mouseX,
-            double mouseY,
-            int button
-    ) {
-        if (dimensionScroll.release(button)) {
-            return true;
-        }
-
-        return super.canvasMouseReleased(
-                mouseX,
-                mouseY,
-                button
-        );
-    }
-
-    @Override
-    protected boolean canvasMouseScrolled(
-            double mouseX,
-            double mouseY,
-            double delta
-    ) {
-        if (dimensionScroll.scroll(delta)) {
-            return true;
-        }
-
-        return super.canvasMouseScrolled(
-                mouseX,
-                mouseY,
-                delta
-        );
     }
 }

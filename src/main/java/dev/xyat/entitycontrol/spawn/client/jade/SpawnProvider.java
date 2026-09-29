@@ -1,9 +1,9 @@
 package dev.xyat.entitycontrol.spawn.client.jade;
 
-import net.minecraft.ChatFormatting;
 import dev.xyat.entitycontrol.spawn.api.SpawnerRuntimeAccessor;
 import dev.xyat.entitycontrol.spawn.config.SpawnerConfig;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -118,24 +118,24 @@ public class SpawnProvider {
             double fixedDelay = data.getDouble("KT_FixedDelaySeconds");
 
             if (different(minDelay, baseMinDelay) || different(maxDelay, baseMaxDelay)) {
-                tooltip.add(Component.translatable(
+                tooltip.add(KineticI18n.translatable(
                         "jade.entitycontrol.spawner.tuning.delay",
-                        Component.literal(formatDecimal(minDelay)).withStyle(ChatFormatting.AQUA),
-                        Component.literal(formatDecimal(maxDelay)).withStyle(ChatFormatting.AQUA)
+                        Component.literal(formatDecimal(minDelay)),
+                        Component.literal(formatDecimal(maxDelay))
                 ));
             }
 
             if (fixedDelay >= 0.0D) {
-                tooltip.add(Component.translatable(
+                tooltip.add(KineticI18n.translatable(
                         "jade.entitycontrol.spawner.tuning.fixed_delay",
-                        Component.literal(formatDecimal(fixedDelay)).withStyle(ChatFormatting.GOLD)
+                        Component.literal(formatDecimal(fixedDelay))
                 ));
             }
 
             if (different(speed, 1.0D)) {
-                tooltip.add(Component.translatable(
+                tooltip.add(KineticI18n.translatable(
                         "jade.entitycontrol.spawner.tuning.speed",
-                        Component.literal(formatDecimal(speed)).withStyle(ChatFormatting.GREEN)
+                        Component.literal(formatDecimal(speed))
                 ));
             }
 
@@ -144,40 +144,40 @@ public class SpawnProvider {
             int baseSpawnCount = data.getInt("KT_BaseSpawnCount");
             if (minSpawnCount != baseSpawnCount || maxSpawnCount != baseSpawnCount) {
                 if (minSpawnCount == maxSpawnCount) {
-                    tooltip.add(Component.translatable(
+                    tooltip.add(KineticI18n.translatable(
                             "jade.entitycontrol.spawner.tuning.spawn_count",
-                            Component.literal(String.valueOf(minSpawnCount)).withStyle(ChatFormatting.AQUA)
+                            Component.literal(String.valueOf(minSpawnCount))
                     ));
                 } else {
-                    tooltip.add(Component.translatable(
+                    tooltip.add(KineticI18n.translatable(
                             "jade.entitycontrol.spawner.tuning.spawn_count_range",
-                            Component.literal(String.valueOf(minSpawnCount)).withStyle(ChatFormatting.AQUA),
-                            Component.literal(String.valueOf(maxSpawnCount)).withStyle(ChatFormatting.GREEN)
+                            Component.literal(String.valueOf(minSpawnCount)),
+                            Component.literal(String.valueOf(maxSpawnCount))
                     ));
                 }
             }
 
             int maxNearby = data.getInt("KT_MaxNearby");
             if (maxNearby != data.getInt("KT_BaseMaxNearby")) {
-                tooltip.add(Component.translatable(
+                tooltip.add(KineticI18n.translatable(
                         "jade.entitycontrol.spawner.tuning.max_nearby",
-                        Component.literal(String.valueOf(maxNearby)).withStyle(ChatFormatting.LIGHT_PURPLE)
+                        Component.literal(String.valueOf(maxNearby))
                 ));
             }
 
             int playerRange = data.getInt("KT_PlayerRange");
             if (playerRange != data.getInt("KT_BasePlayerRange")) {
-                tooltip.add(Component.translatable(
+                tooltip.add(KineticI18n.translatable(
                         "jade.entitycontrol.spawner.tuning.player_range",
-                        Component.literal(String.valueOf(playerRange)).withStyle(ChatFormatting.GREEN)
+                        Component.literal(String.valueOf(playerRange))
                 ));
             }
 
             int spawnRange = data.getInt("KT_SpawnRange");
             if (spawnRange != data.getInt("KT_BaseSpawnRange")) {
-                tooltip.add(Component.translatable(
+                tooltip.add(KineticI18n.translatable(
                         "jade.entitycontrol.spawner.tuning.spawn_range",
-                        Component.literal(String.valueOf(spawnRange)).withStyle(ChatFormatting.AQUA)
+                        Component.literal(String.valueOf(spawnRange))
                 ));
             }
         }
@@ -193,7 +193,7 @@ public class SpawnProvider {
             long currentTime = accessor.getLevel().getGameTime();
             String mode = data.getString("KT_Mode");
 
-            tooltip.add(Component.translatable(
+            tooltip.add(KineticI18n.translatable(
                     "BREAK".equalsIgnoreCase(mode)
                             ? "jade.entitycontrol.spawner.mode.break"
                             : "jade.entitycontrol.spawner.mode.cooldown"
@@ -201,17 +201,17 @@ public class SpawnProvider {
 
             if (cooldownEnd > currentTime) {
                 long secondsLeft = Math.max(0L, (cooldownEnd - currentTime) / 20L);
-                tooltip.add(Component.translatable(
+                tooltip.add(KineticI18n.translatable(
                         "jade.entitycontrol.spawner.cooldown",
-                        Component.literal(formatTime(secondsLeft)).withStyle(ChatFormatting.LIGHT_PURPLE)
+                        Component.literal(formatTime(secondsLeft))
                 ));
             }
 
-            tooltip.add(Component.translatable(
+            tooltip.add(KineticI18n.translatable(
                     "jade.entitycontrol.spawner.progress",
-                    Component.literal(String.valueOf(waveCount)).withStyle(ChatFormatting.AQUA),
-                    Component.literal(String.valueOf(threshold)).withStyle(ChatFormatting.GREEN),
-                    Component.literal(String.valueOf(data.getInt("KT_CooldownSeconds"))).withStyle(ChatFormatting.GOLD)
+                    Component.literal(String.valueOf(waveCount)),
+                    Component.literal(String.valueOf(threshold)),
+                    Component.literal(String.valueOf(data.getInt("KT_CooldownSeconds")))
             ));
         }
 

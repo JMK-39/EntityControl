@@ -1,16 +1,13 @@
 package dev.xyat.entitycontrol.dummy.command;
 
-import dev.xyat.entitycontrol.dummy.util.ColorText;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import dev.xyat.kineticcore.api.command.CommandText;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 import dev.xyat.entitycontrol.dummy.DummyInit;
 import dev.xyat.entitycontrol.dummy.entity.DummyEntityTest;
-import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -41,10 +38,8 @@ public class DummyCommand {
     }
 
     private static MutableComponent createCmd(String shown, String clickValue, String descKey) {
-        return ColorText.translatable("cmd.entitycontrol.dummy.dummy.help.entry", shown).withStyle(style -> style
-                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, clickValue))
-                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, ColorText.translatable(descKey).withStyle(ChatFormatting.GOLD)))
-        );
+        return CommandText.clickToRun(KineticI18n.translatable("cmd.entitycontrol.dummy.dummy.help.entry", shown),
+                clickValue, KineticI18n.translatable(descKey));
     }
 
     private static int spawnDummy(com.mojang.brigadier.context.CommandContext<CommandSourceStack> context) {
@@ -66,9 +61,9 @@ public class DummyCommand {
             dummy.loadFromPlayerPreset(player);
 
             player.serverLevel().addFreshEntity(dummy);
-            context.getSource().sendSuccess(() -> ColorText.translatable("cmd.entitycontrol.dummy.dummy.spawned"), true);
+            context.getSource().sendSuccess(() -> KineticI18n.translatable("cmd.entitycontrol.dummy.dummy.spawned"), true);
         } catch (Exception e) {
-            context.getSource().sendFailure(ColorText.translatable("cmd.entitycontrol.dummy.dummy.error", e.getMessage()));
+            context.getSource().sendFailure(KineticI18n.translatable("cmd.entitycontrol.dummy.dummy.error", e.getMessage()));
         }
         return 1;
     }
@@ -84,7 +79,7 @@ public class DummyCommand {
             }
         }
         int finalCount = count;
-        context.getSource().sendSuccess(() -> ColorText.translatable("cmd.entitycontrol.dummy.dummy.cleared", finalCount), true);
+        context.getSource().sendSuccess(() -> KineticI18n.translatable("cmd.entitycontrol.dummy.dummy.cleared", finalCount), true);
         return 1;
     }
 }

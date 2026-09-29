@@ -1,147 +1,154 @@
 package dev.xyat.entitycontrol.modifier.client.gui.panel;
 
-import net.minecraft.ChatFormatting;
 import dev.xyat.entitycontrol.modifier.client.gui.BuffEditScreen;
 import dev.xyat.entitycontrol.modifier.config.EntityModifierConfig;
-import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
-import dev.xyat.kineticcore.api.client.theme.GuiTheme;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets;
-import dev.xyat.kineticcore.api.client.widget.button.KineticButtons.StateButton;
-import net.minecraft.client.gui.GuiGraphics;
+import dev.xyat.kineticcore.api.client.gui.input.MouseInput;
+import dev.xyat.kineticcore.api.client.gui.render.KineticGraphics;
+import dev.xyat.kineticcore.api.client.gui.text.KineticText;
+import dev.xyat.kineticcore.api.client.gui.theme.KineticTheme;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffect;
-import dev.xyat.kineticcore.api.registry.KineticRegistries;
 
 import java.util.Locale;
 import java.util.Objects;
-import java.util.HashMap;
-import java.util.Map;
 
-public class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
-    private final Map<String, StateButton> removeButtons = new HashMap<>();
-
-    @Override
-    protected int rowStride() { return ROW_HEIGHT + 2; }
+public final class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
+    private static final int REMOVE_BUTTON_WIDTH = 18;
 
     private boolean isBuffModified(String buffId) {
-        return selectedEntityId != null && parent.getLocalData().containsKey(selectedEntityId) &&
-                parent.getLocalData().get(selectedEntityId).buffs.containsKey(buffId);
+        return selectedEntityId != null
+                && parent.getLocalData().containsKey(selectedEntityId)
+                && parent.getLocalData().get(selectedEntityId).buffs.containsKey(buffId);
     }
 
-    private String getReadableName(MobEffect effect, ResourceLocation rl) {
-        String transName = Component.translatable(effect.getDescriptionId()).getString();
-        if (transName.equals(effect.getDescriptionId()) && rl != null) {
-            String[] parts = rl.getPath().replace("_", " ").split("\\.");
-            StringBuilder sb = new StringBuilder();
-            for (String p : parts) {
-                if (p.isEmpty()) continue;
-                sb.append(Character.toUpperCase(p.charAt(0))).append(p.substring(1)).append(" ");
+    private String getReadableName(MobEffect effect, ResourceLocation id) {
+        String translationKey = effect.getDescriptionId();
+        String translated = KineticI18n.translatable(translationKey).getString();
+        if (translated.equals(translationKey) && id != null) {
+            StringBuilder result = new StringBuilder();
+            for (String part : id.getPath().replace('.', '_').split("_")) {
+                if (part.isEmpty()) continue;
+                if (result.length() > 0) result.append(' ');
+                result.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
             }
-            return sb.toString().trim();
+            return result.toString();
         }
-        return transName;
+        return translated;
     }
 
     @Override
     protected void updateSearch(String query) {
-        String q = query.toLowerCase(Locale.ROOT);
+        String q = query == null ? "" : query.toLowerCase(Locale.ROOT);
         displayList = KineticRegistries.mobEffects().values().stream()
-                .filter(a -> {
-                    ResourceLocation rl = KineticRegistries.mobEffects().id(a);
-                    if (rl == null) return false;
-                    String readableName = getReadableName(a, rl).toLowerCase(Locale.ROOT);
-                    return q.isEmpty() || rl.toString().contains(q) || readableName.contains(q);
+                .filter(effect -> {
+                    ResourceLocation id = KineticRegistries.mobEffects().id(effect);
+                    if (id == null) return false;
+                    String readableName = getReadableName(effect, id).toLowerCase(Locale.ROOT);
+                    return q.isEmpty()
+                            || id.toString().toLowerCase(Locale.ROOT).contains(q)
+                            || readableName.contains(q);
                 })
-                .sorted((a, b) -> {
-                    String idA = Objects.requireNonNull(KineticRegistries.mobEffects().id(a)).toString();
-                    String idB = Objects.requireNonNull(KineticRegistries.mobEffects().id(b)).toString();
-                    boolean modA = isBuffModified(idA);
-                    boolean modB = isBuffModified(idB);
-                    if (modA != modB) return modA ? -1 : 1;
-                    return idA.compareTo(idB);
-                }).toList();
-        refreshScroll();
+                .sorted((left, right) -> {
+                    String leftId = Objects.requireNonNull(KineticRegistries.mobEffects().id(left)).toString();
+                    String rightId = Objects.requireNonNull(KineticRegistries.mobEffects().id(right)).toString();
+                    boolean leftModified = isBuffModified(leftId);
+                    boolean rightModified = isBuffModified(rightId);
+                    if (leftModified != rightModified) return leftModified ? -1 : 1;
+                    return leftId.compareTo(rightId);
+                })
+                .toList();
+        refreshRows();
     }
 
     @Override
-    protected Component getSearchHint() { return Component.translatable("gui.entitycontrol.modifier.modifier.search_buff"); }
+    protected Component getSearchHint() {
+        return KineticI18n.translatable("gui.entitycontrol.modifier.modifier.search_buff");
+    }
 
     @Override
-    protected void renderRow(GuiGraphics g, MobEffect effect, int rowY, int mx, int my) {
-        ResourceLocation rl = KineticRegistries.mobEffects().id(effect);
-        String effectId = rl != null ? rl.toString() : "";
+    protected void renderRow(KineticGraphics graphics, MobEffect effect, int index, int rowX, int rowY,
+                             int rowWidth, int rowHeight, int mouseX, int mouseY,
+                             boolean hovered, boolean selected) {
+        ResourceLocation id = KineticRegistries.mobEffects().id(effect);
+        String effectId = id == null ? "" : id.toString();
+        String namespace = id == null ? "minecraft" : id.getNamespace();
 
-        int listTop = y + listTopOffset();
-        boolean hovered = mx >= x + 4 && mx < x + w - 12
-                && my >= listTop && my < listTop + getListHeight()
-                && my >= rowY && my < rowY + ROW_HEIGHT;
-        GuiTheme.stateSurface(g, x + 4, rowY, w - 16, ROW_HEIGHT,
-                GuiTheme.Surface.PANEL_ALT, false, hovered, false);
+        graphics.effectIcon(effect, rowX + 4, rowY + 3, 14);
+        int textX = rowX + 22;
+        Component namespaceText = KineticI18n.translatable(
+                "minecraft".equals(namespace)
+                        ? "gui.entitycontrol.modifier.modifier.namespace.minecraft"
+                        : "gui.entitycontrol.modifier.modifier.namespace.mod",
+                namespace
+        );
+        graphics.text(namespaceText, textX, rowY + 6, KineticTheme.current().text());
 
-        String namespace = rl != null ? rl.getNamespace() : "minecraft";
-        Component namespaceText = Component.literal("[" + namespace + "]")
-                .withStyle(namespace.equals("minecraft") ? ChatFormatting.GREEN : ChatFormatting.BLUE);
-        g.drawString(parent.getFont(), namespaceText, x + 8, rowY + 6, 0xFFFFFF);
-
-        String name = getReadableName(effect, rl);
-        Component nameText = Component.translatable("gui.entitycontrol.modifier.modifier.name", Component.literal(name).withStyle(ChatFormatting.GOLD));
-        int nameX = x + 8 + parent.getFont().width("[" + namespace + "] ");
-        g.drawString(parent.getFont(), nameText, nameX, rowY + 6, 0xFFFFFF);
+        int nameX = textX + KineticText.width(namespaceText) + 4;
+        int rightReserve = isBuffModified(effectId) ? 150 : 28;
+        Component nameText = KineticI18n.translatable(
+                "gui.entitycontrol.modifier.modifier.name",
+                KineticText.ellipsize(getReadableName(effect, id), Math.max(20, rowWidth - (nameX - rowX) - rightReserve))
+        );
+        graphics.text(nameText, nameX, rowY + 6, KineticTheme.current().text());
 
         boolean hasBuff = isBuffModified(effectId);
         if (hasBuff) {
-            EntityModifierConfig.PotionBuff bData = parent.getLocalData().get(selectedEntityId).buffs.get(effectId);
-            Component info = Component.translatable(
+            EntityModifierConfig.PotionBuff data = parent.getLocalData().get(selectedEntityId).buffs.get(effectId);
+            Component info = KineticI18n.translatable(
                     "gui.entitycontrol.modifier.modifier.buff.info",
-                    Component.literal(String.valueOf(bData.minLevel)).withStyle(ChatFormatting.YELLOW),
-                    Component.literal(String.valueOf(bData.maxLevel)).withStyle(ChatFormatting.YELLOW),
-                    Component.literal(String.valueOf((int) (bData.chance * 100))).withStyle(ChatFormatting.GREEN)
-            ).withStyle(ChatFormatting.GRAY);
-            g.drawString(parent.getFont(), info, x + w - 40 - parent.getFont().width(info), rowY + 6, 0xFFFFFF);
-
-            StateButton removeButton = removeButtons.computeIfAbsent(effectId, id -> {
-                StateButton button = KineticWidgets.createCompactButton(
-                        0,
-                        0,
-                        16,
-                        Component.translatable("gui.entitycontrol.modifier.modifier.remove_mark"),
-                        null,
-                        () -> {
-                            if (selectedEntityId != null && parent.getLocalData().containsKey(selectedEntityId)) {
-                                parent.getLocalData().get(selectedEntityId).buffs.remove(id);
-                                updateSearch(searchBox.getValue());
-                            }
-                        }
-                );
-                button.setError(true);
-                return button;
-            });
-            removeButton.setX(x + w - 30);
-            removeButton.setY(rowY + 2);
-            removeButton.setWidth(16);
-            KineticWidgets.renderControl(removeButton, g, mx, my, 0.0F);
-        } else {
-            g.drawString(
-                    parent.getFont(),
-                    Component.translatable("gui.entitycontrol.modifier.modifier.add_mark"),
-                    x + w - 25,
-                    rowY + 6,
-                    0xFFFFFF
+                    data.minLevel,
+                    data.maxLevel,
+                    (int) (data.chance * 100)
             );
+            int removeX = rowX + rowWidth - REMOVE_BUTTON_WIDTH - 4;
+            int infoRight = removeX - 5;
+            graphics.text(info, infoRight - KineticText.width(info), rowY + 6, KineticTheme.current().text());
+
+            boolean removeHovered = mouseX >= removeX && mouseX < removeX + REMOVE_BUTTON_WIDTH
+                    && mouseY >= rowY + 2 && mouseY < rowY + rowHeight - 2;
+            KineticTheme.button(
+                    graphics,
+                    removeX,
+                    rowY + 2,
+                    REMOVE_BUTTON_WIDTH,
+                    rowHeight - 4,
+                    KineticI18n.translatable("gui.entitycontrol.modifier.modifier.remove_mark"),
+                    removeHovered,
+                    true,
+                    true
+            );
+        } else {
+            Component add = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.add_mark");
+            graphics.text(add, rowX + rowWidth - 9 - KineticText.width(add), rowY + 6, KineticTheme.current().text());
         }
     }
 
     @Override
-    protected boolean onRowClicked(MobEffect effect, double mx, double my, int button) {
-        String effectId = Objects.requireNonNull(KineticRegistries.mobEffects().id(effect)).toString();
+    protected boolean onRowClicked(MobEffect effect, int index, MouseInput input) {
+        if (!input.isLeft()) return false;
+        ResourceLocation id = KineticRegistries.mobEffects().id(effect);
+        if (id == null || selectedEntityId == null) return false;
+        String effectId = id.toString();
         boolean hasBuff = isBuffModified(effectId);
 
-        StateButton removeButton = removeButtons.get(effectId);
-        if (hasBuff && removeButton != null && removeButton.mouseClicked(mx, my, button)) return true;
+        if (hasBuff && rowList != null) {
+            int rowY = rowList.rowTop(index);
+            int removeX = rowList.controlX() + rowList.rowsWidth() - REMOVE_BUTTON_WIDTH - 4;
+            if (input.inside(removeX, rowY + 2, REMOVE_BUTTON_WIDTH, rowList.rowHeight() - 4)) {
+                EntityModifierConfig.EntityEditData data = parent.getLocalData().get(selectedEntityId);
+                if (data != null) data.buffs.remove(effectId);
+                updateSearch(searchBox == null ? "" : searchBox.textValue());
+                return true;
+            }
+        }
 
-        EntityModifierConfig.PotionBuff buffData = hasBuff ? parent.getLocalData().get(selectedEntityId).buffs.get(effectId) : new EntityModifierConfig.PotionBuff();
-        KineticClientRuntime.openScreen(new BuffEditScreen(parent, selectedEntityId, effectId, buffData));
+        EntityModifierConfig.PotionBuff buffData = hasBuff
+                ? parent.getLocalData().get(selectedEntityId).buffs.get(effectId)
+                : new EntityModifierConfig.PotionBuff();
+        parent.openChild(new BuffEditScreen(parent, selectedEntityId, effectId, buffData));
         return true;
     }
 }

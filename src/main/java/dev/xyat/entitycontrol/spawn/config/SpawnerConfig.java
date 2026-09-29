@@ -5,7 +5,7 @@ import com.google.gson.GsonBuilder;
 import dev.xyat.entitycontrol.spawn.SpawnModule;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
-import dev.xyat.kineticcore.api.runtime.KineticPaths;
+import dev.xyat.kineticcore.api.runtime.KineticPlatform;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -34,7 +34,7 @@ import java.util.TreeMap;
 public class SpawnerConfig {
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    private static final Path BASE_DIR = KineticPaths.configDirectory().resolve("kineticcore");
+    private static final Path BASE_DIR = KineticPlatform.configDirectory().resolve("kineticcore");
     private static final Path CONFIG_PATH = BASE_DIR.resolve("spawner.json");
     private static final Path BACKUP_PATH = BASE_DIR.resolve("spawner_backup.json");
 

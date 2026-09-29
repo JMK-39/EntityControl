@@ -65,6 +65,7 @@
   "gui.entitycontrol.reset.rule_list.edit": "§aEdit Rule",
   "gui.entitycontrol.reset.rule_list.clear": "§cClear Rule",
   "gui.entitycontrol.reset.rule_list.empty": "§eNo matching entities found.",
+  "gui.entitycontrol.reset.rule_list.invalid_entity": "§c?",
   "gui.entitycontrol.reset.rule_list.rule.none": "§eCurrent rule: §cNot configured",
   "gui.entitycontrol.reset.rule_list.rule.configured": "§aCurrent rule: Configured",
   "gui.entitycontrol.reset.rule_list.rule.threshold": "§eDeath threshold: %s",
@@ -323,9 +324,9 @@
   "gui.entitycontrol.spawn.spawn.tooltip.min_height": "§aMinimum Y level for natural spawning. Negative values are supported; leave blank to use vanilla height rules.",
   "gui.entitycontrol.spawn.spawn.tooltip.max_height": "§aMaximum Y level for natural spawning. Negative values are supported; leave blank to use vanilla height rules.",
   "gui.entitycontrol.spawn.spawner.title": "§eAdvanced Spawner Editor",
-  "msg.entitycontrol.spawn.spawner.broken": "The %1$s spawner at [%2$s, %3$s, %4$s] has broken due to overuse!",
-  "msg.entitycontrol.spawn.spawner.cooldown.end": "The %1$s spawner at [%2$s, %3$s, %4$s] has cooled down and is reactivated!",
-  "msg.entitycontrol.spawn.spawner.cooldown.start": "The %1$s spawner at [%2$s, %3$s, %4$s] overheated! Cooling down for %5$s.",
+  "msg.entitycontrol.spawn.spawner.broken": "§cThe §6%1$s§c spawner at [§b%2$s§c, §b%3$s§c, §b%4$s§c] has broken due to overuse!",
+  "msg.entitycontrol.spawn.spawner.cooldown.end": "§aThe §6%1$s§a spawner at [§b%2$s§a, §b%3$s§a, §b%4$s§a] has cooled down and is reactivated!",
+  "msg.entitycontrol.spawn.spawner.cooldown.start": "§eThe §6%1$s§e spawner at [§b%2$s§e, §b%3$s§e, §b%4$s§e] overheated! Cooling down for %5$s§e.",
   "msg.entitycontrol.spawn.spawner.hours": "%s hours",
   "msg.entitycontrol.spawn.spawner.minutes": "%s minutes",
   "msg.entitycontrol.spawn.spawner.seconds": "%s seconds",
@@ -830,5 +831,9 @@
   "dmg.twilightforest.yeeted": "Yeeted",
   "dmg.void_eye": "Void Eye",
   "dmg.wither": "Wither",
-  "dmg.witherSkull": "WitherSkull"
+  "dmg.witherSkull": "WitherSkull",
+  "gui.entitycontrol.spawn.spawn.biome.summary": "§eWeight:§f%s §eMin:§f%s §eMax:§f%s",
+  "gui.entitycontrol.spawn.spawn.biome.remove": "§cRemove",
+  "gui.entitycontrol.spawn.spawn.biome.remove.tooltip": "§eRemove this biome from the current entity spawn list.",
+  "gui.entitycontrol.spawn.spawn.label_state": "%s %s"
 }

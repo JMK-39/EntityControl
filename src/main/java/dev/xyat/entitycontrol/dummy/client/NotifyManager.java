@@ -1,6 +1,6 @@
 package dev.xyat.entitycontrol.dummy.client;
 
-import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
+import dev.xyat.kineticcore.api.client.gui.overlay.KineticOverlays;
 import net.minecraft.network.chat.Component;
 
 public final class NotifyManager {

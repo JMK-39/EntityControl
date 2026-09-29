@@ -7,7 +7,7 @@ import com.google.gson.GsonBuilder;
 import dev.xyat.entitycontrol.spawn.SpawnModule;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
-import dev.xyat.kineticcore.api.runtime.KineticPaths;
+import dev.xyat.kineticcore.api.runtime.KineticPlatform;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
@@ -48,7 +48,7 @@ public class BiomeSpawnConfig {
     public static final int MAX_PROFILE_COUNT = 64;
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    private static final Path BASE_DIR = KineticPaths.configDirectory().resolve("kineticcore").resolve("spawn_control");
+    private static final Path BASE_DIR = KineticPlatform.configDirectory().resolve("kineticcore").resolve("spawn_control");
     private static final Path GLOBALS_PATH = BASE_DIR.resolve("globals.toml");
     private static final Path BACKUP_PATH = BASE_DIR.resolve("spawn_backup.json");
     private static final String PROFILE_PREFIX = "profile_";

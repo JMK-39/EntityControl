@@ -11,7 +11,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
-import dev.xyat.kineticcore.api.runtime.KineticPaths;
+import dev.xyat.kineticcore.api.runtime.KineticPlatform;
 
 import java.io.Reader;
 import java.io.StringReader;
@@ -28,7 +28,7 @@ import java.util.TreeMap;
 
 public class EntityModifierConfig {
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path CONFIG_PATH = KineticPaths.configDirectory().resolve("kineticcore/entity_modifier.json");
+    private static final Path CONFIG_PATH = KineticPlatform.configDirectory().resolve("kineticcore/entity_modifier.json");
 
     public static Map<String, EntityEditData> ENTITY_DATA = new TreeMap<>();
 

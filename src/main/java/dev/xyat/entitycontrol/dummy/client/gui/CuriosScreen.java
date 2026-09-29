@@ -1,47 +1,52 @@
 package dev.xyat.entitycontrol.dummy.client.gui;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import dev.xyat.kineticcore.api.client.input.KineticMouseButtons;
-import dev.xyat.kineticcore.api.client.screen.KineticScreen;
-import dev.xyat.kineticcore.api.client.selector.KineticSelectors;
-import dev.xyat.kineticcore.api.client.theme.GuiTheme;
-import dev.xyat.kineticcore.api.client.widget.scroll.KineticScroll.GridScrollController;
-import dev.xyat.kineticcore.api.client.tooltip.KineticItemTooltips;
-import dev.xyat.kineticcore.api.minecraft.MinecraftContainers;
-import dev.xyat.kineticcore.api.registry.KineticRegistries;
-import dev.xyat.kineticcore.api.resource.KineticResourceIds;
-import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import dev.xyat.entitycontrol.dummy.CuriosCompat;
 import dev.xyat.entitycontrol.dummy.DummyMenu;
 import dev.xyat.entitycontrol.dummy.DummyUtils;
 import dev.xyat.entitycontrol.dummy.Network.DummyNetwork;
 import dev.xyat.entitycontrol.dummy.client.NotifyManager;
 import dev.xyat.entitycontrol.dummy.entity.DummyEntityTest;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
+import dev.xyat.kineticcore.api.client.gui.input.MouseDragInput;
+import dev.xyat.kineticcore.api.client.gui.input.MouseInput;
+import dev.xyat.kineticcore.api.client.gui.input.ScrollInput;
+import dev.xyat.kineticcore.api.client.gui.page.KineticPage;
+import dev.xyat.kineticcore.api.client.gui.render.KineticGraphics;
+import dev.xyat.kineticcore.api.client.gui.render.KineticTexture;
+import dev.xyat.kineticcore.api.client.gui.scroll.KineticScrollController;
+import dev.xyat.kineticcore.api.client.gui.selector.KineticSelectors;
+import dev.xyat.kineticcore.api.client.gui.theme.KineticTheme;
+import dev.xyat.kineticcore.api.client.gui.ui.KineticUi;
+import dev.xyat.kineticcore.api.client.gui.widget.KineticCustomControl;
+import dev.xyat.kineticcore.api.client.tooltip.KineticItemTooltips;
+import dev.xyat.kineticcore.api.minecraft.MinecraftContainers;
+import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class CuriosScreen extends KineticScreen {
-    private final Screen parent;
-    private final DummyMenu menu;
-    private final DummyEntityTest dummy;
-
+public class CuriosScreen extends KineticPage {
     private static final int COLUMNS = 9;
     private static final int MAX_VISIBLE_ROWS = 4;
     private static final int SLOT_SIZE = 18;
     private static final int SCROLL_W = 6;
     private static final int SCROLL_MIN_THUMB = 15;
-    private static final ResourceLocation INVENTORY_TEX = KineticResourceIds.of("minecraft", "textures/gui/container/generic_54.png");
+    private static final KineticTexture INVENTORY_TEX = KineticTexture.of(
+            "minecraft",
+            "textures/gui/container/generic_54.png",
+            256,
+            256
+    );
 
-    private final GridScrollController curioScroll = new GridScrollController();
+    private final DummyMenu menu;
+    private final DummyEntityTest dummy;
+    private final KineticScrollController curioScroll = new KineticScrollController();
 
     private int totalSlots;
     private int maxRows;
@@ -57,19 +62,18 @@ public class CuriosScreen extends KineticScreen {
     private int scrollX;
     private int playerInvX;
     private int playerInvY;
+    private CuriosInventoryControl inventoryControl;
 
-    public CuriosScreen(Screen parent, DummyMenu menu) {
-        super(Component.translatable("gui.entitycontrol.dummy.dummy.curios_ext.title"));
-        this.parent = parent;
-        setParentScreen(parent);
+    public CuriosScreen(DummyMenu menu) {
+        super(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.curios_ext.title"));
         this.menu = menu;
         this.dummy = menu.entity;
     }
 
     @Override
-    protected void buildUi() {
-        int cx = canvasWidth() / 2;
-        int cy = canvasHeight() / 2;
+    protected void build(KineticUi ui) {
+        int cx = width() / 2;
+        int cy = height() / 2;
 
         this.totalSlots = CuriosCompat.getSlotCount(dummy);
         this.maxRows = Math.max(1, (int) Math.ceil((double) this.totalSlots / COLUMNS));
@@ -88,197 +92,235 @@ public class CuriosScreen extends KineticScreen {
         this.playerInvX = cx - 88;
         this.playerInvY = gridStartY + gridViewH + 10;
 
-        addButton(
-                this.startX + this.panelW - 45,
-                this.startY + 7,
-                40,
-                Component.translatable("gui.entitycontrol.dummy.dummy.back"),
-                null,
-                this::navigateBack
-        );
+        ui.button(startX + panelW - 45, startY + 7, 40)
+                .text(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.back"))
+                .onClick(this::navigateBack)
+                .build();
+
+        int controlLeft = Math.min(gridStartX, playerInvX);
+        int controlTop = gridStartY;
+        int controlRight = Math.max(scrollX + SCROLL_W + 3, playerInvX + 176);
+        int controlBottom = playerInvY + 90;
+        this.inventoryControl = ui.add(new CuriosInventoryControl(
+                controlLeft,
+                controlTop,
+                controlRight - controlLeft,
+                controlBottom - controlTop
+        ));
     }
 
     private void notifyBlacklist() {
-        NotifyManager.notify(Component.translatable("msg.entitycontrol.dummy.dummy.blacklisted"));
+        NotifyManager.notify(KineticI18n.translatable("msg.entitycontrol.dummy.dummy.blacklisted"));
     }
 
     private void notifyNotCurio() {
-        NotifyManager.notify(Component.translatable("msg.entitycontrol.dummy.dummy.not_a_curio"));
+        NotifyManager.notify(KineticI18n.translatable("msg.entitycontrol.dummy.dummy.not_a_curio"));
     }
 
-    private boolean isValidCurio(ItemStack stack) {
+    private boolean isNotCurio(ItemStack stack) {
         if (stack.isEmpty()) return false;
         return stack.getTags().noneMatch(t -> t.location().getNamespace().equals("curios"));
     }
 
     @Override
-    protected void renderCanvasBackground(@NotNull GuiGraphics g, int mx, int my, float pt) {
-        int cx = canvasWidth() / 2;
-
-        GuiTheme.panelAlt(g, startX, startY, panelW, panelH);
-        g.drawCenteredString(this.font, this.title, cx, startY + 13, 0xFFFFAA00);
+    protected void renderBackground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        int cx = width() / 2;
+        KineticTheme.panelAlt(graphics, startX, startY, panelW, panelH);
+        graphics.centeredText(title(), cx, startY + 13, KineticTheme.current().text(), false);
 
         if (this.totalSlots <= 0) {
-            g.drawCenteredString(
-                    this.font,
-                    Component.translatable("gui.entitycontrol.dummy.dummy.curios_ext.no_slots"),
+            graphics.centeredText(
+                    KineticI18n.translatable("gui.entitycontrol.dummy.dummy.curios_ext.no_slots"),
                     gridStartX + gridViewW / 2,
                     gridStartY + gridViewH / 2 - 4,
-                    0xFF5555
+                    KineticTheme.indicatorColor(KineticTheme.Indicator.DANGER),
+                    false
             );
-        } else {
-            int startRow = curioScroll.offset();
-            int startIdx = startRow * COLUMNS;
-            int endIdx = Math.min(startIdx + visibleRows * COLUMNS, totalSlots);
-
-            enableUiScissor(g, gridStartX, gridStartY, gridStartX + gridViewW, gridStartY + gridViewH);
-            for (int i = startIdx; i < endIdx; i++) {
-                int displayIdx = i - startIdx;
-                int x = gridStartX + (displayIdx % COLUMNS) * SLOT_SIZE;
-                int y = gridStartY + (displayIdx / COLUMNS) * SLOT_SIZE;
-                ItemStack stack = CuriosCompat.getCurioItem(dummy, i);
-                boolean hovered = mx >= x && mx < x + SLOT_SIZE && my >= y && my < y + SLOT_SIZE;
-                GuiTheme.itemSlot(g, x, y, SLOT_SIZE, 4, hovered);
-                if (!stack.isEmpty()) {
-                    g.renderItem(stack, x + 1, y + 1);
-                    g.renderItemDecorations(this.font, stack, x + 1, y + 1, null);
-                }
-            }
-            disableUiScissor(g);
-
-            curioScroll.render(g, mx, my, scrollX, gridStartY, SCROLL_W, gridViewH, SCROLL_MIN_THUMB);
-        }
-
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-        g.blit(INVENTORY_TEX, playerInvX, playerInvY, 0, 125, 176, 90, 256, 256);
-
-        if (KineticClientRuntime.localPlayer() != null) {
-            Inventory inv = KineticClientRuntime.localPlayer().getInventory();
-            for (int i = 0; i < 36; i++) {
-                int col = (i < 9) ? i : (i - 9) % 9;
-                int row = (i < 9) ? 3 : (i - 9) / 9;
-                int px = playerInvX + 7 + col * 18;
-                int py = playerInvY + (row == 3 ? 72 : 14 + row * 18);
-                ItemStack stack = inv.getItem(i);
-                if (!stack.isEmpty()) {
-                    g.renderItem(stack, px + 1, py + 1);
-                    g.renderItemDecorations(this.font, stack, px + 1, py + 1, null);
-                }
-            }
         }
     }
 
     @Override
-    protected void renderCanvasForeground(@NotNull GuiGraphics g, int mx, int my, float pt) {
-
-        ItemStack hoveredStack = ItemStack.EMPTY;
-        boolean isCurioHovered = false;
-
-        if (this.totalSlots > 0) {
-            int startRow = curioScroll.offset();
-            int startIdx = startRow * COLUMNS;
-            int endIdx = Math.min(startIdx + visibleRows * COLUMNS, totalSlots);
-            for (int i = startIdx; i < endIdx; i++) {
-                int displayIdx = i - startIdx;
-                int x = gridStartX + (displayIdx % COLUMNS) * SLOT_SIZE;
-                int y = gridStartY + (displayIdx / COLUMNS) * SLOT_SIZE;
-                if (mx >= x && mx < x + SLOT_SIZE && my >= y && my < y + SLOT_SIZE) {
-                    hoveredStack = CuriosCompat.getCurioItem(dummy, i);
-                    isCurioHovered = true;
-                    break;
-                }
-            }
-        }
-
-        if (KineticClientRuntime.localPlayer() != null && !isCurioHovered) {
-            Inventory inv = KineticClientRuntime.localPlayer().getInventory();
-            for (int i = 0; i < 36; i++) {
-                int col = (i < 9) ? i : (i - 9) % 9;
-                int row = (i < 9) ? 3 : (i - 9) / 9;
-                int px = playerInvX + 7 + col * 18;
-                int py = playerInvY + (row == 3 ? 72 : 14 + row * 18);
-                if (mx >= px && mx < px + SLOT_SIZE && my >= py && my < py + SLOT_SIZE) {
-                    hoveredStack = inv.getItem(i);
-                    break;
-                }
-            }
-        }
-
-        if (!hoveredStack.isEmpty() || isCurioHovered) {
-            renderSlotTooltip(g, hoveredStack, mx, my, isCurioHovered);
-        }
-
-        if (KineticClientRuntime.localPlayer() != null) {
-            ItemStack carried = KineticClientRuntime.localPlayer().containerMenu.getCarried();
-            if (!carried.isEmpty()) {
-                g.renderItem(carried, mx - 8, my - 8);
-                g.renderItemDecorations(this.font, carried, mx - 8, my - 8, null);
-            }
+    protected void renderForeground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        if (KineticClientRuntime.localPlayer() == null) return;
+        ItemStack carried = KineticClientRuntime.localPlayer().containerMenu.getCarried();
+        if (!carried.isEmpty()) {
+            graphics.item(carried, mouseX - 8, mouseY - 8);
+            graphics.itemDecorations(carried, mouseX - 8, mouseY - 8);
         }
     }
 
-    private void renderSlotTooltip(GuiGraphics g, ItemStack stack, int mx, int my, boolean isCurioSlot) {
+    @Override
+    protected void renderTooltips(int mouseX, int mouseY) {
+        if (inventoryControl == null) return;
+        HoverInfo hover = inventoryControl.hoverInfo(mouseX, mouseY);
+        if (hover == null) return;
+
         List<Component> tooltip = new ArrayList<>();
-        if (!stack.isEmpty()) {
-            tooltip.addAll(KineticItemTooltips.textLines(stack));
-        } else if (isCurioSlot) {
-            tooltip.add(Component.translatable("gui.entitycontrol.dummy.dummy.slot.curio"));
+        if (!hover.stack().isEmpty()) {
+            tooltip.addAll(KineticItemTooltips.textLines(hover.stack()));
+        } else if (hover.curioSlot()) {
+            tooltip.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.slot.curio"));
         } else {
             return;
         }
 
-        if (isCurioSlot) {
-            tooltip.add(Component.empty());
-            tooltip.add(Component.translatable("gui.entitycontrol.dummy.dummy.tooltip.curio.copy"));
-            tooltip.add(Component.translatable("gui.entitycontrol.dummy.dummy.tooltip.curio.remove"));
+        tooltip.add(Component.empty());
+        if (hover.curioSlot()) {
+            tooltip.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.tooltip.curio.copy"));
+            tooltip.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.tooltip.curio.remove"));
         } else {
-            tooltip.add(Component.empty());
-            tooltip.add(Component.translatable("gui.entitycontrol.dummy.dummy.tooltip.inv.copy"));
-            tooltip.add(Component.translatable("gui.entitycontrol.dummy.dummy.tooltip.inv.quick"));
+            tooltip.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.tooltip.inv.copy"));
+            tooltip.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.tooltip.inv.quick"));
         }
-        showTooltip(tooltip, null);
+        showTooltip(tooltip);
     }
 
-    @Override
-    protected boolean canvasMouseClicked(double mx, double my, int btn) {
-        if (super.canvasMouseClicked(mx, my, btn)) return true;
+    private int getFirstEmptyCurio() {
+        for (int i = 0; i < totalSlots; i++) {
+            if (CuriosCompat.getCurioItem(dummy, i).isEmpty()) return i;
+        }
+        return -1;
+    }
 
-        if (KineticMouseButtons.isPrimary(btn) && curioScroll.beginDrag(
-                mx,
-                my,
-                scrollX,
-                gridStartY,
-                SCROLL_W,
-                gridViewH,
-                SCROLL_MIN_THUMB,
-                3
-        )) {
-            return true;
+    private void openItemSelector(int slotIdx) {
+        KineticSelectors.openItemSelector(selection -> {
+            if (selection == null || !selection.isItem()) return;
+            ItemStack newStack = selection.stack().copy();
+            if (newStack.isEmpty()) return;
+            newStack.setCount(1);
+            if (DummyUtils.isBlacklisted(newStack)) {
+                notifyBlacklist();
+                return;
+            }
+            if (isNotCurio(newStack)) {
+                notifyNotCurio();
+                return;
+            }
+            ResourceLocation itemId = KineticRegistries.items().id(newStack.getItem());
+            if (itemId == null) return;
+            updateSlot(slotIdx, newStack, DummyNetwork.UpdateCurioV2.defaultItem(
+                    menu.containerId,
+                    dummy.getId(),
+                    slotIdx,
+                    itemId
+            ));
+        });
+    }
+
+    private void updateSlot(int index, ItemStack stack, DummyNetwork.UpdateCurioV2 packet) {
+        CuriosCompat.setCurioItem(dummy, index, stack);
+        DummyNetwork.sendToServer(packet);
+    }
+
+    private record HoverInfo(ItemStack stack, boolean curioSlot) {
+    }
+
+    private final class CuriosInventoryControl extends KineticCustomControl {
+        private CuriosInventoryControl(int x, int y, int width, int height) {
+            super(x, y, width, height);
         }
 
-        ItemStack cursorStack = ItemStack.EMPTY;
-        if (KineticClientRuntime.localPlayer() != null) {
-            cursorStack = KineticClientRuntime.localPlayer().containerMenu.getCarried();
+        @Override
+        protected void render(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
+            if (totalSlots > 0) {
+                int startRow = curioScroll.offset();
+                int startIdx = startRow * COLUMNS;
+                int endIdx = Math.min(startIdx + visibleRows * COLUMNS, totalSlots);
+
+                graphics.clipped(gridStartX, gridStartY, gridStartX + gridViewW, gridStartY + gridViewH, () -> {
+                    for (int i = startIdx; i < endIdx; i++) {
+                        int displayIdx = i - startIdx;
+                        int x = gridStartX + (displayIdx % COLUMNS) * SLOT_SIZE;
+                        int y = gridStartY + (displayIdx / COLUMNS) * SLOT_SIZE;
+                        ItemStack stack = CuriosCompat.getCurioItem(dummy, i);
+                        boolean hovered = mouseX >= x && mouseX < x + SLOT_SIZE
+                                && mouseY >= y && mouseY < y + SLOT_SIZE;
+                        KineticTheme.itemSlot(graphics, x, y, SLOT_SIZE, 4, hovered);
+                        if (!stack.isEmpty()) {
+                            graphics.item(stack, x + 1, y + 1);
+                            graphics.itemDecorations(stack, x + 1, y + 1);
+                        }
+                    }
+                });
+                curioScroll.render(graphics, mouseX, mouseY, scrollX, gridStartY, SCROLL_W, gridViewH, SCROLL_MIN_THUMB);
+            }
+
+            graphics.texture(INVENTORY_TEX, playerInvX, playerInvY, 0, 125, 176, 90);
+
+            if (KineticClientRuntime.localPlayer() != null) {
+                Inventory inv = KineticClientRuntime.localPlayer().getInventory();
+                for (int i = 0; i < 36; i++) {
+                    int px = inventorySlotX(i);
+                    int py = inventorySlotY(i);
+                    ItemStack stack = inv.getItem(i);
+                    if (!stack.isEmpty()) {
+                        graphics.item(stack, px + 1, py + 1);
+                        graphics.itemDecorations(stack, px + 1, py + 1);
+                    }
+                }
+            }
         }
 
-        if (this.totalSlots > 0 && my >= gridStartY && my < gridStartY + gridViewH) {
-            int startRow = curioScroll.offset();
-            int startIdx = startRow * COLUMNS;
-            int endIdx = Math.min(startIdx + visibleRows * COLUMNS, totalSlots);
+        private HoverInfo hoverInfo(double mouseX, double mouseY) {
+            if (totalSlots > 0) {
+                int startRow = curioScroll.offset();
+                int startIdx = startRow * COLUMNS;
+                int endIdx = Math.min(startIdx + visibleRows * COLUMNS, totalSlots);
+                for (int i = startIdx; i < endIdx; i++) {
+                    int displayIdx = i - startIdx;
+                    int x = gridStartX + (displayIdx % COLUMNS) * SLOT_SIZE;
+                    int y = gridStartY + (displayIdx / COLUMNS) * SLOT_SIZE;
+                    if (inside(mouseX, mouseY, x, y, SLOT_SIZE, SLOT_SIZE)) {
+                        return new HoverInfo(CuriosCompat.getCurioItem(dummy, i), true);
+                    }
+                }
+            }
 
-            for (int i = startIdx; i < endIdx; i++) {
-                int displayIdx = i - startIdx;
-                int x = gridStartX + (displayIdx % COLUMNS) * SLOT_SIZE;
-                int y = gridStartY + (displayIdx / COLUMNS) * SLOT_SIZE;
+            if (KineticClientRuntime.localPlayer() != null) {
+                Inventory inv = KineticClientRuntime.localPlayer().getInventory();
+                for (int i = 0; i < 36; i++) {
+                    int px = inventorySlotX(i);
+                    int py = inventorySlotY(i);
+                    if (inside(mouseX, mouseY, px, py, SLOT_SIZE, SLOT_SIZE)) {
+                        return new HoverInfo(inv.getItem(i), false);
+                    }
+                }
+            }
+            return null;
+        }
 
-                if (mx >= x && mx < x + SLOT_SIZE && my >= y && my < y + SLOT_SIZE) {
-                    if (KineticMouseButtons.isPrimary(btn)) {
+        @Override
+        protected boolean onMouseClick(MouseInput input) {
+            if (curioScroll.beginDrag(
+                    input.x(), input.y(), input.button(),
+                    scrollX, gridStartY, SCROLL_W, gridViewH, SCROLL_MIN_THUMB, 3
+            )) {
+                return true;
+            }
+
+            ItemStack cursorStack = ItemStack.EMPTY;
+            if (KineticClientRuntime.localPlayer() != null) {
+                cursorStack = KineticClientRuntime.localPlayer().containerMenu.getCarried();
+            }
+
+            if (totalSlots > 0 && input.y() >= gridStartY && input.y() < gridStartY + gridViewH) {
+                int startRow = curioScroll.offset();
+                int startIdx = startRow * COLUMNS;
+                int endIdx = Math.min(startIdx + visibleRows * COLUMNS, totalSlots);
+
+                for (int i = startIdx; i < endIdx; i++) {
+                    int displayIdx = i - startIdx;
+                    int x = gridStartX + (displayIdx % COLUMNS) * SLOT_SIZE;
+                    int y = gridStartY + (displayIdx / COLUMNS) * SLOT_SIZE;
+                    if (!input.inside(x, y, SLOT_SIZE, SLOT_SIZE)) continue;
+
+                    if (input.isLeft()) {
                         if (!cursorStack.isEmpty()) {
                             if (DummyUtils.isBlacklisted(cursorStack)) {
                                 notifyBlacklist();
                                 return true;
                             }
-                            if (isValidCurio(cursorStack)) {
+                            if (isNotCurio(cursorStack)) {
                                 notifyNotCurio();
                                 return true;
                             }
@@ -292,7 +334,7 @@ public class CuriosScreen extends KineticScreen {
                         } else {
                             openItemSelector(i);
                         }
-                    } else if (KineticMouseButtons.isSecondary(btn)) {
+                    } else if (input.isRight()) {
                         updateSlot(i, ItemStack.EMPTY, DummyNetwork.UpdateCurioV2.clear(
                                 menu.containerId,
                                 dummy.getId(),
@@ -302,25 +344,22 @@ public class CuriosScreen extends KineticScreen {
                     return true;
                 }
             }
-        }
 
-        if (KineticClientRuntime.localPlayer() != null) {
-            Inventory inv = KineticClientRuntime.localPlayer().getInventory();
-            for (int i = 0; i < 36; i++) {
-                int col = (i < 9) ? i : (i - 9) % 9;
-                int row = (i < 9) ? 3 : (i - 9) / 9;
-                int px = playerInvX + 7 + col * 18;
-                int py = playerInvY + (row == 3 ? 72 : 14 + row * 18);
+            if (KineticClientRuntime.localPlayer() != null) {
+                Inventory inv = KineticClientRuntime.localPlayer().getInventory();
+                for (int i = 0; i < 36; i++) {
+                    int px = inventorySlotX(i);
+                    int py = inventorySlotY(i);
+                    if (!input.inside(px, py, SLOT_SIZE, SLOT_SIZE)) continue;
 
-                if (mx >= px && mx < px + SLOT_SIZE && my >= py && my < py + SLOT_SIZE) {
                     ItemStack clickedStack = inv.getItem(i);
-                    if (KineticMouseButtons.isPrimary(btn) && KineticClientRuntime.shiftModifierDown()) {
+                    if (input.isLeft() && input.hasShift()) {
                         if (!clickedStack.isEmpty()) {
                             if (DummyUtils.isBlacklisted(clickedStack)) {
                                 notifyBlacklist();
                                 return true;
                             }
-                            if (isValidCurio(clickedStack)) {
+                            if (isNotCurio(clickedStack)) {
                                 notifyNotCurio();
                                 return true;
                             }
@@ -340,77 +379,46 @@ public class CuriosScreen extends KineticScreen {
                     }
 
                     int containerSlotId = (i < 9) ? (33 + i) : (6 + (i - 9));
-                    if (KineticClientRuntime.localPlayer() != null) {
-                        MinecraftContainers.clickSlot(
-                                KineticClientRuntime.localPlayer().containerMenu.containerId,
-                                containerSlotId,
-                                btn,
-                                ClickType.PICKUP
-                        );
-                    }
+                    MinecraftContainers.clickSlot(
+                            KineticClientRuntime.localPlayer().containerMenu.containerId,
+                            containerSlotId,
+                            input.rawButton(),
+                            ClickType.PICKUP
+                    );
                     return true;
                 }
             }
+            return false;
         }
-        return false;
-    }
 
-    @Override
-    protected boolean canvasMouseDragged(double mx, double my, int btn, double dx, double dy) {
-        if (KineticMouseButtons.isPrimary(btn) && curioScroll.drag(my, gridStartY, gridViewH, SCROLL_MIN_THUMB)) return true;
-        return super.canvasMouseDragged(mx, my, btn, dx, dy);
-    }
-
-    @Override
-    protected boolean canvasMouseReleased(double mx, double my, int btn) {
-        if (curioScroll.release(btn)) return true;
-        return super.canvasMouseReleased(mx, my, btn);
-    }
-
-    @Override
-    protected boolean canvasMouseScrolled(double mx, double my, double delta) {
-        if (mx >= gridStartX && mx < scrollX + SCROLL_W + 3
-                && my >= gridStartY && my < gridStartY + gridViewH
-                && curioScroll.scroll(delta, 1)) {
-            return true;
+        @Override
+        protected boolean onMouseDrag(MouseDragInput input) {
+            return input.isLeft() && curioScroll.drag(input.y(), gridStartY, gridViewH, SCROLL_MIN_THUMB);
         }
-        return super.canvasMouseScrolled(mx, my, delta);
-    }
 
-    private int getFirstEmptyCurio() {
-        for (int i = 0; i < totalSlots; i++) {
-            if (CuriosCompat.getCurioItem(dummy, i).isEmpty()) return i;
+        @Override
+        protected boolean onMouseRelease(MouseInput input) {
+            return curioScroll.release(input.button());
         }
-        return -1;
-    }
 
-    private void openItemSelector(int slotIdx) {
-        KineticSelectors.openItemSelector(this, selection -> {
-            if (selection == null || !selection.isItem()) return;
-            ItemStack newStack = selection.stack().copy();
-            if (newStack.isEmpty()) return;
-            newStack.setCount(1);
-            if (DummyUtils.isBlacklisted(newStack)) {
-                notifyBlacklist();
-                return;
-            }
-            if (isValidCurio(newStack)) {
-                notifyNotCurio();
-                return;
-            }
-            ResourceLocation itemId = KineticRegistries.items().id(newStack.getItem());
-            if (itemId == null) return;
-            updateSlot(slotIdx, newStack, DummyNetwork.UpdateCurioV2.defaultItem(
-                    menu.containerId,
-                    dummy.getId(),
-                    slotIdx,
-                    itemId
-            ));
-        });
-    }
+        @Override
+        protected boolean onMouseScroll(ScrollInput input) {
+            return input.inside(gridStartX, gridStartY, scrollX + SCROLL_W + 3 - gridStartX, gridViewH)
+                    && curioScroll.scroll(input.deltaY(), 1);
+        }
 
-    private void updateSlot(int index, ItemStack stack, DummyNetwork.UpdateCurioV2 packet) {
-        CuriosCompat.setCurioItem(dummy, index, stack);
-        DummyNetwork.sendToServer(packet);
+        private int inventorySlotX(int index) {
+            int col = index < 9 ? index : (index - 9) % 9;
+            return playerInvX + 7 + col * 18;
+        }
+
+        private int inventorySlotY(int index) {
+            int row = index < 9 ? 3 : (index - 9) / 9;
+            return playerInvY + (row == 3 ? 72 : 14 + row * 18);
+        }
+
+        private boolean inside(double mouseX, double mouseY, int x, int y, int width, int height) {
+            return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+        }
     }
 }

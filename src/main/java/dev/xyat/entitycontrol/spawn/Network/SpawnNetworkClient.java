@@ -5,14 +5,17 @@ import dev.xyat.entitycontrol.spawn.client.gui.SpawnerControlScreen;
 import dev.xyat.entitycontrol.spawn.config.BiomeSpawnConfig;
 import dev.xyat.entitycontrol.spawn.config.SpawnConfigGui;
 import dev.xyat.entitycontrol.spawn.config.SpawnerConfig;
-import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
+import dev.xyat.kineticcore.api.client.gui.KineticGui;
+import dev.xyat.kineticcore.api.client.gui.overlay.KineticOverlays;
 import dev.xyat.kineticcore.api.config.client.KTConfigApi;
-import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.Component;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 
 public final class SpawnNetworkClient {
     private SpawnNetworkClient() {
+    }
+
+    public static void requestOpenEditor(int editorType) {
+        SpawnNetwork.requestOpenEditor(editorType);
     }
 
     public static void handleSync(SpawnNetwork.SyncPacket packet) {
@@ -24,71 +27,43 @@ public final class SpawnNetworkClient {
         globals.current_index = packet.currentIndex();
 
         BiomeSpawnConfig.ConfigProfile profile = BiomeSpawnConfig.GSON.fromJson(
-                packet.profileJson(),
-                BiomeSpawnConfig.ConfigProfile.class
+                packet.profileJson(), BiomeSpawnConfig.ConfigProfile.class
         );
-        if (profile == null) {
-            profile = new BiomeSpawnConfig.ConfigProfile();
-        }
+        if (profile == null) profile = new BiomeSpawnConfig.ConfigProfile();
 
-        Screen current = KineticClientRuntime.currentScreen();
-        Screen parent = current instanceof SpawnControlScreen currentSpawn
-                ? currentSpawn.getParentScreen()
-                : current;
-        KineticClientRuntime.openScreen(new SpawnControlScreen(
-                globals,
-                profile,
-                packet.editIndex(),
-                parent
-        ));
+        SpawnControlScreen screen = KineticGui.currentPage(SpawnControlScreen.class);
+        if (screen != null) {
+            screen.applySync(globals, profile, packet.editIndex());
+        } else {
+            KineticGui.openChild(new SpawnControlScreen(globals, profile, packet.editIndex()));
+        }
     }
 
     public static void handleSpawnBackupSync(SpawnNetwork.SpawnBackupSyncPacket packet) {
-        if (!(KineticClientRuntime.currentScreen() instanceof SpawnControlScreen screen)
-                || screen.currentEditIndex != packet.editIndex()) {
-            return;
-        }
-
-        BiomeSpawnConfig.ConfigProfile backupProfile = BiomeSpawnConfig.GSON.fromJson(
-                packet.backupJson(),
-                BiomeSpawnConfig.ConfigProfile.class
+        SpawnControlScreen screen = KineticGui.currentPage(SpawnControlScreen.class);
+        if (screen == null || screen.currentEditIndex != packet.editIndex()) return;
+        BiomeSpawnConfig.ConfigProfile backup = BiomeSpawnConfig.GSON.fromJson(
+                packet.backupJson(), BiomeSpawnConfig.ConfigProfile.class
         );
-        if (backupProfile == null) {
-            backupProfile = new BiomeSpawnConfig.ConfigProfile();
-        }
-
-        screen.updateBackupProfile(backupProfile);
+        screen.updateBackupProfile(backup == null ? new BiomeSpawnConfig.ConfigProfile() : backup);
     }
 
     public static void handleSpawnerSync(SpawnNetwork.SpawnerSyncPacket packet) {
         SpawnerConfig.SpawnerEditorSnapshot snapshot = SpawnerConfig.GSON.fromJson(
-                packet.snapshotJson(),
-                SpawnerConfig.SpawnerEditorSnapshot.class
+                packet.snapshotJson(), SpawnerConfig.SpawnerEditorSnapshot.class
         );
-        if (snapshot == null) {
-            snapshot = new SpawnerConfig.SpawnerEditorSnapshot();
-        }
-        Screen current = KineticClientRuntime.currentScreen();
-        Screen parent = current instanceof SpawnerControlScreen currentSpawner
-                ? currentSpawner.getParentScreen()
-                : current;
-        KineticClientRuntime.openScreen(new SpawnerControlScreen(parent, snapshot));
+        if (snapshot == null) snapshot = new SpawnerConfig.SpawnerEditorSnapshot();
+        KineticGui.openChild(new SpawnerControlScreen(snapshot));
     }
 
     public static void handleSpawnSaveResult(SpawnNetwork.SpawnSaveResultPacket packet) {
-        if (packet.success()) {
-            KTConfigApi.notifySaved(SpawnConfigGui.PAGE_ID);
-        } else {
-            KineticOverlays.toast(Component.translatable("gui.kineticcore.config.save_failed"));
-        }
+        if (packet.success()) KTConfigApi.notifySaved(SpawnConfigGui.PAGE_ID);
+        else KineticOverlays.toast(KineticI18n.translatable("gui.kineticcore.config.save_failed"));
     }
 
     public static void handleSpawnerSaveResult(SpawnNetwork.SpawnerSaveResultPacket packet) {
-        if (KineticClientRuntime.currentScreen() instanceof SpawnerControlScreen screen) {
-            screen.handleSaveResult(packet.requestId(), packet.success());
-        }
-        if (packet.success()) {
-            KTConfigApi.notifySaved(SpawnConfigGui.PAGE_ID);
-        }
+        SpawnerControlScreen screen = KineticGui.currentPage(SpawnerControlScreen.class);
+        if (screen != null) screen.handleSaveResult(packet.requestId(), packet.success());
+        if (packet.success()) KTConfigApi.notifySaved(SpawnConfigGui.PAGE_ID);
     }
 }

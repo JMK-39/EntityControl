@@ -76,17 +76,17 @@ public final class EntityReseRuleNetwork {
                 },
                 () -> {
                     if (!snapshotRegistered) {
-                        CHANNEL.registerClientbound(3, RulesSnapshotPacket.class,
+                        CHANNEL.registerClientboundLazy(3, RulesSnapshotPacket.class,
                                 NetworkCodec.of((buffer, message) -> message.encode(buffer), RulesSnapshotPacket::new),
-                                message -> EntityReseRuleClient.handleSnapshot(new ArrayList<>(message.rules)));
+                                () -> message -> EntityReseRuleClient.handleSnapshot(new ArrayList<>(message.rules())));
                         snapshotRegistered = true;
                     }
                 },
                 () -> {
                     if (!resultRegistered) {
-                        CHANNEL.registerClientbound(4, OperationResultPacket.class,
+                        CHANNEL.registerClientboundLazy(4, OperationResultPacket.class,
                                 NetworkCodec.of((buffer, message) -> message.encode(buffer), OperationResultPacket::new),
-                                message -> EntityReseRuleClient.handleOperationResult(message.result, new ArrayList<>(message.rules)));
+                                () -> message -> EntityReseRuleClient.handleOperationResult(message.result(), new ArrayList<>(message.rules())));
                         resultRegistered = true;
                     }
                 }
@@ -223,6 +223,10 @@ public final class EntityReseRuleNetwork {
             writeRules(buffer, rules);
         }
 
+        public List<String> rules() {
+            return List.copyOf(rules);
+        }
+
     }
 
     public static final class OperationResultPacket {
@@ -242,6 +246,14 @@ public final class EntityReseRuleNetwork {
         private void encode(NetworkBuffer buffer) {
             buffer.writeByte(result);
             writeRules(buffer, rules);
+        }
+
+        public byte result() {
+            return result;
+        }
+
+        public List<String> rules() {
+            return List.copyOf(rules);
         }
 
     }

@@ -11,7 +11,7 @@ import dev.xyat.kineticcore.api.network.PacketChannel;
 import dev.xyat.kineticcore.api.network.PacketRegistrations;
 import dev.xyat.kineticcore.api.network.ServerPacketContext;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
-import net.minecraft.network.chat.Component;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 import net.minecraft.server.level.ServerPlayer;
 
 public final class SpawnNetwork {
@@ -44,11 +44,11 @@ public final class SpawnNetwork {
         PacketRegistrations.runIndependent(
                 () -> {
                     if (!syncRegistered) {
-                        CHANNEL.registerClientbound(
+                        CHANNEL.registerClientboundLazy(
                                 0,
                                 SyncPacket.class,
                                 NetworkCodec.of((buffer, message) -> message.encode(buffer), SyncPacket::new),
-                                message -> SpawnNetworkClient.handleSync(message)
+                                () -> SpawnNetworkClient::handleSync
                         );
                         syncRegistered = true;
                     }
@@ -77,11 +77,11 @@ public final class SpawnNetwork {
                 },
                 () -> {
                     if (!spawnerSyncRegistered) {
-                        CHANNEL.registerClientbound(
+                        CHANNEL.registerClientboundLazy(
                                 3,
                                 SpawnerSyncPacket.class,
                                 NetworkCodec.of((buffer, message) -> message.encode(buffer), SpawnerSyncPacket::new),
-                                message -> SpawnNetworkClient.handleSpawnerSync(message)
+                                () -> SpawnNetworkClient::handleSpawnerSync
                         );
                         spawnerSyncRegistered = true;
                     }
@@ -99,11 +99,11 @@ public final class SpawnNetwork {
                 },
                 () -> {
                     if (!spawnerSaveResultRegistered) {
-                        CHANNEL.registerClientbound(
+                        CHANNEL.registerClientboundLazy(
                                 5,
                                 SpawnerSaveResultPacket.class,
                                 NetworkCodec.of((buffer, message) -> message.encode(buffer), SpawnerSaveResultPacket::new),
-                                message -> SpawnNetworkClient.handleSpawnerSaveResult(message)
+                                () -> SpawnNetworkClient::handleSpawnerSaveResult
                         );
                         spawnerSaveResultRegistered = true;
                     }
@@ -121,11 +121,11 @@ public final class SpawnNetwork {
                 },
                 () -> {
                     if (!backupSyncRegistered) {
-                        CHANNEL.registerClientbound(
+                        CHANNEL.registerClientboundLazy(
                                 7,
                                 SpawnBackupSyncPacket.class,
                                 NetworkCodec.of((buffer, message) -> message.encode(buffer), SpawnBackupSyncPacket::new),
-                                message -> SpawnNetworkClient.handleSpawnBackupSync(message)
+                                () -> SpawnNetworkClient::handleSpawnBackupSync
                         );
                         backupSyncRegistered = true;
                     }
@@ -154,11 +154,11 @@ public final class SpawnNetwork {
                 },
                 () -> {
                     if (!spawnSaveResultRegistered) {
-                        CHANNEL.registerClientbound(
+                        CHANNEL.registerClientboundLazy(
                                 10,
                                 SpawnSaveResultPacket.class,
                                 NetworkCodec.of((buffer, message) -> message.encode(buffer), SpawnSaveResultPacket::new),
-                                message -> SpawnNetworkClient.handleSpawnSaveResult(message)
+                                () -> SpawnNetworkClient::handleSpawnSaveResult
                         );
                         spawnSaveResultRegistered = true;
                     }
@@ -251,12 +251,12 @@ public final class SpawnNetwork {
         BiomeSpawnConfig.loadGlobals();
         if (!BiomeSpawnConfig.isValidProfileCount(message.count)
                 || message.count < BiomeSpawnConfig.globals.current_index) {
-            player.sendSystemMessage(Component.translatable("msg.entitycontrol.spawn.spawn.profile_count_invalid"));
+            player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.spawn.spawn.profile_count_invalid"));
             return;
         }
         BiomeSpawnConfig.globals.config_amount = message.count;
         if (!BiomeSpawnConfig.saveGlobals()) {
-            player.sendSystemMessage(Component.translatable("msg.entitycontrol.spawn.spawn.save_failed"));
+            player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.spawn.spawn.save_failed"));
         }
     }
 
@@ -282,7 +282,7 @@ public final class SpawnNetwork {
         if (!BiomeSpawnConfig.isValidProfileCount(message.amount)
                 || message.currentIndex < 1 || message.currentIndex > message.amount
                 || message.editIndex < 1 || message.editIndex > message.amount) {
-            player.sendSystemMessage(Component.translatable("msg.entitycontrol.spawn.spawn.save_invalid"));
+            player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.spawn.spawn.save_invalid"));
             sendSpawnSaveResult(player, false);
             return;
         }
@@ -293,7 +293,7 @@ public final class SpawnNetwork {
                     BiomeSpawnConfig.ConfigProfile.class
             );
             if (profile == null) {
-                player.sendSystemMessage(Component.translatable("msg.entitycontrol.spawn.spawn.save_invalid"));
+                player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.spawn.spawn.save_invalid"));
                 sendSpawnSaveResult(player, false);
                 return;
             }
@@ -308,7 +308,7 @@ public final class SpawnNetwork {
                     message.editIndex,
                     profile
             )) {
-                player.sendSystemMessage(Component.translatable("msg.entitycontrol.spawn.spawn.save_failed"));
+                player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.spawn.spawn.save_failed"));
                 sendSpawnSaveResult(player, false);
                 return;
             }
@@ -320,7 +320,7 @@ public final class SpawnNetwork {
                     player.getGameProfile().getName(),
                     exception
             );
-            player.sendSystemMessage(Component.translatable("msg.entitycontrol.spawn.spawn.save_invalid"));
+            player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.spawn.spawn.save_invalid"));
             sendSpawnSaveResult(player, false);
         }
     }
@@ -363,12 +363,12 @@ public final class SpawnNetwork {
                     SpawnerConfig.SpawnerData.class
             );
             if (incoming == null) {
-                player.sendSystemMessage(Component.translatable("msg.entitycontrol.spawn.spawner.save_invalid"));
+                player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.spawn.spawner.save_invalid"));
                 sendSpawnerSaveResult(player, message.requestId, false);
                 return;
             }
             if (!SpawnerConfig.applyEditorSnapshot(incoming)) {
-                player.sendSystemMessage(Component.translatable("msg.entitycontrol.spawn.spawner.save_failed"));
+                player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.spawn.spawner.save_failed"));
                 sendSpawnerSaveResult(player, message.requestId, false);
                 return;
             }
@@ -379,7 +379,7 @@ public final class SpawnNetwork {
                     player.getGameProfile().getName(),
                     exception
             );
-            player.sendSystemMessage(Component.translatable("msg.entitycontrol.spawn.spawner.save_invalid"));
+            player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.spawn.spawner.save_invalid"));
             sendSpawnerSaveResult(player, message.requestId, false);
         }
     }

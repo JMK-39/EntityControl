@@ -11,8 +11,7 @@ import dev.xyat.kineticcore.api.network.PacketChannel;
 import dev.xyat.kineticcore.api.network.PacketRegistrations;
 import dev.xyat.kineticcore.api.network.ServerPacketContext;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
-import dev.xyat.kineticcore.api.runtime.KineticPlatform;
-import net.minecraft.network.chat.Component;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 import net.minecraft.server.level.ServerPlayer;
 
 public final class BreakSpawnNetwork {
@@ -45,11 +44,11 @@ public final class BreakSpawnNetwork {
                 },
                 () -> {
                     if (!openRegistered) {
-                        CHANNEL.registerClientbound(
+                        CHANNEL.registerClientboundLazy(
                                 1,
                                 OpenEditorPacket.class,
                                 NetworkCodec.of((buffer, message) -> message.encode(buffer), OpenEditorPacket::new),
-                                message -> BreakSpawnNetworkClient.handleOpenScreen(message)
+                                () -> BreakSpawnNetworkClient::handleOpenScreen
                         );
                         openRegistered = true;
                     }
@@ -67,11 +66,11 @@ public final class BreakSpawnNetwork {
                 },
                 () -> {
                     if (!resultRegistered) {
-                        CHANNEL.registerClientbound(
+                        CHANNEL.registerClientboundLazy(
                                 3,
                                 SaveConfigResultPacket.class,
                                 NetworkCodec.of((buffer, message) -> message.encode(buffer), SaveConfigResultPacket::new),
-                                message -> BreakSpawnNetworkClient.handleSaveResult(message.success)
+                                () -> message -> BreakSpawnNetworkClient.handleSaveResult(message.success())
                         );
                         resultRegistered = true;
                     }
@@ -80,7 +79,6 @@ public final class BreakSpawnNetwork {
     }
 
     public static void requestOpenEditor() {
-        KineticPlatform.runOnClient(() -> BreakSpawnNetworkClient::captureReturnScreen);
         CHANNEL.sendToServer(new RequestOpenEditorPacket());
     }
 
@@ -98,7 +96,7 @@ public final class BreakSpawnNetwork {
             return;
         }
         if (!BreakSpawnConfig.loadAndClean(player.getServer())) {
-            player.sendSystemMessage(Component.translatable("msg.entitycontrol.breakspawn.load_failed"));
+            player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.breakspawn.load_failed"));
             return;
         }
         sendEditorSnapshot(player);
@@ -116,12 +114,12 @@ public final class BreakSpawnNetwork {
         BreakSpawnConfig.ConfigRoot parsed = BreakSpawnConfig.parseConfigJson(message.jsonConfig);
         BreakSpawnConfig.ConfigRoot validated = BreakSpawnConfig.validateForServer(parsed, player.getServer());
         if (validated == null) {
-            player.sendSystemMessage(Component.translatable("msg.entitycontrol.breakspawn.save_invalid"));
+            player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.breakspawn.save_invalid"));
             CHANNEL.sendToPlayer(player, new SaveConfigResultPacket(false));
             return;
         }
         if (!BreakSpawnConfig.save(validated)) {
-            player.sendSystemMessage(Component.translatable("msg.entitycontrol.breakspawn.save_failed"));
+            player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.breakspawn.save_failed"));
             CHANNEL.sendToPlayer(player, new SaveConfigResultPacket(false));
             return;
         }

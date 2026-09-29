@@ -65,6 +65,7 @@
   "gui.entitycontrol.reset.rule_list.edit": "§a编辑规则",
   "gui.entitycontrol.reset.rule_list.clear": "§c清除规则",
   "gui.entitycontrol.reset.rule_list.empty": "§e没有找到符合条件的生物。",
+  "gui.entitycontrol.reset.rule_list.invalid_entity": "§c?",
   "gui.entitycontrol.reset.rule_list.rule.none": "§e当前规则：§c未配置",
   "gui.entitycontrol.reset.rule_list.rule.configured": "§a当前规则：已配置",
   "gui.entitycontrol.reset.rule_list.rule.threshold": "§e死亡阈值：%s",
@@ -224,9 +225,9 @@
   "msg.entitycontrol.spawn.spawner.hours": "%s 小时",
   "msg.entitycontrol.spawn.spawner.minutes": "%s 分钟",
   "msg.entitycontrol.spawn.spawner.seconds": "%s 秒",
-  "msg.entitycontrol.spawn.spawner.broken": "位于 [%2$s, %3$s, %4$s] 的 %1$s 刷怪笼因过度使用而损坏了！",
-  "msg.entitycontrol.spawn.spawner.cooldown.end": "位于 [%2$s, %3$s, %4$s] 的 %1$s 刷怪笼冷却完毕，已重新激活！",
-  "msg.entitycontrol.spawn.spawner.cooldown.start": "位于 [%2$s, %3$s, %4$s] 的 %1$s 刷怪笼过热！进入 %5$s 的冷却休眠。",
+  "msg.entitycontrol.spawn.spawner.broken": "§c位于 [§b%2$s§c, §b%3$s§c, §b%4$s§c] 的 §6%1$s§c 刷怪笼因过度使用而损坏了！",
+  "msg.entitycontrol.spawn.spawner.cooldown.end": "§a位于 [§b%2$s§a, §b%3$s§a, §b%4$s§a] 的 §6%1$s§a 刷怪笼冷却完毕，已重新激活！",
+  "msg.entitycontrol.spawn.spawner.cooldown.start": "§e位于 [§b%2$s§e, §b%3$s§e, §b%4$s§e] 的 §6%1$s§e 刷怪笼过热！进入 %5$s§e 的冷却休眠。",
   "gui.entitycontrol.spawn.spawn.tooltip.reset_rules": "§e[Shift + 右键] 重置该生物的规则与维度设置",
   "gui.entitycontrol.spawn.spawn.tooltip.reset_biomes": "§e[Shift + 右键] 重置该生物的群系与权重设置",
   "gui.entitycontrol.spawn.spawn.category.reset": "§c还原默认分类",
@@ -830,5 +831,9 @@
   "dmg.twilightforest.yeeted": "被扔飞",
   "dmg.void_eye": "虚空之眼",
   "dmg.wither": "凋灵",
-  "dmg.witherSkull": "凋灵之首"
+  "dmg.witherSkull": "凋灵之首",
+  "gui.entitycontrol.spawn.spawn.biome.summary": "§e权重:§f%s §e最少:§f%s §e最多:§f%s",
+  "gui.entitycontrol.spawn.spawn.biome.remove": "§c移除",
+  "gui.entitycontrol.spawn.spawn.biome.remove.tooltip": "§e从当前生物的群系生成列表中移除这个群系。",
+  "gui.entitycontrol.spawn.spawn.label_state": "%s %s"
 }

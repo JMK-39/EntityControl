@@ -5,7 +5,7 @@ import com.google.gson.GsonBuilder;
 import dev.xyat.entitycontrol.breakspawn.BreakSpawnModule;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
-import dev.xyat.kineticcore.api.runtime.KineticPaths;
+import dev.xyat.kineticcore.api.runtime.KineticPlatform;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -29,7 +29,7 @@ import java.util.TreeMap;
 
 public final class BreakSpawnConfig {
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path CONFIG_PATH = KineticPaths.configDirectory().resolve("kineticcore").resolve("break_spawn.json");
+    private static final Path CONFIG_PATH = KineticPlatform.configDirectory().resolve("kineticcore").resolve("break_spawn.json");
     private static final int MAX_NBT_LENGTH = 131072;
 
     public static volatile ConfigRoot CURRENT = new ConfigRoot();

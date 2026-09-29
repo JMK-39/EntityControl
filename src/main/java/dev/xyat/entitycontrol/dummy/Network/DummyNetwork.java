@@ -13,6 +13,7 @@ import dev.xyat.kineticcore.api.network.PacketRegistrations;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.registry.KineticEntityAttributes;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
@@ -51,11 +52,11 @@ public class DummyNetwork {
         PacketRegistrations.runIndependent(
                 () -> {
                     if (!syncRegistered) {
-                        CHANNEL.registerClientbound(
+                        CHANNEL.registerClientboundLazy(
                                 ID_SYNC,
                                 Sync.class,
                                 NetworkCodec.of((buffer, message) -> message.toBytes(buffer), Sync::new),
-                                message -> DummyNetworkClient.handleSync(message)
+                                () -> DummyNetworkClient::handleSync
                         );
                         syncRegistered = true;
                     }
@@ -82,11 +83,11 @@ public class DummyNetwork {
                 },
                 () -> {
                     if (!syncNotifyRegistered) {
-                        CHANNEL.registerClientbound(
+                        CHANNEL.registerClientboundLazy(
                                 ID_SYNC_NOTIFY,
                                 SyncNotify.class,
                                 NetworkCodec.of((buffer, message) -> message.toBytes(buffer), SyncNotify::new),
-                                message -> DummyNetworkClient.handleNotify(message)
+                                () -> DummyNetworkClient::handleNotify
                         );
                         syncNotifyRegistered = true;
                     }
@@ -454,11 +455,11 @@ public class DummyNetwork {
                 return;
             }
             if (DummyUtils.isBlacklisted(template)) {
-                sendToPlayer(new SyncNotify(Component.translatable("msg.entitycontrol.dummy.dummy.blacklisted")), player);
+                sendToPlayer(new SyncNotify(KineticI18n.translatable("msg.entitycontrol.dummy.dummy.blacklisted")), player);
                 return;
             }
             if (template.getTags().noneMatch(tag -> tag.location().getNamespace().equals("curios"))) {
-                sendToPlayer(new SyncNotify(Component.translatable("msg.entitycontrol.dummy.dummy.not_a_curio")), player);
+                sendToPlayer(new SyncNotify(KineticI18n.translatable("msg.entitycontrol.dummy.dummy.not_a_curio")), player);
                 return;
             }
 
@@ -542,7 +543,7 @@ public class DummyNetwork {
 
     public record SyncNotify(Component msg) {
         public SyncNotify() {
-            this(Component.translatable("msg.entitycontrol.dummy.dummy.updated"));
+            this(KineticI18n.translatable("msg.entitycontrol.dummy.dummy.updated"));
         }
 
         public SyncNotify(NetworkBuffer buf) {

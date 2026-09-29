@@ -1,0 +1,38 @@
+// 附属最终 JAR 检查：reobfJar 之后，确认附属对 KineticCore 的每个方法引用都能在核心发布 JAR 中按名称与描述符解析。
+// Addon final-JAR check: after reobfJar, verify every method reference into KineticCore resolves by name and
+// descriptor in the released (reobfuscated) core JAR. Catches the NoSuchMethodError class of bugs that a successful
+// compileJava cannot.
+//
+// 用法 / Usage (build.gradle, BEFORE the dependencies block):
+//     apply from: 'gradle/kinetic-addon-reobf-verification.gradle'
+// and inside dependencies, next to fg.deobf(kineticcore):
+//     kineticCoreReobf "dev.xyat.kineticcore:kineticcore:${kineticCoreVersion}"
+// 本地核心构建可用 -Pkineticcore_jar=<path to reobf kineticcore jar> 覆盖。
+// Override with -Pkineticcore_jar=<path to a locally built reobf kineticcore jar>.
+
+configurations {
+    kineticCoreReobf {
+        canBeConsumed = false
+        transitive = false
+    }
+}
+
+tasks.register('checkKineticReobfRefs', Exec) {
+    group = 'verification'
+    description = 'Checks method references into KineticCore in the final (reobf) addon JAR.'
+    dependsOn 'reobfJar'
+    def launcher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    def checker = file('gradle/KineticReobfCheck.java')
+    def finalJar = tasks.named('jar').flatMap { it.archiveFile }
+    def coreJars = configurations.kineticCoreReobf
+    inputs.file(checker)
+    doFirst {
+        def coreJar = project.findProperty('kineticcore_jar')?.toString() ?: coreJars.singleFile.absolutePath
+        commandLine launcher.get().executablePath.asFile.absolutePath, checker.absolutePath, 'addon',
+                coreJar, finalJar.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { it.name == 'build' }.configureEach {
+    dependsOn tasks.named('checkKineticReobfRefs')
+}

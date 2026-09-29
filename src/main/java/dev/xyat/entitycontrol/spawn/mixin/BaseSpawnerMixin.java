@@ -1,10 +1,10 @@
 package dev.xyat.entitycontrol.spawn.mixin;
 
-import net.minecraft.ChatFormatting;
 import dev.xyat.entitycontrol.spawn.api.SpawnerRuntimeAccessor;
 import dev.xyat.entitycontrol.spawn.config.SpawnerConfig;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -472,21 +472,12 @@ public abstract class BaseSpawnerMixin implements SpawnerRuntimeAccessor {
     private Component entitycontrol_spawn$formatTime(int totalSeconds) {
         if (totalSeconds >= 3600) {
             String hours = String.format(Locale.ROOT, "%.1f", totalSeconds / 3600.0D);
-            return Component.translatable(
-                    "msg.entitycontrol.spawn.spawner.hours",
-                    Component.literal(hours).withStyle(ChatFormatting.YELLOW)
-            ).withStyle(ChatFormatting.GRAY);
+            return KineticI18n.translatable("msg.entitycontrol.spawn.spawner.hours", hours);
         }
         if (totalSeconds >= 60) {
-            return Component.translatable(
-                    "msg.entitycontrol.spawn.spawner.minutes",
-                    Component.literal(String.valueOf(totalSeconds / 60)).withStyle(ChatFormatting.YELLOW)
-            ).withStyle(ChatFormatting.GRAY);
+            return KineticI18n.translatable("msg.entitycontrol.spawn.spawner.minutes", totalSeconds / 60);
         }
-        return Component.translatable(
-                "msg.entitycontrol.spawn.spawner.seconds",
-                Component.literal(String.valueOf(totalSeconds)).withStyle(ChatFormatting.YELLOW)
-        ).withStyle(ChatFormatting.GRAY);
+        return KineticI18n.translatable("msg.entitycontrol.spawn.spawner.seconds", totalSeconds);
     }
 
     @Unique
@@ -503,30 +494,22 @@ public abstract class BaseSpawnerMixin implements SpawnerRuntimeAccessor {
             return;
         }
 
-        Component entityName = Component.literal(entityId.toString()).withStyle(ChatFormatting.GOLD);
+        Component entityName = Component.literal(entityId.toString());
         var type = net.minecraft.world.entity.EntityType.byString(entityId.toString());
         if (type.isPresent()) {
-            entityName = type.get().getDescription().copy().withStyle(ChatFormatting.GOLD);
+            entityName = type.get().getDescription();
         }
 
         Object[] args = new Object[4 + (extraArgs == null ? 0 : extraArgs.length)];
         args[0] = entityName;
-        args[1] = Component.literal(String.valueOf(pos.getX())).withStyle(ChatFormatting.AQUA);
-        args[2] = Component.literal(String.valueOf(pos.getY())).withStyle(ChatFormatting.AQUA);
-        args[3] = Component.literal(String.valueOf(pos.getZ())).withStyle(ChatFormatting.AQUA);
+        args[1] = pos.getX();
+        args[2] = pos.getY();
+        args[3] = pos.getZ();
         if (extraArgs != null) {
-            for (int i = 0; i < extraArgs.length; i++) {
-                Object value = extraArgs[i];
-                args[4 + i] = value instanceof Component
-                        ? value
-                        : Component.literal(String.valueOf(value)).withStyle(ChatFormatting.YELLOW);
-            }
+            System.arraycopy(extraArgs, 0, args, 4, extraArgs.length);
         }
 
-        ChatFormatting messageColor = langKey.endsWith(".broken")
-                ? ChatFormatting.RED
-                : (langKey.endsWith(".cooldown.end") ? ChatFormatting.GREEN : ChatFormatting.YELLOW);
-        Component message = Component.translatable(langKey, args).withStyle(messageColor);
+        Component message = KineticI18n.translatable(langKey, args);
         for (Player player : players) {
             player.displayClientMessage(message, true);
         }

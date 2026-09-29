@@ -4,10 +4,9 @@ import dev.xyat.kineticcore.api.config.client.KTClientConfigAdapter;
 import dev.xyat.kineticcore.api.config.client.KTConfigApi;
 import dev.xyat.kineticcore.api.config.client.KTConfigPage;
 import dev.xyat.kineticcore.api.config.client.KTConfigScope;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 import dev.xyat.entitycontrol.dummy.client.DeathSummaryOverlay;
 import dev.xyat.entitycontrol.dummy.client.DummyTextManager;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,46 +27,46 @@ public final class DummyConfigGui {
     private static KTConfigPage buildClientPage() {
         return KTClientConfigAdapter.filteredPageBuilder(
                         PAGE_ID,
-                        Component.translatable("cfg.entitycontrol.dummy.dummy.category"),
+                        KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.category"),
                         DummyClientConfig.SPEC,
                         DummyConfigGui::includeAutomaticClientField
                 )
-                .pageDescription(Component.translatable("cfg.entitycontrol.dummy.dummy.client.description"))
+                .pageDescription(KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.client.description"))
                 .applyTiming(KTConfigPage.ApplyTiming.IMMEDIATE)
                 .divider()
-                .tickSecondsValue("summary_duration", Component.translatable("cfg.entitycontrol.dummy.dummy.summaryDuration"),
+                .tickSecondsValue("summary_duration", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.summaryDuration"),
                         DummyClientConfig.summaryDuration::get, DummyClientConfig.summaryDuration::set,
-                        100, 20, 600, Component.translatable("cfg.entitycontrol.dummy.dummy.summaryDuration.tooltip"))
-                .color("color_normal", Component.translatable("cfg.entitycontrol.dummy.dummy.colorNormal"),
+                        100, 20, 600, KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.summaryDuration.tooltip"))
+                .color("color_normal", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorNormal"),
                         DummyClientConfig.colorNormal::get, DummyClientConfig.colorNormal::set, 0xFF69B4,
-                        Component.translatable("cfg.entitycontrol.dummy.dummy.colorNormal.tooltip"))
-                .color("color_crit", Component.translatable("cfg.entitycontrol.dummy.dummy.colorCrit"),
+                        KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorNormal.tooltip"))
+                .color("color_crit", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorCrit"),
                         DummyClientConfig.colorCrit::get, DummyClientConfig.colorCrit::set, 0xFF5555,
-                        Component.translatable("cfg.entitycontrol.dummy.dummy.colorCrit.tooltip"))
-                .color("color_minion", Component.translatable("cfg.entitycontrol.dummy.dummy.colorMinion"),
+                        KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorCrit.tooltip"))
+                .color("color_minion", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorMinion"),
                         DummyClientConfig.colorMinion::get, DummyClientConfig.colorMinion::set, 0x55FF55,
-                        Component.translatable("cfg.entitycontrol.dummy.dummy.colorMinion.tooltip"))
-                .color("color_overhead_source", Component.translatable("cfg.entitycontrol.dummy.dummy.colorOverSource"),
+                        KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorMinion.tooltip"))
+                .color("color_overhead_source", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorOverSource"),
                         DummyClientConfig.colorOverheadSource::get, DummyClientConfig.colorOverheadSource::set, 0xBBFFFF,
-                        Component.translatable("cfg.entitycontrol.dummy.dummy.colorOverSource.tooltip"))
-                .color("color_overhead_type", Component.translatable("cfg.entitycontrol.dummy.dummy.colorOverType"),
+                        KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorOverSource.tooltip"))
+                .color("color_overhead_type", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorOverType"),
                         DummyClientConfig.colorOverheadType::get, DummyClientConfig.colorOverheadType::set, 0xFFFF55,
-                        Component.translatable("cfg.entitycontrol.dummy.dummy.colorOverType.tooltip"))
-                .color("color_overhead_stats", Component.translatable("cfg.entitycontrol.dummy.dummy.colorOverStats"),
+                        KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorOverType.tooltip"))
+                .color("color_overhead_stats", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorOverStats"),
                         DummyClientConfig.colorOverheadStats::get, DummyClientConfig.colorOverheadStats::set, 0x55FF55,
-                        Component.translatable("cfg.entitycontrol.dummy.dummy.colorOverStats.tooltip"))
-                .color("color_overhead_dps", Component.translatable("cfg.entitycontrol.dummy.dummy.colorOverDps"),
+                        KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorOverStats.tooltip"))
+                .color("color_overhead_dps", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorOverDps"),
                         DummyClientConfig.colorOverheadDps::get, DummyClientConfig.colorOverheadDps::set, 0x00F6F6,
-                        Component.translatable("cfg.entitycontrol.dummy.dummy.colorOverDps.tooltip"))
-                .color("color_summary_title", Component.translatable("cfg.entitycontrol.dummy.dummy.colorSumTitle"),
+                        KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorOverDps.tooltip"))
+                .color("color_summary_title", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorSumTitle"),
                         DummyClientConfig.colorSummaryTitle::get, DummyClientConfig.colorSummaryTitle::set, 0xFFAA00,
-                        Component.translatable("cfg.entitycontrol.dummy.dummy.colorSumTitle.tooltip"))
-                .color("color_summary_stats", Component.translatable("cfg.entitycontrol.dummy.dummy.colorSumStats"),
+                        KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorSumTitle.tooltip"))
+                .color("color_summary_stats", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorSumStats"),
                         DummyClientConfig.colorSummaryStats::get, DummyClientConfig.colorSummaryStats::set, 0x55FF55,
-                        Component.translatable("cfg.entitycontrol.dummy.dummy.colorSumStats.tooltip"))
-                .color("color_summary_time", Component.translatable("cfg.entitycontrol.dummy.dummy.colorSumTime"),
+                        KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorSumStats.tooltip"))
+                .color("color_summary_time", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorSumTime"),
                         DummyClientConfig.colorSummaryTime::get, DummyClientConfig.colorSummaryTime::set, 0x55FFFF,
-                        Component.translatable("cfg.entitycontrol.dummy.dummy.colorSumTime.tooltip"))
+                        KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.colorSumTime.tooltip"))
                 .onSave(DummyConfigGui::saveClientConfig)
                 .build();
     }
@@ -87,36 +86,36 @@ public final class DummyConfigGui {
     }
 
     private static KTConfigPage buildServerPage() {
-        return KTConfigPage.builder(SERVER_PAGE_ID, Component.translatable("cfg.entitycontrol.dummy.dummy.server.category"))
+        return KTConfigPage.builder(SERVER_PAGE_ID, KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.server.category"))
                 .scope(KTConfigScope.SERVER_AUTHORITATIVE)
                 .serverManaged()
                 .applyTiming(KTConfigPage.ApplyTiming.MIXED)
-                .applyNotice(Component.translatable("cfg.entitycontrol.dummy.dummy.apply_notice"))
-                .pageDescription(Component.translatable("cfg.entitycontrol.dummy.dummy.server.description"))
-                .itemRuleList("equipment_blacklist", Component.translatable("cfg.entitycontrol.dummy.dummy.blacklist"),
+                .applyNotice(KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.apply_notice"))
+                .pageDescription(KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.server.description"))
+                .itemRuleList("equipment_blacklist", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.blacklist"),
                         () -> new ArrayList<>(DummyConfig.equipmentBlacklist.get()),
                         values -> DummyConfig.equipmentBlacklist.set(new ArrayList<>(values)),
                         Arrays.asList("kineticcore:levitation_backpack", "somerandomitem:infinite_potion"),
-                        Component.translatable("cfg.entitycontrol.dummy.dummy.blacklist.tooltip"))
-                .intValue("standby_range", Component.translatable("cfg.entitycontrol.dummy.dummy.standbyRange"),
+                        KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.blacklist.tooltip"))
+                .intValue("standby_range", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.standbyRange"),
                         DummyConfig.dummyStandbyRange::get, DummyConfig.dummyStandbyRange::set,
-                        16, 0, 64, Component.translatable("cfg.entitycontrol.dummy.dummy.standbyRange.tooltip"))
-                .intValue("broadcast_range", Component.translatable("cfg.entitycontrol.dummy.dummy.broadcastRange"),
+                        16, 0, 64, KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.standbyRange.tooltip"))
+                .intValue("broadcast_range", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.broadcastRange"),
                         DummyConfig.dummyBroadcastRange::get, DummyConfig.dummyBroadcastRange::set,
-                        32, 0, 256, Component.translatable("cfg.entitycontrol.dummy.dummy.broadcastRange.tooltip"))
-                .tickSecondsValue("standby_check_interval", Component.translatable("cfg.entitycontrol.dummy.dummy.standbyCheckInterval"),
+                        32, 0, 256, KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.broadcastRange.tooltip"))
+                .tickSecondsValue("standby_check_interval", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.standbyCheckInterval"),
                         DummyConfig.dummyStandbyCheckIntervalTicks::get, DummyConfig.dummyStandbyCheckIntervalTicks::set,
-                        20, 1, 200, Component.translatable("cfg.entitycontrol.dummy.dummy.standbyCheckInterval.tooltip"))
-                .tickSecondsValue("sync_interval", Component.translatable("cfg.entitycontrol.dummy.dummy.syncInterval"),
+                        20, 1, 200, KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.standbyCheckInterval.tooltip"))
+                .tickSecondsValue("sync_interval", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.syncInterval"),
                         DummyConfig.dummySyncIntervalTicks::get, DummyConfig.dummySyncIntervalTicks::set,
-                        2, 1, 20, Component.translatable("cfg.entitycontrol.dummy.dummy.syncInterval.tooltip"))
-                .intValue("curio_extra_slots", Component.translatable("cfg.entitycontrol.dummy.dummy.curioExtraSlots"),
+                        2, 1, 20, KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.syncInterval.tooltip"))
+                .intValue("curio_extra_slots", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.curioExtraSlots"),
                         DummyConfig.dummyCurioExtraSlots::get, DummyConfig.dummyCurioExtraSlots::set,
-                        53, 0, 53, Component.translatable("cfg.entitycontrol.dummy.dummy.curioExtraSlots.tooltip"))
+                        53, 0, 53, KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.curioExtraSlots.tooltip"))
                 .build();
     }
 
-    public static Screen create(Screen parent) {
-        return KTConfigApi.createScreen(parent, PAGE_ID);
+    public static void open() {
+        KTConfigApi.openPage(PAGE_ID);
     }
 }

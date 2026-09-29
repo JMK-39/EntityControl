@@ -5,6 +5,7 @@ import dev.xyat.entitycontrol.reset.config.EntityReseConfig;
 import dev.xyat.kineticcore.api.entity.event.KineticLivingEvents;
 import dev.xyat.kineticcore.api.event.KineticEventPriority;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.DoubleTag;
 import net.minecraft.nbt.FloatTag;
@@ -193,7 +194,7 @@ public final class EntityResetHandler {
         entity.setHealth(entity.getMaxHealth());
 
         if (entity.level() instanceof ServerLevel serverLevel) {
-            Component message = Component.translatable(
+            Component message = KineticI18n.translatable(
                     "msg.entitycontrol.reset.entity_reset.broadcast",
                     entity.getDisplayName()
             );

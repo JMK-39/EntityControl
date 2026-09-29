@@ -1,30 +1,27 @@
 package dev.xyat.entitycontrol.spawn.client.gui;
 
-import net.minecraft.ChatFormatting;
-import dev.xyat.kineticcore.api.client.input.KineticMouseButtons;
-import dev.xyat.kineticcore.api.client.search.KineticSearch;
-import dev.xyat.kineticcore.api.client.theme.GuiTheme;
-import dev.xyat.kineticcore.api.client.overlay.KineticOverlays;
-import dev.xyat.kineticcore.api.client.screen.KineticScreen;
-import dev.xyat.kineticcore.api.client.widget.KineticWidgets;
-import dev.xyat.kineticcore.api.client.widget.button.KineticButtons.StateButton;
-import dev.xyat.kineticcore.api.client.widget.input.KineticNumericFields;
-import dev.xyat.kineticcore.api.client.widget.input.KineticNumericFields.NumericEditBox;
-import dev.xyat.kineticcore.api.client.widget.input.KineticTextFields.KineticEditBox;
-import dev.xyat.kineticcore.api.client.widget.render.KineticEntityPreview.EntityPreviewRenderer;
-import dev.xyat.kineticcore.api.client.widget.scroll.KineticScroll.GridScrollController;
-import dev.xyat.kineticcore.api.client.widget.state.EditedEntryTracker;
 import dev.xyat.entitycontrol.spawn.Network.SpawnNetwork;
 import dev.xyat.entitycontrol.spawn.config.SpawnerConfig;
+import dev.xyat.kineticcore.api.client.gui.input.MouseDragInput;
+import dev.xyat.kineticcore.api.client.gui.input.MouseInput;
+import dev.xyat.kineticcore.api.client.gui.input.ScrollInput;
+import dev.xyat.kineticcore.api.client.gui.overlay.KineticOverlays;
+import dev.xyat.kineticcore.api.client.gui.page.KineticPage;
+import dev.xyat.kineticcore.api.client.gui.render.KineticGraphics;
+import dev.xyat.kineticcore.api.client.gui.scroll.KineticScrollController;
+import dev.xyat.kineticcore.api.client.gui.state.EditedEntryTracker;
+import dev.xyat.kineticcore.api.client.gui.theme.KineticTheme;
+import dev.xyat.kineticcore.api.client.gui.ui.KineticUi;
+import dev.xyat.kineticcore.api.client.gui.ui.NumberType;
+import dev.xyat.kineticcore.api.client.gui.widget.KineticCustomControl;
+import dev.xyat.kineticcore.api.client.gui.widget.KineticEntityPreview;
+import dev.xyat.kineticcore.api.client.search.KineticSearch;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
-import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,10 +32,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-public class SpawnerControlScreen extends KineticScreen {
+public final class SpawnerControlScreen extends KineticPage {
     public static final int V_WIDTH = 640;
     public static final int V_HEIGHT = 360;
-
     private static final int COLS = 4;
     private static final int CELL_SIZE = 72;
     private static final int GRID_X = 12;
@@ -49,7 +45,6 @@ public class SpawnerControlScreen extends KineticScreen {
     private static final int RX = GRID_X + GRID_W + 12;
     private static final int RW = V_WIDTH - RX - 8;
 
-    private final Screen parent;
     private final SpawnerConfig.SpawnerData data;
     private final List<String> allEntityIds;
     private final List<String> displayList = new ArrayList<>();
@@ -57,136 +52,69 @@ public class SpawnerControlScreen extends KineticScreen {
     private final Map<String, LocalBaseline> baselines = new HashMap<>();
     private final Set<String> modifiedEntities = new HashSet<>();
     private final EditedEntryTracker<String> editedEntities = new EditedEntryTracker<>();
-    private final GridScrollController gridScroll = new GridScrollController();
-    private final EntityPreviewRenderer entityPreviewRenderer = KineticWidgets.createEntityPreviewRenderer();
+    private final KineticEntityPreview entityPreview = KineticEntityPreview.create();
+    private final EntityGridControl entityGrid = new EntityGridControl();
 
-    private KineticEditBox searchBox;
+    private String searchQuery = "";
     private String selectedId;
     private boolean tuningTab = true;
     private boolean globalMode;
-    private boolean updating;
     private String lastSavedJson;
     private String pendingSaveJson;
     private long nextSaveRequestId;
     private long pendingSaveRequestId = -1L;
-
-    private StateButton btnTabTuning;
-    private StateButton btnTabBreaker;
-    private StateButton btnScope;
-    private StateButton btnRestore;
-    private StateButton btnTuning;
-    private StateButton btnFixedDelay;
-    private StateButton btnBreaker;
-    private StateButton btnMode;
-
-    private NumericEditBox boxMinDelay;
-    private NumericEditBox boxMaxDelay;
-    private NumericEditBox boxFixedDelay;
-    private NumericEditBox boxSpeed;
-    private NumericEditBox boxMinSpawnCount;
-    private NumericEditBox boxMaxSpawnCount;
-    private NumericEditBox boxMaxNearby;
-    private NumericEditBox boxPlayerRange;
-    private NumericEditBox boxSpawnRange;
-    private NumericEditBox boxThreshold;
-    private NumericEditBox boxCooldown;
-
     private List<Component> deferredTooltip;
 
     public SpawnerControlScreen(SpawnerConfig.SpawnerEditorSnapshot snapshot) {
-        this(null, snapshot);
-    }
-
-    public SpawnerControlScreen(
-            Screen parent,
-            SpawnerConfig.SpawnerEditorSnapshot snapshot
-    ) {
-        super(Component.translatable("gui.entitycontrol.spawn.spawner.title"));
-        this.parent = parent;
-        setParentScreen(parent);
-
+        super(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.title"));
         SpawnerConfig.SpawnerEditorSnapshot safe = snapshot == null
-                ? new SpawnerConfig.SpawnerEditorSnapshot()
-                : snapshot;
+                ? new SpawnerConfig.SpawnerEditorSnapshot() : snapshot;
         data = safe.data == null ? new SpawnerConfig.SpawnerData() : safe.data;
-        SpawnerConfig.SpawnerBackupData backupData = safe.backup == null
-                ? new SpawnerConfig.SpawnerBackupData()
-                : safe.backup;
-        if (data.global == null) {
-            data.global = new SpawnerConfig.SpawnerRule();
-        }
-        if (data.entities == null) {
-            data.entities = new java.util.TreeMap<>();
-        }
-        if (backupData.entities == null) {
-            backupData.entities = new java.util.TreeMap<>();
-        }
+        SpawnerConfig.SpawnerBackupData backup = safe.backup == null
+                ? new SpawnerConfig.SpawnerBackupData() : safe.backup;
+        if (data.global == null) data.global = new SpawnerConfig.SpawnerRule();
+        if (data.entities == null) data.entities = new java.util.TreeMap<>();
+        if (backup.entities == null) backup.entities = new java.util.TreeMap<>();
 
         allEntityIds = new ArrayList<>(safe.entityIds == null ? List.of() : safe.entityIds);
-        if (allEntityIds.isEmpty()) {
-            KineticRegistries.entityTypes().ids().forEach(id -> allEntityIds.add(id.toString()));
-        }
+        if (allEntityIds.isEmpty()) KineticRegistries.entityTypes().ids().forEach(id -> allEntityIds.add(id.toString()));
         allEntityIds.sort(String::compareToIgnoreCase);
-
-        for (Map.Entry<String, SpawnerConfig.BackupEntry> entry : backupData.entities.entrySet()) {
-            SpawnerConfig.BackupEntry backup = entry.getValue();
-            if (backup == null) {
-                continue;
-            }
-            baselines.put(
-                    entry.getKey(),
-                    new LocalBaseline(
-                            backup.hadCustomRule,
-                            backup.rule == null ? null : backup.rule.copy()
-                    )
-            );
+        for (Map.Entry<String, SpawnerConfig.BackupEntry> entry : backup.entities.entrySet()) {
+            SpawnerConfig.BackupEntry value = entry.getValue();
+            if (value == null) continue;
+            baselines.put(entry.getKey(), new LocalBaseline(
+                    value.hadCustomRule,
+                    value.rule == null ? null : value.rule.copy()
+            ));
             modifiedEntities.add(entry.getKey());
         }
-
         editedEntities.refresh(allEntityIds, modifiedEntities::contains);
         buildSearchIndex();
+        updateSearch("");
+        if (!displayList.isEmpty()) selectedId = displayList.get(0);
         lastSavedJson = SpawnerConfig.GSON.toJson(data);
         configureStandaloneDraft(this::captureSpawnerSnapshot, this::restoreSpawnerSnapshot);
     }
 
-    private record SpawnerSnapshot(
-            String dataJson,
-            Map<String, LocalBaseline> baselines,
-            Set<String> modifiedEntities,
-            String selectedId,
-            boolean tuningTab,
-            boolean globalMode
-    ) {
+    private record SpawnerSnapshot(String dataJson, Map<String, LocalBaseline> baselines,
+                                   Set<String> modifiedEntities, String selectedId,
+                                   boolean tuningTab, boolean globalMode) {
     }
 
     private SpawnerSnapshot captureSpawnerSnapshot() {
-        Map<String, LocalBaseline> baselineCopy = new HashMap<>();
-        for (Map.Entry<String, LocalBaseline> entry : baselines.entrySet()) {
-            LocalBaseline value = entry.getValue();
-            baselineCopy.put(
-                    entry.getKey(),
-                    value == null ? null : new LocalBaseline(
-                            value.hadCustomRule(),
-                            value.rule() == null ? null : value.rule().copy()
-                    )
-            );
-        }
+        Map<String, LocalBaseline> copy = new HashMap<>();
+        baselines.forEach((id, baseline) -> copy.put(id, baseline == null ? null : new LocalBaseline(
+                baseline.hadCustomRule(), baseline.rule() == null ? null : baseline.rule().copy()
+        )));
         return new SpawnerSnapshot(
-                SpawnerConfig.GSON.toJson(data),
-                baselineCopy,
-                new HashSet<>(modifiedEntities),
-                selectedId,
-                tuningTab,
-                globalMode
+                SpawnerConfig.GSON.toJson(data), copy, new HashSet<>(modifiedEntities),
+                selectedId, tuningTab, globalMode
         );
     }
 
     private void restoreSpawnerSnapshot(SpawnerSnapshot snapshot) {
         if (snapshot == null) return;
-        SpawnerConfig.SpawnerData restored = SpawnerConfig.GSON.fromJson(
-                snapshot.dataJson(),
-                SpawnerConfig.SpawnerData.class
-        );
+        SpawnerConfig.SpawnerData restored = SpawnerConfig.GSON.fromJson(snapshot.dataJson(), SpawnerConfig.SpawnerData.class);
         if (restored != null) {
             data.enabled = restored.enabled;
             data.notification = restored.notification;
@@ -194,242 +122,239 @@ public class SpawnerControlScreen extends KineticScreen {
             data.entities.clear();
             if (restored.entities != null) data.entities.putAll(restored.entities);
         }
-
         baselines.clear();
-        for (Map.Entry<String, LocalBaseline> entry : snapshot.baselines().entrySet()) {
-            LocalBaseline value = entry.getValue();
-            baselines.put(
-                    entry.getKey(),
-                    value == null ? null : new LocalBaseline(
-                            value.hadCustomRule(),
-                            value.rule() == null ? null : value.rule().copy()
-                    )
-            );
-        }
+        snapshot.baselines().forEach((id, baseline) -> baselines.put(id, baseline == null ? null : new LocalBaseline(
+                baseline.hadCustomRule(), baseline.rule() == null ? null : baseline.rule().copy()
+        )));
         modifiedEntities.clear();
         modifiedEntities.addAll(snapshot.modifiedEntities());
         editedEntities.refresh(allEntityIds, modifiedEntities::contains);
         selectedId = snapshot.selectedId();
         tuningTab = snapshot.tuningTab();
         globalMode = snapshot.globalMode();
-        updateSearch(searchBox == null ? "" : searchBox.getValue());
+        updateSearch(searchQuery);
     }
 
     @Override
-    protected void buildUi() {
-        searchBox = addTextField(
-                GRID_X,
-                15,
-                GRID_W,
-                Component.empty(),
-                Component.translatable("gui.entitycontrol.spawn.spawner.search_hint"),
-                null,
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.search")
-        );
-        searchBox.setResponder(this::updateSearch);
+    protected void build(KineticUi ui) {
+        if (!globalMode) {
+            ui.textField(GRID_X, 15, GRID_W)
+                    .label(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.search_hint"))
+                    .placeholder(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.search_hint"))
+                    .value(searchQuery).maxLength(256)
+                    .tooltip(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tooltip.search"))
+                    .onChange(value -> {
+                        searchQuery = value == null ? "" : value;
+                        updateSearch(searchQuery);
+                    }).firstShownTextAsDefault().build();
+        }
 
         int topW = (RW - 15) / 4;
-        addButtonWithHandler(
-                RX,
-                15,
-                topW,
-                getMasterText(),
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.master"),
-                button -> {
-                    data.enabled = !data.enabled;
-                    button.setText(getMasterText());
-                }
-        );
+        ui.toggle(RX, 15, topW).compact().value(data.enabled)
+                .labels(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.master.on"),
+                        KineticI18n.translatable("gui.entitycontrol.spawn.spawner.master.off"))
+                .tooltip(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tooltip.master"))
+                .onChange(value -> data.enabled = value).build();
+        ui.toggle(RX + topW + 5, 15, topW).compact().value(data.notification)
+                .labels(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.notification.on"),
+                        KineticI18n.translatable("gui.entitycontrol.spawn.spawner.notification.off"))
+                .tooltip(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tooltip.notification"))
+                .onChange(value -> data.notification = value).build();
+        ui.button(RX + (topW + 5) * 2, 15, topW).compact()
+                .text(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.save"))
+                .tooltip(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tooltip.save"))
+                .onClick(this::saveAndApply).build();
+        ui.button(RX + (topW + 5) * 3, 15, topW).compact()
+                .text(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.close"))
+                .tooltip(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tooltip.close"))
+                .onClick(this::navigateBack).build();
 
-        addButtonWithHandler(
-                RX + topW + 5,
-                15,
-                topW,
-                getNotificationText(),
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.notification"),
-                button -> {
-                    data.notification = !data.notification;
-                    button.setText(getNotificationText());
-                }
-        );
-
-        addButton(
-                RX + (topW + 5) * 2,
-                15,
-                topW,
-                Component.translatable("gui.entitycontrol.spawn.spawner.save"),
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.save"),
-                () -> saveAndApply()
-        );
-
-        addButton(
-                RX + (topW + 5) * 3,
-                15,
-                topW,
-                Component.translatable("gui.entitycontrol.spawn.spawner.close"),
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.close"),
-                this::navigateBack
-        );
-
-        int tabW = (RW - 5) / 2;
-        btnTabTuning = addButton(
-                RX,
-                40,
-                tabW,
-                Component.translatable("gui.entitycontrol.spawn.spawner.tab.tuning"),
-                null,
-                () -> switchTab(true)
-        );
-
-        btnTabBreaker = addButton(
-                RX + tabW + 5,
-                40,
-                tabW,
-                Component.translatable("gui.entitycontrol.spawn.spawner.tab.breaker"),
-                null,
-                () -> switchTab(false)
-        );
+        ui.tabBar(RX, 40, RW, List.of(
+                        KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tab.tuning"),
+                        KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tab.breaker")
+                ))
+                .selected(tuningTab ? 0 : 1)
+                .onSelect(index -> {
+                    tuningTab = index == 0;
+                    rebuild();
+                }).build();
 
         int actionW = (RW - 5) / 2;
-        btnScope = addButton(
-                RX,
-                65,
-                actionW,
-                getScopeText(),
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.scope"),
-                () -> {
+        ui.button(RX, 65, actionW).compact()
+                .text(scopeText())
+                .tooltip(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tooltip.scope"))
+                .onClick(() -> {
                     globalMode = !globalMode;
                     closeContextMenu();
-                    updateControlValues();
-                }
-        );
+                    rebuild();
+                }).build();
+        if (!globalMode) {
+            ui.button(RX + actionW + 5, 65, actionW).compact()
+                    .text(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.restore"))
+                    .tooltip(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tooltip.restore"))
+                    .enabled(selectedId != null && modifiedEntities.contains(selectedId))
+                    .onClick(this::restoreSelected).build();
+            ui.add(entityGrid);
+        }
 
-        btnRestore = addButton(
-                RX + actionW + 5,
-                65,
-                actionW,
-                Component.translatable("gui.entitycontrol.spawn.spawner.restore"),
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.restore"),
-                this::restoreSelected
-        );
-
-        btnTuning = addButton(
-                RX,
-                91,
-                tabW,
-                Component.empty(),
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.tuning"),
-                () -> {
-                    SpawnerConfig.SpawnerRule rule = getEditableRule();
-                    if (rule == null) return;
-                    rule.tuningEnabled = !rule.tuningEnabled;
-                    afterRuleChanged();
-                    updateControlValues();
-                }
-        );
-
-        btnFixedDelay = addButton(
-                RX + tabW + 5,
-                91,
-                tabW,
-                Component.empty(),
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.fixed_toggle"),
-                () -> {
-                    SpawnerConfig.SpawnerRule rule = getEditableRule();
-                    if (rule == null) return;
-                    rule.fixedSpawnDelaySeconds = rule.fixedSpawnDelaySeconds >= 0.0D
-                            ? -1.0D
-                            : rule.minSpawnDelaySeconds;
-                    afterRuleChanged();
-                    updateControlValues();
-                }
-        );
-
-        btnBreaker = addButton(
-                RX,
-                91,
-                tabW,
-                Component.empty(),
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.breaker"),
-                () -> {
-                    SpawnerConfig.SpawnerRule rule = getEditableRule();
-                    if (rule == null) return;
-                    rule.breakerEnabled = !rule.breakerEnabled;
-                    afterRuleChanged();
-                    updateControlValues();
-                }
-        );
-
-        btnMode = addButton(
-                RX + tabW + 5,
-                91,
-                tabW,
-                Component.empty(),
-                Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.mode"),
-                () -> {
-                    SpawnerConfig.SpawnerRule rule = getEditableRule();
-                    if (rule == null) return;
-                    rule.mode = "BREAK".equalsIgnoreCase(rule.mode) ? "COOLDOWN" : "BREAK";
-                    afterRuleChanged();
-                    updateControlValues();
-                }
-        );
-
-        boxMinDelay = addDecimalBox(120, 0, 1638.35D, "gui.entitycontrol.spawn.spawner.tooltip.min_delay");
-        boxMaxDelay = addDecimalBox(120, 1, 1638.35D, "gui.entitycontrol.spawn.spawner.tooltip.max_delay");
-        boxFixedDelay = addDecimalBox(159, 0, 1638.35D, "gui.entitycontrol.spawn.spawner.tooltip.fixed_delay");
-        boxSpeed = addDecimalBox(159, 1, 10.0D, "gui.entitycontrol.spawn.spawner.tooltip.speed");
-        boxMinSpawnCount = addIntegerBox(198, 0, 0, 128, "gui.entitycontrol.spawn.spawner.tooltip.min_spawn_count");
-        boxMaxSpawnCount = addIntegerBox(198, 1, 0, 128, "gui.entitycontrol.spawn.spawner.tooltip.max_spawn_count");
-        boxMaxNearby = addIntegerBox(237, 0, -1, 1024, "gui.entitycontrol.spawn.spawner.tooltip.max_nearby");
-        boxPlayerRange = addIntegerBox(237, 1, 0, 256, "gui.entitycontrol.spawn.spawner.tooltip.player_range");
-        boxSpawnRange = addIntegerBox(276, 0, 0, 128, "gui.entitycontrol.spawn.spawner.tooltip.spawn_range");
-
-        boxThreshold = addIntegerBox(120, 0, 1, 1_000_000, "gui.entitycontrol.spawn.spawner.tooltip.threshold");
-        boxCooldown = addIntegerBox(120, 1, 0, 604800, "gui.entitycontrol.spawn.spawner.tooltip.cooldown");
-
-        boxMinDelay.setResponder(value -> updateDecimalField(boxMinDelay, Field.MIN_DELAY));
-        boxMaxDelay.setResponder(value -> updateDecimalField(boxMaxDelay, Field.MAX_DELAY));
-        boxFixedDelay.setResponder(value -> updateDecimalField(boxFixedDelay, Field.FIXED_DELAY));
-        boxSpeed.setResponder(value -> updateDecimalField(boxSpeed, Field.SPEED));
-        boxMinSpawnCount.setResponder(value -> updateIntField(boxMinSpawnCount, Field.MIN_SPAWN_COUNT));
-        boxMaxSpawnCount.setResponder(value -> updateIntField(boxMaxSpawnCount, Field.MAX_SPAWN_COUNT));
-        boxMaxNearby.setResponder(value -> updateIntField(boxMaxNearby, Field.MAX_NEARBY));
-        boxPlayerRange.setResponder(value -> updateIntField(boxPlayerRange, Field.PLAYER_RANGE));
-        boxSpawnRange.setResponder(value -> updateIntField(boxSpawnRange, Field.SPAWN_RANGE));
-        boxThreshold.setResponder(value -> updateIntField(boxThreshold, Field.THRESHOLD));
-        boxCooldown.setResponder(value -> updateIntField(boxCooldown, Field.COOLDOWN));
-
-        updateSearch("");
-        if (!displayList.isEmpty()) updateSelection(displayList.get(0));
-        switchTab(true);
+        SpawnerConfig.SpawnerRule rule = getDisplayRule();
+        if (rule == null) return;
+        if (tuningTab) buildTuning(ui, rule);
+        else buildBreaker(ui, rule);
     }
 
-    private NumericEditBox addIntegerBox(int y, int column, int min, int max, String tooltipKey) {
+    private void buildTuning(KineticUi ui, SpawnerConfig.SpawnerRule rule) {
+        int half = (RW - 5) / 2;
+        ui.toggle(RX, 91, half).compact().value(rule.tuningEnabled)
+                .labels(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tuning.on"),
+                        KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tuning.off"))
+                .tooltip(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tooltip.tuning"))
+                .onChange(value -> {
+                    getEditableRule().tuningEnabled = value;
+                    afterRuleChanged();
+                }).build();
+        boolean fixed = rule.fixedSpawnDelaySeconds >= 0D;
+        ui.toggle(RX + half + 5, 91, half).compact().value(fixed)
+                .labels(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.fixed.on"),
+                        KineticI18n.translatable("gui.entitycontrol.spawn.spawner.fixed.off"))
+                .tooltip(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tooltip.fixed_toggle"))
+                .onChange(value -> {
+                    SpawnerConfig.SpawnerRule editable = getEditableRule();
+                    editable.fixedSpawnDelaySeconds = value ? editable.minSpawnDelaySeconds : -1D;
+                    afterRuleChanged();
+                    rebuild();
+                }).build();
+
+        number(ui, 120, 0, NumberType.DECIMAL, rule.minSpawnDelaySeconds, 0.05D, 1638.35D,
+                "gui.entitycontrol.spawn.spawner.tooltip.min_delay", Field.MIN_DELAY);
+        number(ui, 120, 1, NumberType.DECIMAL, rule.maxSpawnDelaySeconds, 0.05D, 1638.35D,
+                "gui.entitycontrol.spawn.spawner.tooltip.max_delay", Field.MAX_DELAY);
+        if (fixed) {
+            number(ui, 159, 0, NumberType.DECIMAL, rule.fixedSpawnDelaySeconds, 0.05D, 1638.35D,
+                    "gui.entitycontrol.spawn.spawner.tooltip.fixed_delay", Field.FIXED_DELAY);
+        }
+        number(ui, 159, 1, NumberType.DECIMAL, rule.speedMultiplier, 0.01D, 10D,
+                "gui.entitycontrol.spawn.spawner.tooltip.speed", Field.SPEED);
+        number(ui, 198, 0, NumberType.INT, rule.minSpawnCount, 0, 128,
+                "gui.entitycontrol.spawn.spawner.tooltip.min_spawn_count", Field.MIN_SPAWN_COUNT);
+        number(ui, 198, 1, NumberType.INT, rule.maxSpawnCount, 0, 128,
+                "gui.entitycontrol.spawn.spawner.tooltip.max_spawn_count", Field.MAX_SPAWN_COUNT);
+        number(ui, 237, 0, NumberType.INT, rule.maxNearbyEntities, -1, 1024,
+                "gui.entitycontrol.spawn.spawner.tooltip.max_nearby", Field.MAX_NEARBY);
+        number(ui, 237, 1, NumberType.INT, rule.requiredPlayerRange, 0, 256,
+                "gui.entitycontrol.spawn.spawner.tooltip.player_range", Field.PLAYER_RANGE);
+        number(ui, 276, 0, NumberType.INT, rule.spawnRange, 0, 128,
+                "gui.entitycontrol.spawn.spawner.tooltip.spawn_range", Field.SPAWN_RANGE);
+    }
+
+    private void buildBreaker(KineticUi ui, SpawnerConfig.SpawnerRule rule) {
+        int half = (RW - 5) / 2;
+        ui.toggle(RX, 91, half).compact().value(rule.breakerEnabled)
+                .labels(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.breaker.on"),
+                        KineticI18n.translatable("gui.entitycontrol.spawn.spawner.breaker.off"))
+                .tooltip(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tooltip.breaker"))
+                .onChange(value -> {
+                    getEditableRule().breakerEnabled = value;
+                    afterRuleChanged();
+                }).build();
+        boolean breakMode = "BREAK".equalsIgnoreCase(rule.mode);
+        ui.toggle(RX + half + 5, 91, half).compact().value(breakMode)
+                .labels(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.mode.break"),
+                        KineticI18n.translatable("gui.entitycontrol.spawn.spawner.mode.cooldown"))
+                .tooltip(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tooltip.mode"))
+                .onChange(value -> {
+                    getEditableRule().mode = value ? "BREAK" : "COOLDOWN";
+                    afterRuleChanged();
+                }).build();
+        number(ui, 120, 0, NumberType.INT, rule.threshold, 1, 1_000_000,
+                "gui.entitycontrol.spawn.spawner.tooltip.threshold", Field.THRESHOLD);
+        number(ui, 120, 1, NumberType.INT, rule.cooldown, 0, 604800,
+                "gui.entitycontrol.spawn.spawner.tooltip.cooldown", Field.COOLDOWN);
+    }
+
+    private void number(KineticUi ui, int labelY, int column, NumberType type, Number value,
+                        Number min, Number max, String tooltip, Field field) {
         int columnW = (RW - 5) / 2;
         int x = RX + column * (columnW + 5);
-        NumericEditBox box = addIntegerField(
-                x, y + 11, columnW, Component.empty(), false, min, max, null, Component.translatable(tooltipKey)
-        );
-        box.setMaxLength(7);
-        return box;
+        ui.numberField(x, labelY + 11, columnW, type)
+                .allowNegative(min != null && min.doubleValue() < 0D)
+                .range(min, max).value(value)
+                .tooltip(KineticI18n.translatable(tooltip))
+                .onChange(raw -> updateField(raw, field)).firstShownTextAsDefault().build();
     }
 
-    private NumericEditBox addDecimalBox(int y, int column, Double max, String tooltipKey) {
-        int columnW = (RW - 5) / 2;
-        int x = RX + column * (columnW + 5);
-        NumericEditBox box = addDecimalField(
-                x, y + 11, columnW, Component.empty(), false, null, max, null, Component.translatable(tooltipKey)
-        );
-        box.setMaxLength(8);
-        return box;
-    }
-
-    private void switchTab(boolean showTuning) {
-        tuningTab = showTuning;
-        btnTabTuning.setEnabled(!showTuning);
-        btnTabBreaker.setEnabled(showTuning);
-        updateControlVisibility();
+    private void updateField(String raw, Field field) {
+        if (raw == null || raw.isBlank() || "-".equals(raw) || ".".equals(raw)) return;
+        SpawnerConfig.SpawnerRule rule = getEditableRule();
+        if (rule == null) return;
+        try {
+            switch (field) {
+                case MIN_DELAY -> {
+                    double value = Double.parseDouble(raw);
+                    if (value < 0.05D || value > 1638.35D) return;
+                    rule.minSpawnDelaySeconds = value;
+                    if (rule.maxSpawnDelaySeconds < value) rule.maxSpawnDelaySeconds = value;
+                }
+                case MAX_DELAY -> {
+                    double value = Double.parseDouble(raw);
+                    if (value < 0.05D || value > 1638.35D) return;
+                    rule.maxSpawnDelaySeconds = value;
+                    if (rule.minSpawnDelaySeconds > value) rule.minSpawnDelaySeconds = value;
+                }
+                case FIXED_DELAY -> {
+                    double value = Double.parseDouble(raw);
+                    if (value < 0.05D || value > 1638.35D) return;
+                    rule.fixedSpawnDelaySeconds = value;
+                }
+                case SPEED -> {
+                    double value = Double.parseDouble(raw);
+                    if (value < 0.01D || value > 10D) return;
+                    rule.speedMultiplier = value;
+                }
+                case MIN_SPAWN_COUNT -> {
+                    int value = Integer.parseInt(raw);
+                    if (value < 0 || value > 128) return;
+                    rule.minSpawnCount = value;
+                    if (rule.maxSpawnCount < value) rule.maxSpawnCount = value;
+                }
+                case MAX_SPAWN_COUNT -> {
+                    int value = Integer.parseInt(raw);
+                    if (value < 0 || value > 128) return;
+                    rule.maxSpawnCount = value;
+                    if (rule.minSpawnCount > value) rule.minSpawnCount = value;
+                }
+                case MAX_NEARBY -> {
+                    int value = Integer.parseInt(raw);
+                    if (value < -1 || value > 1024) return;
+                    rule.maxNearbyEntities = value;
+                }
+                case PLAYER_RANGE -> {
+                    int value = Integer.parseInt(raw);
+                    if (value < 0 || value > 256) return;
+                    rule.requiredPlayerRange = value;
+                }
+                case SPAWN_RANGE -> {
+                    int value = Integer.parseInt(raw);
+                    if (value < 0 || value > 128) return;
+                    rule.spawnRange = value;
+                }
+                case THRESHOLD -> {
+                    int value = Integer.parseInt(raw);
+                    if (value < 1 || value > 1_000_000) return;
+                    rule.threshold = value;
+                }
+                case COOLDOWN -> {
+                    int value = Integer.parseInt(raw);
+                    if (value < 0 || value > 604800) return;
+                    rule.cooldown = value;
+                }
+            }
+        } catch (NumberFormatException ignored) {
+            return;
+        }
+        afterRuleChanged();
+        if (field == Field.MIN_DELAY || field == Field.MAX_DELAY
+                || field == Field.MIN_SPAWN_COUNT || field == Field.MAX_SPAWN_COUNT) rebuild();
     }
 
     private void buildSearchIndex() {
@@ -438,158 +363,86 @@ public class SpawnerControlScreen extends KineticScreen {
             ResourceLocation location = KineticResourceIds.tryParse(id);
             EntityType<?> type = location == null ? null : KineticRegistries.entityTypes().get(location);
             String name = type == null ? id : type.getDescription().getString();
-            String searchData = (
-                    id + " "
-                            + name + " "
-                            + KineticSearch.pinyin(name)
-            ).toLowerCase(Locale.ROOT);
-            searchIndex.put(id, searchData);
+            String raw = id + " " + name;
+            searchIndex.put(id, (raw + " " + KineticSearch.pinyin(raw)).toLowerCase(Locale.ROOT));
         }
     }
 
     private void updateSearch(String query) {
         String lower = query == null ? "" : query.toLowerCase(Locale.ROOT).trim();
         displayList.clear();
-
-        if (lower.isEmpty()) {
-            displayList.addAll(allEntityIds);
-        } else {
-            for (String id : allEntityIds) {
-                if (lower.startsWith("@")) {
-                    ResourceLocation location = KineticResourceIds.tryParse(id);
-                    if (location != null && location.getNamespace().contains(lower.substring(1))) {
-                        displayList.add(id);
-                    }
-                    continue;
-                }
-
-                String indexed = searchIndex.getOrDefault(id, id.toLowerCase(Locale.ROOT));
-                if (KineticSearch.match(indexed, lower)) {
-                    displayList.add(id);
-                }
-            }
+        for (String id : allEntityIds) {
+            boolean match;
+            if (lower.isEmpty()) match = true;
+            else if (lower.startsWith("@")) {
+                ResourceLocation location = KineticResourceIds.tryParse(id);
+                match = location != null && location.getNamespace().contains(lower.substring(1));
+            } else match = KineticSearch.match(searchIndex.getOrDefault(id, id.toLowerCase(Locale.ROOT)), lower);
+            if (match) displayList.add(id);
         }
-
         sortDisplayList();
-        gridScroll.reset();
-        updateGridScrollRange();
+        entityGrid.resetScroll();
     }
 
     private void sortDisplayList() {
         displayList.sort(editedEntities.comparator(String::compareToIgnoreCase));
     }
 
-    private void updateGridScrollRange() {
-        int totalRows = (displayList.size() + COLS - 1) / COLS;
-        int maxRows = Math.max(0, totalRows - VISIBLE_ROWS);
-        gridScroll.updateRange(maxRows, totalRows, VISIBLE_ROWS);
-    }
-
-    private void updateSelection(String entityId) {
+    private void selectEntity(String entityId) {
         selectedId = entityId;
         globalMode = false;
         closeContextMenu();
-        if (searchBox != null) {
-            blurControl(searchBox);
-        }
-        updateControlValues();
+        clearFocus();
+        rebuild();
     }
 
     private SpawnerConfig.SpawnerRule getEditableRule() {
-        if (globalMode) {
-            if (data.global == null) {
-                data.global = new SpawnerConfig.SpawnerRule();
-            }
-            return data.global;
-        }
-        if (selectedId == null) {
-            return null;
-        }
+        if (globalMode) return data.global;
+        if (selectedId == null) return null;
         ensureBaseline(selectedId);
-        return data.entities.computeIfAbsent(
-                selectedId,
-                key -> SpawnerConfig.createRuleForEditor(data)
-        );
+        return data.entities.computeIfAbsent(selectedId, key -> SpawnerConfig.createRuleForEditor(data));
     }
 
     private SpawnerConfig.SpawnerRule getDisplayRule() {
-        if (globalMode) {
-            return data.global;
-        }
-        if (selectedId == null) {
-            return null;
-        }
+        if (globalMode) return data.global;
+        if (selectedId == null) return null;
         SpawnerConfig.SpawnerRule rule = data.entities.get(selectedId);
         return rule == null ? data.global : rule;
     }
 
     private void ensureBaseline(String entityId) {
-        if (entityId == null || baselines.containsKey(entityId)) {
-            return;
-        }
+        if (entityId == null || baselines.containsKey(entityId)) return;
         SpawnerConfig.SpawnerRule current = data.entities.get(entityId);
-        baselines.put(
-                entityId,
-                new LocalBaseline(
-                        current != null,
-                        current == null ? null : current.copy()
-                )
-        );
+        baselines.put(entityId, new LocalBaseline(current != null, current == null ? null : current.copy()));
     }
 
     private void refreshModifiedState(String entityId) {
-        if (entityId == null) {
-            return;
-        }
+        if (entityId == null) return;
         LocalBaseline baseline = baselines.get(entityId);
-        if (baseline == null) {
-            return;
-        }
-
+        if (baseline == null) return;
         SpawnerConfig.SpawnerRule current = data.entities.get(entityId);
-        if (!baseline.hadCustomRule
-                && current != null
-                && sameRule(current, SpawnerConfig.createRuleForEditor(data))) {
+        if (!baseline.hadCustomRule() && current != null && sameRule(current, SpawnerConfig.createRuleForEditor(data))) {
             data.entities.remove(entityId);
             current = null;
         }
-
         boolean modified = differsFromBaseline(current, baseline);
-        boolean changed = modified
-                ? modifiedEntities.add(entityId)
-                : modifiedEntities.remove(entityId);
+        if (modified) modifiedEntities.add(entityId); else modifiedEntities.remove(entityId);
         editedEntities.update(entityId, modified);
-
-        if (changed) {
-            sortDisplayList();
-            updateGridScrollRange();
-            if (modified) {
-                gridScroll.setOffset(0);
-            }
-        }
-        updateRestoreState();
+        sortDisplayList();
     }
 
     private void afterRuleChanged() {
-        if (!globalMode) {
-            refreshModifiedState(selectedId);
-        }
+        if (!globalMode) refreshModifiedState(selectedId);
     }
 
     private boolean differsFromBaseline(SpawnerConfig.SpawnerRule current, LocalBaseline baseline) {
-        if (!baseline.hadCustomRule) {
-            return current != null;
-        }
-        return !sameRule(current, baseline.rule);
+        if (!baseline.hadCustomRule()) return current != null;
+        return !sameRule(current, baseline.rule());
     }
 
     private boolean sameRule(SpawnerConfig.SpawnerRule left, SpawnerConfig.SpawnerRule right) {
-        if (left == right) {
-            return true;
-        }
-        if (left == null || right == null) {
-            return false;
-        }
+        if (left == right) return true;
+        if (left == null || right == null) return false;
         return left.breakerEnabled == right.breakerEnabled
                 && left.tuningEnabled == right.tuningEnabled
                 && left.threshold == right.threshold
@@ -611,269 +464,23 @@ public class SpawnerControlScreen extends KineticScreen {
     }
 
     private void restoreSelected() {
-        if (globalMode || selectedId == null) {
-            return;
-        }
+        if (globalMode || selectedId == null) return;
         LocalBaseline baseline = baselines.get(selectedId);
-        if (baseline == null) {
-            return;
-        }
-
-        if (baseline.hadCustomRule && baseline.rule != null) {
-            data.entities.put(selectedId, baseline.rule.copy());
-        } else {
-            data.entities.remove(selectedId);
-        }
-
+        if (baseline == null) return;
+        if (baseline.hadCustomRule() && baseline.rule() != null) data.entities.put(selectedId, baseline.rule().copy());
+        else data.entities.remove(selectedId);
         modifiedEntities.remove(selectedId);
         editedEntities.update(selectedId, false);
         baselines.remove(selectedId);
         sortDisplayList();
-        updateGridScrollRange();
-        updateControlValues();
-        KineticOverlays.toast(Component.translatable("msg.entitycontrol.spawn.spawner.restored"));
+        KineticOverlays.toast(KineticI18n.translatable("msg.entitycontrol.spawn.spawner.restored"));
+        rebuild();
     }
 
-    private void updateIntField(NumericEditBox box, Field field) {
-        if (updating || (!globalMode && selectedId == null)) {
-            return;
-        }
-        String raw = box.getValue();
-        if (raw.isEmpty()) {
-            if (field == Field.MAX_NEARBY) {
-                SpawnerConfig.SpawnerRule rule = getEditableRule();
-                if (rule != null && rule.maxNearbyEntities != -1) {
-                    rule.maxNearbyEntities = -1;
-                    afterRuleChanged();
-                }
-            }
-            return;
-        }
-
-        Integer value = box.getIntValue();
-        if (value == null) {
-            KineticOverlays.toast(Component.translatable("msg.entitycontrol.spawn.invalid_number"));
-            updateControlValues();
-            return;
-        }
-
-        SpawnerConfig.SpawnerRule rule = getEditableRule();
-        if (rule == null) {
-            return;
-        }
-
-        switch (field) {
-            case MIN_SPAWN_COUNT -> {
-                rule.minSpawnCount = value;
-                if (rule.maxSpawnCount < value) {
-                    rule.maxSpawnCount = value;
-                }
-            }
-            case MAX_SPAWN_COUNT -> {
-                rule.maxSpawnCount = value;
-                if (rule.minSpawnCount > value) {
-                    rule.minSpawnCount = value;
-                }
-            }
-            case MAX_NEARBY -> rule.maxNearbyEntities = value;
-            case PLAYER_RANGE -> rule.requiredPlayerRange = value;
-            case SPAWN_RANGE -> rule.spawnRange = value;
-            case THRESHOLD -> rule.threshold = value;
-            case COOLDOWN -> rule.cooldown = value;
-            default -> {
-                return;
-            }
-        }
-
-        afterRuleChanged();
-        if (field == Field.MIN_SPAWN_COUNT || field == Field.MAX_SPAWN_COUNT) {
-            updateControlValues();
-        }
-    }
-
-    private void updateDecimalField(NumericEditBox box, Field field) {
-        if (updating || (!globalMode && selectedId == null)) {
-            return;
-        }
-
-        String raw = box.getValue();
-        if (raw.isEmpty() || ".".equals(raw)) {
-            return;
-        }
-
-        Double value = box.getDoubleValue();
-        if (value == null) {
-            KineticOverlays.toast(Component.translatable("msg.entitycontrol.spawn.invalid_number"));
-            updateControlValues();
-            return;
-        }
-
-        double minimum = field == Field.SPEED ? 0.01D : 0.05D;
-        double maximum = field == Field.SPEED ? 10.0D : 1638.35D;
-        if (value <= 0.0D) {
-            return;
-        }
-        if (value < minimum || value > maximum) {
-            KineticOverlays.toast(Component.translatable("msg.entitycontrol.spawn.invalid_number"));
-            updateControlValues();
-            return;
-        }
-
-        SpawnerConfig.SpawnerRule rule = getEditableRule();
-        if (rule == null) {
-            return;
-        }
-
-        switch (field) {
-            case MIN_DELAY -> {
-                rule.minSpawnDelaySeconds = value;
-                if (rule.maxSpawnDelaySeconds < value) {
-                    rule.maxSpawnDelaySeconds = value;
-                }
-            }
-            case MAX_DELAY -> {
-                rule.maxSpawnDelaySeconds = value;
-                if (rule.minSpawnDelaySeconds > value) {
-                    rule.minSpawnDelaySeconds = value;
-                }
-            }
-            case FIXED_DELAY -> rule.fixedSpawnDelaySeconds = value;
-            case SPEED -> rule.speedMultiplier = value;
-            default -> {
-                return;
-            }
-        }
-
-        afterRuleChanged();
-        if (field == Field.MIN_DELAY || field == Field.MAX_DELAY) {
-            updateControlValues();
-        }
-    }
-
-    private void updateControlValues() {
-        if (btnRestore == null) {
-            return;
-        }
-
-        if (btnScope != null) {
-            btnScope.setText(getScopeText());
-        }
-
-        SpawnerConfig.SpawnerRule rule = getDisplayRule();
-        updating = true;
-        if (rule != null) {
-            btnTuning.setText(Component.translatable(
-                    rule.tuningEnabled
-                            ? "gui.entitycontrol.spawn.spawner.tuning.on"
-                            : "gui.entitycontrol.spawn.spawner.tuning.off"
-            ));
-            btnFixedDelay.setText(Component.translatable(
-                    rule.fixedSpawnDelaySeconds >= 0.0D
-                            ? "gui.entitycontrol.spawn.spawner.fixed.on"
-                            : "gui.entitycontrol.spawn.spawner.fixed.off"
-            ));
-            btnBreaker.setText(Component.translatable(
-                    rule.breakerEnabled
-                            ? "gui.entitycontrol.spawn.spawner.breaker.on"
-                            : "gui.entitycontrol.spawn.spawner.breaker.off"
-            ));
-            btnMode.setText(Component.translatable(
-                    "BREAK".equalsIgnoreCase(rule.mode)
-                            ? "gui.entitycontrol.spawn.spawner.mode.break"
-                            : "gui.entitycontrol.spawn.spawner.mode.cooldown"
-            ));
-
-            boxMinDelay.setValue(KineticNumericFields.formatDecimal(rule.minSpawnDelaySeconds));
-            boxMaxDelay.setValue(KineticNumericFields.formatDecimal(rule.maxSpawnDelaySeconds));
-            boxFixedDelay.setValue(KineticNumericFields.formatDecimal(
-                    rule.fixedSpawnDelaySeconds >= 0.0D
-                            ? rule.fixedSpawnDelaySeconds
-                            : rule.minSpawnDelaySeconds
-            ));
-            boxSpeed.setValue(KineticNumericFields.formatDecimal(rule.speedMultiplier));
-            boxMinSpawnCount.setIntValue(rule.minSpawnCount);
-            boxMaxSpawnCount.setIntValue(rule.maxSpawnCount);
-            if (rule.maxNearbyEntities < 0) {
-                boxMaxNearby.setValue("");
-            } else {
-                boxMaxNearby.setIntValue(rule.maxNearbyEntities);
-            }
-            boxPlayerRange.setIntValue(rule.requiredPlayerRange);
-            boxSpawnRange.setIntValue(rule.spawnRange);
-            boxThreshold.setIntValue(rule.threshold);
-            boxCooldown.setIntValue(rule.cooldown);
-        }
-        updating = false;
-        updateRestoreState();
-        updateControlVisibility();
-    }
-
-    private void updateRestoreState() {
-        if (btnRestore != null) {
-            btnRestore.setEnabled(!globalMode
-                    && selectedId != null
-                    && modifiedEntities.contains(selectedId));
-        }
-    }
-
-    private void updateControlVisibility() {
-        if (btnTuning == null) {
-            return;
-        }
-
-        if (searchBox != null) {
-            searchBox.setVisible(!globalMode);
-            searchBox.setEnabled(!globalMode);
-            if (globalMode) blurControl(searchBox);
-        }
-
-        boolean selected = selectedId != null;
-        boolean editable = globalMode || selected;
-        SpawnerConfig.SpawnerRule rule = getDisplayRule();
-        boolean fixedEnabled = rule != null && rule.fixedSpawnDelaySeconds >= 0.0D;
-
-        btnRestore.setVisible(selected && !globalMode);
-        btnRestore.setEnabled(selected && !globalMode && modifiedEntities.contains(selectedId));
-        btnTuning.setVisible(editable && tuningTab);
-        btnFixedDelay.setVisible(editable && tuningTab);
-        btnBreaker.setVisible(editable && !tuningTab);
-        btnMode.setVisible(editable && !tuningTab);
-
-        boxMinDelay.setVisible(editable && tuningTab);
-        boxMaxDelay.setVisible(editable && tuningTab);
-        boxFixedDelay.setVisible(editable && tuningTab && fixedEnabled);
-        boxSpeed.setVisible(editable && tuningTab);
-        boxMinSpawnCount.setVisible(editable && tuningTab);
-        boxMaxSpawnCount.setVisible(editable && tuningTab);
-        boxMaxNearby.setVisible(editable && tuningTab);
-        boxPlayerRange.setVisible(editable && tuningTab);
-        boxSpawnRange.setVisible(editable && tuningTab);
-        boxThreshold.setVisible(editable && !tuningTab);
-        boxCooldown.setVisible(editable && !tuningTab);
-    }
-
-    private Component getScopeText() {
-        return Component.translatable(
-                globalMode
-                        ? "gui.entitycontrol.spawn.spawner.scope.entity"
-                        : "gui.entitycontrol.spawn.spawner.scope.global"
-        );
-    }
-
-    private Component getMasterText() {
-        return Component.translatable(
-                data.enabled
-                        ? "gui.entitycontrol.spawn.spawner.master.on"
-                        : "gui.entitycontrol.spawn.spawner.master.off"
-        );
-    }
-
-    private Component getNotificationText() {
-        return Component.translatable(
-                data.notification
-                        ? "gui.entitycontrol.spawn.spawner.notification.on"
-                        : "gui.entitycontrol.spawn.spawner.notification.off"
-        );
+    private Component scopeText() {
+        return KineticI18n.translatable(globalMode
+                ? "gui.entitycontrol.spawn.spawner.scope.entity"
+                : "gui.entitycontrol.spawn.spawner.scope.global");
     }
 
     private String getEntityName(String entityId) {
@@ -883,372 +490,73 @@ public class SpawnerControlScreen extends KineticScreen {
     }
 
     @Override
-    protected void renderCanvasBackground(
-            @NotNull GuiGraphics graphics,
-            int mouseX,
-            int mouseY,
-            float partialTick
-    ) {
-        GuiTheme.canvasBackground(graphics, V_WIDTH, V_HEIGHT);
-        GuiTheme.stateOutline(graphics, 0, 0, V_WIDTH, V_HEIGHT, false, false, false);
-        GuiTheme.panelAlt(
-                graphics,
-                GRID_X - 2,
-                GRID_Y - 2,
-                GRID_W + 4,
-                GRID_H + 4
-        );
+    protected void renderBackground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        deferredTooltip = null;
+        KineticTheme.canvasBackground(graphics, width(), height());
+        KineticTheme.panel(graphics, RX - 6, 6, RW + 12, 348);
     }
 
     @Override
-    protected void renderCanvasForeground(
-            @NotNull GuiGraphics graphics,
-            int mouseX,
-            int mouseY,
-            float partialTick
-    ) {
-        deferredTooltip = null;
-        if (globalMode) {
-            renderGlobalModePanel(graphics);
-        } else {
-            renderGrid(graphics, mouseX, mouseY);
-        }
-
-        renderRightPanel(graphics);
-
+    protected void renderForeground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        if (globalMode) renderGlobalMode(graphics);
+        renderLabels(graphics);
+        if (deferredTooltip != null && !deferredTooltip.isEmpty()) showTooltip(deferredTooltip);
     }
 
-    private void renderGlobalModePanel(GuiGraphics graphics) {
-        int panelX = GRID_X + 8;
-        int panelY = GRID_Y + 24;
-        int panelW = GRID_W - 16;
-
-        graphics.drawCenteredString(
-                font,
-                Component.translatable("gui.entitycontrol.spawn.spawner.global_mode.title"),
-                GRID_X + GRID_W / 2,
-                panelY,
-                0xFF55FFFF
-        );
-
-        graphics.drawCenteredString(
-                font,
-                Component.translatable("gui.entitycontrol.spawn.spawner.global_mode.desc"),
-                GRID_X + GRID_W / 2,
-                panelY + 32,
-                0xFFFFFFFF
-        );
-
-        graphics.drawCenteredString(
-                font,
-                Component.translatable("gui.entitycontrol.spawn.spawner.global_mode.priority"),
-                GRID_X + GRID_W / 2,
-                panelY + 52,
-                0xFFFFAA00
-        );
-
-        GuiTheme.separator(graphics, panelX, panelY + 78, panelW);
-
-        graphics.drawCenteredString(
-                font,
-                Component.translatable("gui.entitycontrol.spawn.spawner.global_mode.hint"),
-                GRID_X + GRID_W / 2,
-                panelY + 98,
-                0xFF55FF55
-        );
+    private void renderGlobalMode(KineticGraphics graphics) {
+        int center = GRID_X + GRID_W / 2;
+        graphics.centeredText(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.global_mode.title"), center, 78,
+                KineticTheme.current().accent(), false);
+        graphics.centeredText(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.global_mode.desc"), center, 110,
+                KineticTheme.current().text(), false);
+        graphics.centeredText(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.global_mode.priority"), center, 130,
+                KineticTheme.current().mutedText(), false);
+        KineticTheme.separator(graphics, GRID_X + 8, 156, GRID_W - 16);
+        graphics.centeredText(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.global_mode.hint"), center, 178,
+                KineticTheme.current().translatedText(), false);
     }
 
-    private void renderGrid(GuiGraphics graphics, int mouseX, int mouseY) {
-        int baseRow = gridScroll.smoothIndexOffset();
-        int visualShift = gridScroll.visualShift(CELL_SIZE);
-        int startIndex = baseRow * COLS;
-        int endIndex = Math.min(startIndex + (VISIBLE_ROWS + 2) * COLS, displayList.size());
-
-        enableUiScissor(graphics, GRID_X, GRID_Y, GRID_X + GRID_W, GRID_Y + GRID_H);
-        for (int i = startIndex; i < endIndex; i++) {
-            int relative = i - startIndex;
-            int x = GRID_X + relative % COLS * CELL_SIZE;
-            int y = GRID_Y + relative / COLS * CELL_SIZE - visualShift;
-            String entityId = displayList.get(i);
-            boolean selected = entityId.equals(selectedId);
-            boolean modified = modifiedEntities.contains(entityId);
-            boolean hover = mouseX >= x && mouseX < x + CELL_SIZE
-                    && mouseY >= y && mouseY < y + CELL_SIZE;
-
-            EntityPreviewRenderer.drawCheckerboard(
-                    graphics,
-                    x + 1,
-                    y + 1,
-                    CELL_SIZE - 2,
-                    CELL_SIZE - 2
-            );
-
-            if (hover || selected) {
-                GuiTheme.stateOutline(
-                        graphics, x, y, CELL_SIZE, CELL_SIZE,
-                        selected, hover, false, 3
-                );
-            } else if (modified) {
-                GuiTheme.indicatorOutline(
-                        graphics, x, y, CELL_SIZE, CELL_SIZE,
-                        GuiTheme.Indicator.SUCCESS, 3
-                );
-            } else {
-                GuiTheme.stateOutline(graphics, x, y, CELL_SIZE, CELL_SIZE, false, false, false);
-            }
-
-            boolean rendered = entityPreviewRenderer.renderCanvas(
-                    graphics,
-                    entityId,
-                    "spawner:" + entityId,
-                    x + 3,
-                    y + 3,
-                    CELL_SIZE - 6,
-                    CELL_SIZE - 6,
-                    hover
-            );
-            if (!rendered) {
-                graphics.drawCenteredString(
-                        font,
-                        Component.literal("?"),
-                        x + CELL_SIZE / 2,
-                        y + CELL_SIZE / 2 - 4,
-                        0xFF5555
-                );
-            }
-
-            if (modified) {
-                GuiTheme.indicatorFill(graphics, x + 4, y + 4, 4, 4, GuiTheme.Indicator.SUCCESS);
-            }
-
-            if (hover) {
-                ArrayList<Component> tooltip = new ArrayList<>();
-                tooltip.add(Component.literal(getEntityName(entityId)));
-                tooltip.add(Component.translatable(
-                        "gui.entitycontrol.spawn.spawner.tooltip.entity_id",
-                        Component.literal(entityId).withStyle(ChatFormatting.AQUA)
-                ));
-                tooltip.add(Component.translatable(
-                        modified
-                                ? "gui.entitycontrol.spawn.spawner.tooltip.modified"
-                                : "gui.entitycontrol.spawn.spawner.tooltip.unmodified"
-                ));
-                tooltip.add(Component.translatable("gui.entitycontrol.spawn.spawner.tooltip.right_click"));
-                tooltip.add(Component.translatable(
-                        "gui.entitycontrol.spawn.spawn.tooltip.model_zoom",
-                        Component.literal(String.valueOf(entityPreviewRenderer.getZoomPercent("spawner:" + entityId))).withStyle(ChatFormatting.YELLOW)
-                ));
-                deferredTooltip = tooltip;
-            }
-        }
-        disableUiScissor(graphics);
-
-        GuiTheme.scrollbar(
-                gridScroll,
-                graphics,
-                mouseX,
-                mouseY,
-                GRID_X + GRID_W + 4,
-                GRID_Y,
-                4,
-                GRID_H,
-                20
-        );
-    }
-
-    private void renderRightPanel(GuiGraphics graphics) {
+    private void renderLabels(KineticGraphics graphics) {
         if (!globalMode && selectedId == null) {
-            graphics.drawCenteredString(
-                    font,
-                    Component.translatable("gui.entitycontrol.spawn.spawner.no_selection"),
-                    RX + RW / 2,
-                    170,
-                    0xAAAAAA
-            );
+            graphics.centeredText(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.no_selection"), RX + RW / 2, 170,
+                    KineticTheme.current().mutedText(), false);
             return;
         }
-
         if (tuningTab) {
-            renderFieldLabel(graphics, "gui.entitycontrol.spawn.spawner.min_delay", 120, 0);
-            renderFieldLabel(graphics, "gui.entitycontrol.spawn.spawner.max_delay", 120, 1);
-            renderFieldLabel(graphics, "gui.entitycontrol.spawn.spawner.fixed_delay", 159, 0);
-            renderFieldLabel(graphics, "gui.entitycontrol.spawn.spawner.speed", 159, 1);
-            renderFieldLabel(graphics, "gui.entitycontrol.spawn.spawner.min_spawn_count", 198, 0);
-            renderFieldLabel(graphics, "gui.entitycontrol.spawn.spawner.max_spawn_count", 198, 1);
-            renderFieldLabel(graphics, "gui.entitycontrol.spawn.spawner.max_nearby", 237, 0);
-            renderFieldLabel(graphics, "gui.entitycontrol.spawn.spawner.player_range", 237, 1);
-            renderFieldLabel(graphics, "gui.entitycontrol.spawn.spawner.spawn_range", 276, 0);
-
+            label(graphics, "gui.entitycontrol.spawn.spawner.min_delay", 120, 0);
+            label(graphics, "gui.entitycontrol.spawn.spawner.max_delay", 120, 1);
             SpawnerConfig.SpawnerRule rule = getDisplayRule();
-            if (rule != null && rule.fixedSpawnDelaySeconds < 0.0D) {
-                graphics.drawString(
-                        font,
-                        Component.translatable("gui.entitycontrol.spawn.spawner.fixed.random"),
-                        RX + 5,
-                        174,
-                        0xAAAAAA
-                );
-            }
+            if (rule != null && rule.fixedSpawnDelaySeconds >= 0D) label(graphics, "gui.entitycontrol.spawn.spawner.fixed_delay", 159, 0);
+            else if (rule != null) graphics.text(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.fixed.random"), RX, 171, KineticTheme.current().mutedText());
+            label(graphics, "gui.entitycontrol.spawn.spawner.speed", 159, 1);
+            label(graphics, "gui.entitycontrol.spawn.spawner.min_spawn_count", 198, 0);
+            label(graphics, "gui.entitycontrol.spawn.spawner.max_spawn_count", 198, 1);
+            label(graphics, "gui.entitycontrol.spawn.spawner.max_nearby", 237, 0);
+            label(graphics, "gui.entitycontrol.spawn.spawner.player_range", 237, 1);
+            label(graphics, "gui.entitycontrol.spawn.spawner.spawn_range", 276, 0);
         } else {
-            renderFieldLabel(graphics, "gui.entitycontrol.spawn.spawner.threshold", 120, 0);
-            renderFieldLabel(graphics, "gui.entitycontrol.spawn.spawner.cooldown", 120, 1);
-            graphics.drawString(
-                    font,
-                    Component.translatable("gui.entitycontrol.spawn.spawner.breaker.desc"),
-                    RX,
-                    171,
-                    0xAAAAAA
-            );
-            graphics.drawString(
-                    font,
-                    Component.translatable("gui.entitycontrol.spawn.spawner.backup.desc"),
-                    RX,
-                    191,
-                    0xAAAAAA
-            );
+            label(graphics, "gui.entitycontrol.spawn.spawner.threshold", 120, 0);
+            label(graphics, "gui.entitycontrol.spawn.spawner.cooldown", 120, 1);
+            graphics.text(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.breaker.desc"), RX, 171, KineticTheme.current().mutedText());
+            graphics.text(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.backup.desc"), RX, 191, KineticTheme.current().mutedText());
         }
     }
 
-    private void renderFieldLabel(GuiGraphics graphics, String key, int y, int column) {
+    private void label(KineticGraphics graphics, String key, int y, int column) {
         int columnW = (RW - 5) / 2;
-        int x = RX + column * (columnW + 5);
-        graphics.drawString(font, Component.translatable(key), x, y, 0xAAAAAA);
-    }
-
-    @Override
-    protected void renderTooltips(
-            GuiGraphics graphics,
-            int scaledMouseX,
-            int scaledMouseY,
-            int mouseX,
-            int mouseY
-    ) {
-        if (deferredTooltip != null && !deferredTooltip.isEmpty()) {
-            KineticOverlays.requestTooltip(deferredTooltip, mouseX, mouseY);
-        }
-    }
-
-    @Override
-    protected boolean canvasMouseClicked(double mouseX, double mouseY, int button) {
-        if (isGridArea(mouseX, mouseY)) {
-            int index = getGridIndex(mouseX, mouseY);
-            if (index >= 0 && index < displayList.size()) {
-                String entityId = displayList.get(index);
-                if (KineticMouseButtons.isSecondary(button)) {
-                    updateSelection(entityId);
-                    openEntityContextMenu(mouseX, mouseY, entityId);
-                    clearControlFocus();
-                    return true;
-                }
-                if (KineticMouseButtons.isPrimary(button)) {
-                    updateSelection(entityId);
-                    clearControlFocus();
-                    return true;
-                }
-            }
-        }
-
-        if (KineticMouseButtons.isPrimary(button) && gridScroll.beginDrag(
-                mouseX,
-                mouseY,
-                GRID_X + GRID_W + 4,
-                GRID_Y,
-                4,
-                GRID_H,
-                20,
-                2
-        )) {
-            return true;
-        }
-
-        return super.canvasMouseClicked(mouseX, mouseY, button);
-    }
-
-    private void openEntityContextMenu(double mouseX, double mouseY, String entityId) {
-        boolean canRestore = modifiedEntities.contains(entityId);
-        Component label = Component.translatable(
-                canRestore
-                        ? "gui.entitycontrol.spawn.spawner.context.reset"
-                        : "gui.entitycontrol.spawn.spawner.context.no_reset"
-        );
-        KineticOverlays.MenuItem item = canRestore
-                ? KineticOverlays.MenuItem.action(label, () -> {
-                    updateSelection(entityId);
-                    restoreSelected();
-                })
-                : KineticOverlays.MenuItem.disabled(label);
-        openContextMenu(mouseX, mouseY, List.of(item));
-    }
-
-    private boolean isGridArea(double mouseX, double mouseY) {
-        return !globalMode
-                && mouseX >= GRID_X
-                && mouseX < GRID_X + GRID_W
-                && mouseY >= GRID_Y
-                && mouseY < GRID_Y + GRID_H;
-    }
-
-    private int getGridIndex(double mouseX, double mouseY) {
-        int column = (int) ((mouseX - GRID_X) / CELL_SIZE);
-        int visualShift = gridScroll.visualShift(CELL_SIZE);
-        int row = (int) Math.floor((mouseY - GRID_Y + visualShift) / CELL_SIZE);
-        return gridScroll.smoothIndexOffset() * COLS + row * COLS + column;
-    }
-
-    @Override
-    protected boolean canvasMouseDragged(
-            double mouseX,
-            double mouseY,
-            int button,
-            double dragX,
-            double dragY
-    ) {
-        if (!globalMode && gridScroll.drag(mouseY, GRID_Y, GRID_H, 20)) {
-            return true;
-        }
-        return super.canvasMouseDragged(mouseX, mouseY, button, dragX, dragY);
-    }
-
-    @Override
-    protected boolean canvasMouseReleased(double mouseX, double mouseY, int button) {
-        if (!globalMode && gridScroll.release(button)) {
-            return true;
-        }
-        return super.canvasMouseReleased(mouseX, mouseY, button);
-    }
-
-    @Override
-    protected boolean canvasMouseScrolled(double mouseX, double mouseY, double delta) {
-        if (KineticClientRuntime.controlModifierDown() && isGridArea(mouseX, mouseY)) {
-            int index = getGridIndex(mouseX, mouseY);
-            if (index >= 0 && index < displayList.size()) {
-                entityPreviewRenderer.adjustZoom(
-                        "spawner:" + displayList.get(index),
-                        delta
-                );
-                return true;
-            }
-        }
-
-        if (isGridArea(mouseX, mouseY) && gridScroll.scroll(delta)) {
-            return true;
-        }
-        return super.canvasMouseScrolled(mouseX, mouseY, delta);
+        graphics.text(KineticI18n.translatable(key), RX + column * (columnW + 5), y, KineticTheme.current().mutedText());
     }
 
     private void saveAndApply() {
-        String currentJson = SpawnerConfig.GSON.toJson(data);
-
+        String json = SpawnerConfig.GSON.toJson(data);
         long requestId = ++nextSaveRequestId;
-        pendingSaveJson = currentJson;
+        pendingSaveJson = json;
         pendingSaveRequestId = requestId;
-        SpawnNetwork.saveSpawner(currentJson, requestId);
+        SpawnNetwork.saveSpawner(json, requestId);
     }
 
     public void handleSaveResult(long requestId, boolean success) {
-        if (requestId != pendingSaveRequestId) {
-            return;
-        }
+        if (requestId != pendingSaveRequestId) return;
         if (success && pendingSaveJson != null) {
             lastSavedJson = pendingSaveJson;
             commitDraft();
@@ -1257,39 +565,146 @@ public class SpawnerControlScreen extends KineticScreen {
         pendingSaveRequestId = -1L;
     }
 
-    private boolean hasUnsavedChanges() {
-        return !Objects.equals(SpawnerConfig.GSON.toJson(data), lastSavedJson);
-    }
-
     @Override
-    protected boolean handleCloseRequest() {
-        return false;
-    }
-
-    @Override
-    protected void screenRemoved() {
-        entityPreviewRenderer.clear();
+    protected void onRemoved() {
+        entityPreview.clear();
         editedEntities.clear();
     }
 
     private enum Field {
-        MIN_DELAY,
-        MAX_DELAY,
-        FIXED_DELAY,
-        SPEED,
-        MIN_SPAWN_COUNT,
-        MAX_SPAWN_COUNT,
-        MAX_NEARBY,
-        PLAYER_RANGE,
-        SPAWN_RANGE,
-        THRESHOLD,
-        COOLDOWN
-    }
-
-    public Screen getParentScreen() {
-        return parent;
+        MIN_DELAY, MAX_DELAY, FIXED_DELAY, SPEED,
+        MIN_SPAWN_COUNT, MAX_SPAWN_COUNT, MAX_NEARBY,
+        PLAYER_RANGE, SPAWN_RANGE, THRESHOLD, COOLDOWN
     }
 
     private record LocalBaseline(boolean hadCustomRule, SpawnerConfig.SpawnerRule rule) {
+    }
+
+    private final class EntityGridControl extends KineticCustomControl {
+        private final KineticScrollController scroll = new KineticScrollController();
+
+        private EntityGridControl() {
+            super(GRID_X - 4, GRID_Y - 4, GRID_W + 16, GRID_H + 8);
+            scroll.bindSelection(() -> selectedId == null ? -1 : displayList.indexOf(selectedId),
+                    index -> Math.max(0, index / COLS - VISIBLE_ROWS / 2));
+        }
+
+        private void resetScroll() {
+            scroll.reset();
+        }
+
+        private void updateRange() {
+            int rows = (displayList.size() + COLS - 1) / COLS;
+            scroll.update(rows, VISIBLE_ROWS);
+        }
+
+        private int indexAt(double mouseX, double mouseY) {
+            if (mouseX < GRID_X || mouseX >= GRID_X + GRID_W || mouseY < GRID_Y || mouseY >= GRID_Y + GRID_H) return -1;
+            int column = (int) ((mouseX - GRID_X) / CELL_SIZE);
+            int row = (int) Math.floor((mouseY - GRID_Y + scroll.visualShift(CELL_SIZE)) / CELL_SIZE);
+            return (scroll.smoothIndexOffset() + row) * COLS + column;
+        }
+
+        @Override
+        protected void render(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
+            deferredTooltip = null;
+            updateRange();
+            int firstRow = scroll.smoothIndexOffset();
+            int shift = scroll.visualShift(CELL_SIZE);
+            int first = firstRow * COLS;
+            int last = Math.min(displayList.size(), first + (VISIBLE_ROWS + 1) * COLS);
+            graphics.clipped(GRID_X, GRID_Y, GRID_X + GRID_W, GRID_Y + GRID_H, () -> {
+                for (int index = first; index < last; index++) {
+                    int local = index - first;
+                    int x = GRID_X + local % COLS * CELL_SIZE;
+                    int y = GRID_Y + local / COLS * CELL_SIZE - shift;
+                    String id = displayList.get(index);
+                    boolean selected = id.equals(selectedId);
+                    boolean modified = modifiedEntities.contains(id);
+                    boolean hovered = mouseX >= GRID_X && mouseX < GRID_X + GRID_W
+                            && mouseY >= GRID_Y && mouseY < GRID_Y + GRID_H
+                            && mouseX >= x && mouseX < x + CELL_SIZE && mouseY >= y && mouseY < y + CELL_SIZE;
+                    KineticEntityPreview.drawCheckerboard(graphics, x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+                    if (selected) {
+                        KineticTheme.stateOutline(graphics, x, y, CELL_SIZE, CELL_SIZE, true, false, false);
+                    } else if (modified) {
+                        KineticTheme.indicatorOutline(graphics, x, y, CELL_SIZE, CELL_SIZE,
+                                KineticTheme.Indicator.SUCCESS);
+                    } else {
+                        KineticTheme.stateOutline(graphics, x, y, CELL_SIZE, CELL_SIZE, false, hovered, false);
+                    }
+                    String stateKey = "spawner:" + id;
+                    boolean rendered = entityPreview.render(graphics, id, stateKey, x + 3, y + 3,
+                            CELL_SIZE - 6, CELL_SIZE - 6, hovered);
+                    if (!rendered) {
+                        graphics.centeredText(KineticI18n.translatable("gui.entitycontrol.spawn.spawn.invalid_entity.question_mark"),
+                                x + CELL_SIZE / 2, y + CELL_SIZE / 2 - 4, KineticTheme.current().danger(), false);
+                    } else {
+                        registerPreviewZoomArea(entityPreview, stateKey, x, Math.max(y, GRID_Y), CELL_SIZE,
+                                Math.max(0, Math.min(y + CELL_SIZE, GRID_Y + GRID_H) - Math.max(y, GRID_Y)));
+                    }
+                    scroll.renderSelectionFlash(graphics, index, x, y, CELL_SIZE, CELL_SIZE);
+                    if (hovered) {
+                        deferredTooltip = new ArrayList<>();
+                        deferredTooltip.add(Component.literal(getEntityName(id)));
+                        deferredTooltip.add(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tooltip.entity_id", id));
+                        deferredTooltip.add(KineticI18n.translatable(modified
+                                ? "gui.entitycontrol.spawn.spawner.tooltip.modified"
+                                : "gui.entitycontrol.spawn.spawner.tooltip.unmodified"));
+                        deferredTooltip.add(KineticI18n.translatable("gui.entitycontrol.spawn.spawner.tooltip.right_click"));
+                        deferredTooltip.add(KineticI18n.translatable("gui.entitycontrol.spawn.spawn.tooltip.model_zoom",
+                                entityPreview.zoomPercent(stateKey)));
+                    }
+                }
+            });
+            scroll.render(graphics, mouseX, mouseY, GRID_X + GRID_W + 4, GRID_Y, 4, GRID_H, 20);
+        }
+
+        @Override
+        protected boolean onMouseClick(MouseInput input) {
+            if (scroll.beginDrag(input.x(), input.y(), input.button(), GRID_X + GRID_W + 4, GRID_Y, 4, GRID_H, 20, 3)) return true;
+            int index = indexAt(input.x(), input.y());
+            if (index < 0 || index >= displayList.size()) return false;
+            String id = displayList.get(index);
+            if (input.isLeft()) {
+                selectEntity(id);
+                return true;
+            }
+            if (input.isRight()) {
+                selectedId = id;
+                openEntityContextMenu(input.x(), input.y(), id);
+                return true;
+            }
+            return false;
+        }
+
+        private void openEntityContextMenu(double x, double y, String entityId) {
+            boolean canRestore = modifiedEntities.contains(entityId);
+            Component label = KineticI18n.translatable(canRestore
+                    ? "gui.entitycontrol.spawn.spawner.context.reset"
+                    : "gui.entitycontrol.spawn.spawner.context.no_reset");
+            KineticOverlays.MenuItem item = canRestore
+                    ? KineticOverlays.MenuItem.action(label, () -> {
+                        selectedId = entityId;
+                        restoreSelected();
+                    })
+                    : KineticOverlays.MenuItem.disabled(label);
+            openContextMenu(x, y, List.of(item));
+        }
+
+        @Override
+        protected boolean onMouseDrag(MouseDragInput input) {
+            return scroll.drag(input.y(), GRID_Y, GRID_H, 20);
+        }
+
+        @Override
+        protected boolean onMouseRelease(MouseInput input) {
+            return scroll.release(input.button());
+        }
+
+        @Override
+        protected boolean onMouseScroll(ScrollInput input) {
+            return scroll.scroll(input.deltaY());
+        }
     }
 }

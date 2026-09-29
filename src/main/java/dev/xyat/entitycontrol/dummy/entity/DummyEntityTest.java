@@ -4,6 +4,7 @@ import dev.xyat.kineticcore.api.menu.KineticMenus;
 import dev.xyat.kineticcore.api.registry.KineticEntityAttributes;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 import dev.xyat.entitycontrol.dummy.DummyMenu;
 import dev.xyat.entitycontrol.dummy.CuriosCompat;
 import dev.xyat.entitycontrol.dummy.config.DummyConfig;
@@ -433,7 +434,7 @@ public class DummyEntityTest extends Mob implements MenuProvider {
 
     @Override
     public @NotNull Component getDisplayName() {
-        return Component.translatable("entity.entitycontrol.dummy");
+        return KineticI18n.translatable("entity.entitycontrol.dummy");
     }
 
     public SimpleContainer getInventory() {

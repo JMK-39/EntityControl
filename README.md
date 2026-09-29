@@ -10,7 +10,7 @@ Entity Control gives modpack authors and server administrators visual tools for 
 
 ### Installation and access
 
-- Current build target: **Minecraft 1.20.1**, **Forge 47.4.2+**, and **KineticCore 26.9.20+**.
+- Current build target: **Minecraft 1.20.1**, **Forge 47.4.2+**, and **26.9.28+**.
 - Install Entity Control and KineticCore in the client and server `mods` folders for multiplayer use.
 - Optional: **Jade 11.0.0+** for dummy/spawner information; **Curios 5.10.0+** for dummy accessory slots.
 - Enter a world, press **F6** to open KineticCore, and select **Entity Control** and the required module. The key can be changed in Controls.
@@ -114,7 +114,7 @@ Entity Control 为整合包作者和服务器管理员提供生物生成、遭�
 
 ### 安装与入口
 
-- 当前构建目标：**Minecraft 1.20.1**、**Forge 47.4.2+**、**KineticCore 26.9.20+**。
+- 当前构建目标：**Minecraft 1.20.1**、**Forge 47.4.2+**、**26.9.28+**。
 - 多人游戏时，将 Entity Control 与 KineticCore 安装到客户端和服务端的 `mods` 文件夹。
 - 可选：**Jade 11.0.0+** 显示假人和刷怪笼信息；**Curios 5.10.0+** 为假人提供饰品槽。
 - 进入世界后按 **F6** 打开 KineticCore，选择 **Entity Control** 和对应模块；可在按键设置中修改快捷键。

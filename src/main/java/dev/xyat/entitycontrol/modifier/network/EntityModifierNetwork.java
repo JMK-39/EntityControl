@@ -15,7 +15,7 @@ import dev.xyat.kineticcore.api.network.NetworkVersionPolicy;
 import dev.xyat.kineticcore.api.network.PacketChannel;
 import dev.xyat.kineticcore.api.network.PacketRegistrations;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
-import net.minecraft.network.chat.Component;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 import net.minecraft.server.level.ServerPlayer;
 
 public final class EntityModifierNetwork {
@@ -49,11 +49,11 @@ public final class EntityModifierNetwork {
                 },
                 () -> {
                     if (!openRegistered) {
-                        CHANNEL.registerClientbound(
+                        CHANNEL.registerClientboundLazy(
                                 1,
                                 OpenModifierScreenPacket.class,
                                 NetworkCodec.of((buffer, message) -> message.encode(buffer), OpenModifierScreenPacket::new),
-                                message -> EntityModifierNetworkClient.handleOpenScreen(message)
+                                () -> EntityModifierNetworkClient::handleOpenScreen
                         );
                         openRegistered = true;
                     }
@@ -71,20 +71,20 @@ public final class EntityModifierNetwork {
                 },
                 () -> {
                     if (!resultRegistered) {
-                        CHANNEL.registerClientbound(
+                        CHANNEL.registerClientboundLazy(
                                 3,
                                 SaveModifierResultPacket.class,
                                 NetworkCodec.of((buffer, message) -> message.encode(buffer), SaveModifierResultPacket::new),
-                                message -> EntityModifierNetworkClient.handleSaveResult(message.success)
+                                () -> message -> EntityModifierNetworkClient.handleSaveResult(message.success())
                         );
                         resultRegistered = true;
                     }
                 },
                 () -> {
                     if (!attributesRegistered) {
-                        CHANNEL.registerClientbound(4, DynamicAttributesPacket.class,
+                        CHANNEL.registerClientboundLazy(4, DynamicAttributesPacket.class,
                                 NetworkCodec.of((buffer, message) -> message.encode(buffer), DynamicAttributesPacket::new),
-                                message -> EntityModifierNetworkClient.handleDynamicAttributes(message));
+                                () -> EntityModifierNetworkClient::handleDynamicAttributes);
                         attributesRegistered = true;
                     }
                 }
@@ -116,7 +116,7 @@ public final class EntityModifierNetwork {
     private static void handleOpenRequest(ServerPlayer player) {
         if (player == null || !player.hasPermissions(2)) return;
         if (!EntityModifierConfig.loadAndClean(player.getServer())) {
-            player.sendSystemMessage(Component.translatable("msg.entitycontrol.modifier.modifier.load_failed"));
+            player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.modifier.modifier.load_failed"));
             return;
         }
         sendEditorSnapshot(player);
@@ -132,14 +132,14 @@ public final class EntityModifierNetwork {
             java.util.Map<String, EntityModifierConfig.EntityEditData> data =
                     EntityModifierConfig.parseConfigJson(message.jsonConfig);
             if (data == null || player.getServer() == null) {
-                player.sendSystemMessage(Component.translatable("msg.entitycontrol.modifier.modifier.save_failed"));
+                player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.modifier.modifier.save_failed"));
                 CHANNEL.sendToPlayer(player, new SaveModifierResultPacket(false));
                 return;
             }
             java.util.Map<String, EntityModifierConfig.EntityEditData> validated =
                     EntityModifierConfig.validateForServer(data, player.getServer());
             if (!EntityModifierConfig.save(validated)) {
-                player.sendSystemMessage(Component.translatable("msg.entitycontrol.modifier.modifier.save_failed"));
+                player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.modifier.modifier.save_failed"));
                 CHANNEL.sendToPlayer(player, new SaveModifierResultPacket(false));
                 return;
             }
@@ -148,7 +148,7 @@ public final class EntityModifierNetwork {
             CHANNEL.sendToPlayer(player, new SaveModifierResultPacket(true));
         } catch (Exception exception) {
             ModifierModule.LOGGER.error("Save config error", exception);
-            player.sendSystemMessage(Component.translatable("msg.entitycontrol.modifier.modifier.save_failed"));
+            player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.modifier.modifier.save_failed"));
             CHANNEL.sendToPlayer(player, new SaveModifierResultPacket(false));
         }
     }

@@ -2,7 +2,7 @@ package dev.xyat.entitycontrol.dummy;
 
 import dev.xyat.entitycontrol.dummy.Network.DummyNetwork;
 import dev.xyat.entitycontrol.dummy.entity.DummyEntityTest;
-import net.minecraft.network.chat.Component;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Inventory;
@@ -61,7 +61,7 @@ public class DummyMenu extends AbstractContainerMenu {
             ItemStack carried = getCarried();
             if (!carried.isEmpty() && DummyUtils.isBlacklisted(carried)) {
                 if (!player.level().isClientSide) {
-                    DummyNetwork.sendToPlayer(new DummyNetwork.SyncNotify(Component.translatable("msg.entitycontrol.dummy.dummy.blacklisted")), (ServerPlayer) player);
+                    DummyNetwork.sendToPlayer(new DummyNetwork.SyncNotify(KineticI18n.translatable("msg.entitycontrol.dummy.dummy.blacklisted")), (ServerPlayer) player);
                 }
                 return;
             }
@@ -90,7 +90,7 @@ public class DummyMenu extends AbstractContainerMenu {
             } else {
                 if (DummyUtils.isBlacklisted(stack)) {
                     if (!player.level().isClientSide) {
-                        DummyNetwork.sendToPlayer(new DummyNetwork.SyncNotify(Component.translatable("msg.entitycontrol.dummy.dummy.blacklisted")), (ServerPlayer) player);
+                        DummyNetwork.sendToPlayer(new DummyNetwork.SyncNotify(KineticI18n.translatable("msg.entitycontrol.dummy.dummy.blacklisted")), (ServerPlayer) player);
                     }
                     return ItemStack.EMPTY;
                 }

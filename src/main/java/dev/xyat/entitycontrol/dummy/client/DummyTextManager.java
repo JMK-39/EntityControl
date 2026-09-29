@@ -1,23 +1,20 @@
 package dev.xyat.entitycontrol.dummy.client;
 
-import dev.xyat.entitycontrol.dummy.util.ColorText;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.Tesselator;
 import dev.xyat.entitycontrol.dummy.config.DummyClientConfig;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
 import dev.xyat.kineticcore.api.client.event.KineticClientEvents;
+import dev.xyat.kineticcore.api.client.gui.render.KineticGraphics;
+import dev.xyat.kineticcore.api.client.gui.text.KineticText;
+import dev.xyat.kineticcore.api.client.render.KineticWorldRender;
 import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
-import org.joml.Matrix4f;
-import org.joml.Vector4f;
+import dev.xyat.kineticcore.api.text.KineticI18n;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -156,36 +153,16 @@ public class DummyTextManager {
     }
 
     private static void onRenderLevel(KineticClientEvents.LevelRenderContext event) {
-            PoseStack poseStack = event.poseStack();
-            Vec3 camPos = event.camera().getPosition();
+        Vec3 camPos = event.camera().getPosition();
 
-            var level = KineticClientRuntime.currentLevel();
-            Player player = KineticClientRuntime.localPlayer();
-            if (level == null || player == null) return;
+        var level = KineticClientRuntime.currentLevel();
+        Player player = KineticClientRuntime.localPlayer();
+        if (level == null || player == null) return;
 
-            int screenWidth = KineticClientRuntime.guiScaledWidth();
-            int screenHeight = KineticClientRuntime.guiScaledHeight();
+        boolean cumulativeMode = DummyClientConfig.accumulateDamage.get();
 
-            MultiBufferSource.BufferSource immediate = MultiBufferSource.immediate(Tesselator.getInstance().getBuilder());
-            boolean cumulativeMode = DummyClientConfig.accumulateDamage.get();
-
-            Matrix4f viewMatrix = poseStack.last().pose();
-            Matrix4f projMatrix = event.projectionMatrix();
-
-            RenderSystem.backupProjectionMatrix();
-            Matrix4f ortho = new Matrix4f().setOrtho(0, screenWidth, screenHeight, 0, -1000, 1000);
-            RenderSystem.setProjectionMatrix(ortho, RenderSystem.getVertexSorting());
-
-            PoseStack modelViewStack = RenderSystem.getModelViewStack();
-            modelViewStack.pushPose();
-            modelViewStack.setIdentity();
-            RenderSystem.applyModelViewMatrix();
-
-            PoseStack pose = new PoseStack();
-
-            RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
-            RenderSystem.disableDepthTest();
+        try (KineticWorldRender.ScreenOverlay overlay = KineticWorldRender.beginScreenOverlay(event)) {
+            KineticGraphics g = overlay.graphics();
 
             for (Map.Entry<Integer, HudInstance> entry : activeHuds.entrySet()) {
                 Entity entity = level.getEntity(entry.getKey());
@@ -199,9 +176,9 @@ public class DummyTextManager {
                         continue;
                     }
 
-                    ScreenPosition position = projectPosition(origin, camPos, viewMatrix, projMatrix, screenWidth, screenHeight);
+                    Vec2 position = overlay.project(origin);
                     if (position != null) {
-                        entry.getValue().render2D(pose, position.x(), position.y(), immediate);
+                        entry.getValue().render2D(g, position.x, position.y);
                     }
                 }
             }
@@ -216,7 +193,7 @@ public class DummyTextManager {
                     HudInstance hud = activeHuds.get(entry.getKey());
                     double worldOffset = hud == null ? 0.5D : DummyClientConfig.overheadOffset.get();
                     Vec3 origin = entity.getPosition(event.partialTick()).add(0, entity.getBbHeight() + worldOffset, 0);
-                    ScreenPosition position = projectPosition(origin, camPos, viewMatrix, projMatrix, screenWidth, screenHeight);
+                    Vec2 position = overlay.project(origin);
                     if (position == null) {
                         continue;
                     }
@@ -225,49 +202,17 @@ public class DummyTextManager {
                     if (hud != null) {
                         verticalOffset -= hud.getRenderedHeight();
                     }
-                    entry.getValue().render2D(pose, position.x(), position.y() + verticalOffset, immediate);
+                    entry.getValue().render2D(g, position.x, position.y + verticalOffset);
                 }
             } else {
                 for (FloatingText particle : particles) {
-                    ScreenPosition position = projectPosition(particle.origin3d, camPos, viewMatrix, projMatrix, screenWidth, screenHeight);
+                    Vec2 position = overlay.project(particle.origin3d);
                     if (position != null) {
-                        particle.render2D(pose, position.x(), position.y(), immediate, event.partialTick());
+                        particle.render2D(g, position.x, position.y, event.partialTick());
                     }
                 }
             }
-
-            immediate.endBatch();
-
-            RenderSystem.enableDepthTest();
-            RenderSystem.disableBlend();
-
-            modelViewStack.popPose();
-            RenderSystem.applyModelViewMatrix();
-            RenderSystem.restoreProjectionMatrix();
-    }
-
-    private static ScreenPosition projectPosition(Vec3 origin, Vec3 camPos, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight) {
-        Vector4f position = new Vector4f(
-                (float) (origin.x - camPos.x),
-                (float) (origin.y - camPos.y),
-                (float) (origin.z - camPos.z),
-                1.0F
-        );
-        viewMatrix.transform(position);
-        projMatrix.transform(position);
-
-        if (position.w() <= 0.0F) {
-            return null;
         }
-
-        float normalizedX = position.x() / position.w();
-        float normalizedY = position.y() / position.w();
-        float screenX = (normalizedX + 1.0F) * 0.5F * screenWidth;
-        float screenY = (1.0F - normalizedY) * 0.5F * screenHeight;
-        return new ScreenPosition(screenX, screenY);
-    }
-
-    private record ScreenPosition(float x, float y) {
     }
 
     private static class HudInstance {
@@ -280,19 +225,19 @@ public class DummyTextManager {
             if (DummyClientConfig.showOverheadSource.get()) {
                 int configColor = DummyClientConfig.colorOverheadSource.get();
                 MutableComponent sourceName = source.copy();
-                lines.add(ColorText.translatable("gui.entitycontrol.dummy.dummy.source", sourceName).withStyle(style -> style.withColor(configColor)));
+                lines.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.source", sourceName).withStyle(style -> style.withColor(configColor)));
             }
             if (DummyClientConfig.showOverheadType.get()) {
                 int configColor = DummyClientConfig.colorOverheadType.get();
                 MutableComponent typeName = type.copy();
-                lines.add(ColorText.translatable("gui.entitycontrol.dummy.dummy.type", typeName).withStyle(style -> style.withColor(configColor)));
+                lines.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.type", typeName).withStyle(style -> style.withColor(configColor)));
             }
-            lines.add(ColorText.translatable("gui.entitycontrol.dummy.dummy.stats", DECIMAL_FORMAT.format(total), hits).withStyle(style -> style.withColor(DummyClientConfig.colorOverheadStats.get())));
+            lines.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.stats", DECIMAL_FORMAT.format(total), hits).withStyle(style -> style.withColor(DummyClientConfig.colorOverheadStats.get())));
 
             if (DummyClientConfig.showOverheadAvgDps.get()) {
-                lines.add(ColorText.translatable("gui.entitycontrol.dummy.dummy.dps_with_avg", DECIMAL_FORMAT.format(dps), DECIMAL_FORMAT.format(avgDps)).withStyle(style -> style.withColor(DummyClientConfig.colorOverheadDps.get())));
+                lines.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.dps_with_avg", DECIMAL_FORMAT.format(dps), DECIMAL_FORMAT.format(avgDps)).withStyle(style -> style.withColor(DummyClientConfig.colorOverheadDps.get())));
             } else {
-                lines.add(ColorText.translatable("gui.entitycontrol.dummy.dummy.dps", DECIMAL_FORMAT.format(dps)).withStyle(style -> style.withColor(DummyClientConfig.colorOverheadDps.get())));
+                lines.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.dps", DECIMAL_FORMAT.format(dps)).withStyle(style -> style.withColor(DummyClientConfig.colorOverheadDps.get())));
             }
         }
 
@@ -301,27 +246,26 @@ public class DummyTextManager {
                     * DummyClientConfig.damageTextScale.get().floatValue() * 0.8F;
         }
 
-        void render2D(PoseStack pose, float screenX, float screenY, MultiBufferSource buffer) {
-            Font font = KineticClientRuntime.font();
-            pose.pushPose();
+        void render2D(KineticGraphics g, float screenX, float screenY) {
+            g.push();
 
-            pose.translate(screenX, screenY, 0);
+            g.translate(screenX, screenY);
 
             float scale = DummyClientConfig.overheadScale.get().floatValue()
                     * DummyClientConfig.damageTextScale.get().floatValue() * 0.8f;
-            pose.scale(scale, scale, 1.0f);
+            g.scale(scale, scale);
 
-            Matrix4f matrix = pose.last().pose();
             int yOffset = -(lines.size() * 10);
-            int bgColor = 0;
 
             for (Component line : lines) {
-                float xOffset = -font.width(line) / 2.0f;
-                font.drawInBatch(line, xOffset, yOffset, 0xFFFFFF, false, matrix, buffer, Font.DisplayMode.NORMAL, bgColor, 15728880);
+                g.push();
+                g.translate(-KineticText.width(line) / 2.0f, yOffset);
+                g.text(line, 0, 0, 0xFFFFFF, false);
+                g.pop();
                 yOffset += 10;
             }
 
-            pose.popPose();
+            g.pop();
         }
     }
 
@@ -385,20 +329,20 @@ public class DummyTextManager {
             displayColor = 0xFF000000 | (configuredColor & 0x00FFFFFF);
         }
 
-        void render2D(PoseStack pose, float screenX, float screenY, MultiBufferSource buffer) {
-            Font font = KineticClientRuntime.font();
-            pose.pushPose();
-            pose.translate(screenX, screenY, 0);
+        void render2D(KineticGraphics g, float screenX, float screenY) {
+            g.push();
+            g.translate(screenX, screenY);
 
             float scale = DummyClientConfig.particleScale.get().floatValue();
-            pose.scale(scale, scale, 1.0F);
+            g.scale(scale, scale);
 
-            float x = -font.width(displayText) / 2.0F;
-            Matrix4f matrix = pose.last().pose();
+            float x = -KineticText.width(displayText) / 2.0F;
             int shadowColor = 0xA0000000 | ((displayColor & 0x00FCFCFC) >> 2);
-            font.drawInBatch(displayText, x + 0.5F, 0.5F, shadowColor, false, matrix, buffer, Font.DisplayMode.NORMAL, 0, 15728880);
-            font.drawInBatch(displayText, x, 0, displayColor, false, matrix, buffer, Font.DisplayMode.NORMAL, 0, 15728880);
-            pose.popPose();
+            g.translate(x + 0.5F, 0.5F);
+            g.text(displayText, 0, 0, shadowColor, false);
+            g.translate(-0.5F, -0.5F);
+            g.text(displayText, 0, 0, displayColor, false);
+            g.pop();
         }
     }
 
@@ -441,7 +385,7 @@ public class DummyTextManager {
             return age > PARTICLE_LIFESPAN;
         }
 
-        void render2D(PoseStack pose, float screenX, float screenY, MultiBufferSource buffer, float partialTick) {
+        void render2D(KineticGraphics g, float screenX, float screenY, float partialTick) {
             float currentAge = age + partialTick;
             if (currentAge > PARTICLE_LIFESPAN) return;
 
@@ -458,30 +402,16 @@ public class DummyTextManager {
             float currentOffsetX = offsetX + vx * partialTick;
             float currentOffsetY = offsetY + vy * partialTick;
 
-            pose.pushPose();
-            pose.translate(screenX + currentOffsetX, screenY + currentOffsetY, 0);
+            g.push();
+            g.translate(screenX + currentOffsetX, screenY + currentOffsetY);
 
             float scale = DummyClientConfig.particleScale.get().floatValue();
-            pose.scale(scale, scale, 1.0f);
+            g.scale(scale, scale);
 
-            Font font = KineticClientRuntime.font();
-            float x = -font.width(text) / 2f;
-            Matrix4f matrix = pose.last().pose();
+            g.translate(-KineticText.width(text) / 2f, 0);
+            g.text(text, 0, 0, finalColor, true);
 
-            font.drawInBatch(
-                    text,
-                    x,
-                    0,
-                    finalColor,
-                    true,
-                    matrix,
-                    buffer,
-                    Font.DisplayMode.NORMAL,
-                    0,
-                    15728880
-            );
-
-            pose.popPose();
+            g.pop();
         }
     }
 }
