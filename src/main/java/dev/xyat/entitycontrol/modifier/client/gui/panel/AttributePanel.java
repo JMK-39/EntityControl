@@ -1,5 +1,6 @@
 package dev.xyat.entitycontrol.modifier.client.gui.panel;
 
+import dev.xyat.entitycontrol.client.gui.kit.EcPage;
 import dev.xyat.entitycontrol.modifier.config.EntityModifierConfig;
 import dev.xyat.kineticcore.api.client.gui.input.MouseInput;
 import dev.xyat.kineticcore.api.client.gui.overlay.KineticOverlays;
@@ -43,7 +44,9 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
     private KineticButton deleteButton;
     private String selectedAttribute;
     private String selectedMode;
+    private static final int VALUE_WIDTH = 64;
     private boolean loadingValue;
+    private int valueLabelX;
 
     private EntityModifierConfig.AttributeRule putRule(double value) {
         EntityModifierConfig.EntityEditData data = parent.getLocalData().computeIfAbsent(
@@ -111,7 +114,7 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
                     label, help, mode.equals(selectedMode), () -> selectMode(mode)
             ));
         }
-        parent.showModifierContextMenu(x + 4, y + h - 42, entries);
+        parent.showModifierContextMenu(modeButton.controlX(), modeButton.controlY() + modeButton.controlHeight() + 2, entries);
     }
 
     private void selectMode(String mode) {
@@ -197,26 +200,33 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
         updateControls();
     }
 
+    /** 底部一行：[模式 ▾] 数值 [输入框] [删除规则]，按钮宽度按文字计算。 */
     @Override
     protected void initExtra(KineticUi ui) {
-        int buttonGap = 6;
-        int buttonWidth = (w - 8 - buttonGap) / 2;
-        int buttonY = y + h - 42;
-        modeButton = ui.button(x + 4, buttonY, buttonWidth)
-                .compact()
+        int rowY = y + h - EcPage.H;
+        List<Component> modeLabels = new ArrayList<>();
+        modeLabels.add(KineticI18n.translatable("gui.entitycontrol.modifier.global.mode.choose"));
+        for (String mode : MODES) {
+            modeLabels.add(KineticI18n.translatable("gui.entitycontrol.modifier.global.mode." + mode.toLowerCase(Locale.ROOT)));
+        }
+        int modeWidth = EcPage.fitWidth(modeLabels);
+        modeButton = ui.button(x, rowY, modeWidth)
                 .text(modeLabel())
                 .tooltip(KineticI18n.translatable("gui.entitycontrol.modifier.global.mode.tooltip"))
                 .onClick(this::showModeMenu)
                 .build();
 
-        deleteButton = ui.button(x + 4 + buttonWidth + buttonGap, buttonY, buttonWidth)
-                .compact()
-                .text(KineticI18n.translatable("gui.entitycontrol.modifier.global.delete_rule"))
+        Component label = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.edit_val");
+        valueLabelX = x + modeWidth + EcPage.GAP * 2;
+        int valueX = valueLabelX + KineticText.width(label) + EcPage.GAP;
+        Component deleteText = KineticI18n.translatable("gui.entitycontrol.modifier.global.delete_rule");
+        deleteButton = ui.button(valueX + VALUE_WIDTH + EcPage.GAP, rowY, EcPage.fitWidth(List.of(deleteText)))
+                .text(deleteText)
                 .tooltip(KineticI18n.translatable("gui.entitycontrol.modifier.global.delete_rule.tooltip"))
                 .onClick(this::removeSelectedRule)
                 .build();
 
-        attrValueBox = ui.numberField(x + w - 136, y + h - 20, 130, NumberType.DECIMAL)
+        attrValueBox = ui.numberField(valueX, rowY, VALUE_WIDTH, NumberType.DECIMAL)
                 .label(KineticI18n.translatable("gui.entitycontrol.modifier.modifier.edit_val"))
                 .allowNegative(true)
                 .range(-1.0E9D, 1.0E9D)
@@ -328,12 +338,7 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
 
     @Override
     protected int getListHeight() {
-        return h - 72;
-    }
-
-    @Override
-    protected int listTopOffset() {
-        return 25;
+        return h - listTopOffset() - EcPage.H - EcPage.GAP;
     }
 
     @Override
@@ -356,7 +361,8 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
                 namespace
         );
         int textX = rowX + 6;
-        graphics.text(namespaceText, textX, rowY + 6, KineticTheme.current().text());
+        // Parse legacy language-file colors continuously across translation placeholders.
+        graphics.text(namespaceText.getString(), textX, rowY + 6, KineticTheme.current().text());
 
         String attrName = getReadableName(attr, id);
         int valueReserve = 86;
@@ -366,7 +372,7 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
                 "gui.entitycontrol.modifier.modifier.name",
                 KineticText.ellipsize(attrName, maxNameWidth)
         );
-        graphics.text(nameText, nameX, rowY + 6, KineticTheme.current().text());
+        graphics.text(nameText.getString(), nameX, rowY + 6, KineticTheme.current().text());
 
         double displayValue = previewEntity != null && previewEntity.getAttributes().hasAttribute(attr)
                 ? previewEntity.getAttributes().getBaseValue(attr)
@@ -398,7 +404,7 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
                 operation + String.format(Locale.ROOT, "%.2f", displayValue)
         );
         graphics.text(
-                valueText,
+                valueText.getString(),
                 rowX + rowWidth - 7 - KineticText.width(valueText),
                 rowY + 6,
                 KineticTheme.current().text()
@@ -418,12 +424,7 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
     @Override
     protected void renderExtra(KineticGraphics graphics, int mouseX, int mouseY) {
         Component label = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.edit_val");
-        graphics.text(
-                label,
-                x + w - 142 - KineticText.width(label),
-                y + h - 14,
-                KineticTheme.current().text()
-        );
+        graphics.text(label, valueLabelX, y + h - EcPage.H + 4, KineticTheme.current().text());
     }
 
     @Override

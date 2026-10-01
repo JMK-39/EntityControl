@@ -2,222 +2,149 @@ package dev.xyat.entitycontrol.breakspawn.client.gui;
 
 import dev.xyat.entitycontrol.breakspawn.config.BreakSpawnConfig;
 import dev.xyat.entitycontrol.breakspawn.network.BreakSpawnNetwork;
-import dev.xyat.kineticcore.api.client.gui.page.KineticPage;
+import dev.xyat.entitycontrol.client.gui.kit.EcPage;
+import dev.xyat.entitycontrol.client.gui.kit.ItemSlotGrid;
+import dev.xyat.kineticcore.api.client.gui.input.MouseButton;
+import dev.xyat.kineticcore.api.client.gui.input.MouseInput;
+import dev.xyat.kineticcore.api.client.gui.layout.KineticLayout;
+import dev.xyat.kineticcore.api.client.gui.overlay.KineticOverlays;
 import dev.xyat.kineticcore.api.client.gui.render.KineticGraphics;
+import dev.xyat.kineticcore.api.client.gui.selector.KineticSelectors;
 import dev.xyat.kineticcore.api.client.gui.theme.KineticTheme;
 import dev.xyat.kineticcore.api.client.gui.ui.KineticUi;
-import dev.xyat.kineticcore.api.client.gui.ui.NumberType;
-import dev.xyat.kineticcore.api.client.gui.widget.list.ItemGridDensity;
-import dev.xyat.kineticcore.api.client.gui.widget.list.ItemGridItem;
-import dev.xyat.kineticcore.api.client.gui.widget.list.ItemGridOutline;
-import dev.xyat.kineticcore.api.client.gui.widget.list.KineticItemGrid;
+import dev.xyat.kineticcore.api.client.gui.widget.KineticButton;
 import dev.xyat.kineticcore.api.client.search.KineticSearch;
-import dev.xyat.kineticcore.api.client.gui.selector.KineticSelectors;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import dev.xyat.kineticcore.api.text.KineticI18n;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Consumer;
 
-public final class BlockRuleEditorScreen extends KineticPage {
-    private static final int LEFT_X = 12;
-    private static final int LEFT_W = 224;
-    private static final int SEARCH_Y = 40;
-    private static final int LIST_Y = 67;
-    private static final int LIST_H = 277;
-    private static final int RIGHT_X = 244;
-    private static final int RIGHT_W = 384;
+/**
+ * 自然方块破坏遭遇。顶栏：返回 / 方块操作 ▾ / 全局默认 / 保存 / 更多 ▾。
+ * 左侧为已配置的方块（物品格），右侧同时显示“触发概率”“触发条件”“生成范围”和刷怪池入口，不再分页签。
+ */
+public final class BlockRuleEditorScreen extends EcPage {
+    private static final int LIST_WIDTH = 7 * (ItemSlotGrid.SLOT + ItemSlotGrid.GAP) + 8 + PAD * 2;
+    private static final int LABEL_WIDTH = 96;
+    private static final int PAIR_WIDTH = 50;
 
     private final BreakSpawnConfig.ConfigRoot config;
-    private final List<String> filteredBlocks = new ArrayList<>();
-    private KineticItemGrid blockGrid;
-    private int blockScrollOffset;
-    private String searchQuery = "";
+    private final ItemSlotGrid blocks = new ItemSlotGrid();
+    private final List<String> visibleBlocks = new ArrayList<>();
+    private String query = "";
     private String selectedBlockId;
-    private int activeTab;
+    private String savedJson;
+    private KineticLayout.Rect helpRect;
+    private Component helpText;
 
     public BlockRuleEditorScreen(BreakSpawnConfig.ConfigRoot config) {
         super(KineticI18n.translatable("gui.entitycontrol.breakspawn.blocks.title"));
         this.config = config;
-        refreshBlocks("");
+        this.savedJson = BreakSpawnConfig.GSON.toJson(config);
         if (!config.blocks.isEmpty()) selectedBlockId = config.blocks.keySet().iterator().next();
         configureStandaloneDraft(() -> BreakSpawnConfig.copyForEdit(config),
-                snapshot -> BreakSpawnConfig.restoreFromEditCopy(config, snapshot));
+                snapshot -> {
+                    BreakSpawnConfig.restoreFromEditCopy(config, snapshot);
+                    if (isAttached()) rebuild();
+                });
     }
+
+    static MutableComponent tr(String key, Object... args) {
+        return KineticI18n.translatable("gui.entitycontrol.breakspawn.ui." + key, args);
+    }
+
+    static MutableComponent tip(String key, Object... args) {
+        return KineticI18n.translatable("gui.entitycontrol.breakspawn.ui." + key + ".tooltip", args);
+    }
+
+    private boolean dirty() {
+        return !BreakSpawnConfig.GSON.toJson(config).equals(savedJson);
+    }
+
+    private void changed() {
+        KineticButton save = headerButton("save");
+        if (save != null) save.setEnabled(dirty());
+    }
+
+    private BreakSpawnConfig.BlockRule selectedRule() {
+        return selectedBlockId == null ? null : config.blocks.get(selectedBlockId);
+    }
+
+    private static Block block(String id) {
+        ResourceLocation location = KineticResourceIds.tryParse(id);
+        return location == null ? null : KineticRegistries.blocks().get(location);
+    }
+
+    static Component blockName(String id) {
+        Block block = block(id);
+        return block == null ? Component.literal(id) : block.getName();
+    }
+
+    // ------------------------------------------------------------------ 外框
 
     @Override
-    protected void build(KineticUi ui) {
-        ui.textField(LEFT_X, SEARCH_Y, 142)
-                .label(KineticI18n.translatable("gui.entitycontrol.breakspawn.search.blocks"))
-                .placeholder(KineticI18n.translatable("gui.entitycontrol.breakspawn.search.blocks.placeholder"))
-                .maxLength(128)
-                .value(searchQuery)
-                .onChange(value -> {
-                    searchQuery = value == null ? "" : value;
-                    refreshBlocks(searchQuery);
-                })
-                .firstShownTextAsDefault().build();
-        ui.button(LEFT_X + 147, SEARCH_Y, 77).compact()
-                .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.blocks.add"))
-                .onClick(this::openBlockSelector).build();
-        ui.button(325, 12, 72).compact()
-                .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.global.open"))
-                .onClick(() -> openChild(new GlobalSettingsScreen(config))).build();
-        var remove = ui.button(402, 12, 72).compact()
-                .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.blocks.remove"))
-                .onClick(this::removeSelectedBlock).build();
-        remove.setEnabled(selectedRule() != null);
-        ui.button(479, 12, 72).compact()
-                .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.save"))
-                .onClick(this::saveConfig).build();
-        ui.button(556, 12, 72).compact()
-                .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.back"))
-                .onClick(this::navigateBack).build();
-
-        blockGrid = ui.itemGrid(LEFT_X, LIST_Y, LEFT_W, LIST_H, ItemGridDensity.COMPACT, blockItems())
-                .scrollOffset(blockScrollOffset).onClick(this::selectBlock).build();
-
-        boolean hasRule = selectedRule() != null;
-        var tab0 = ui.button(RIGHT_X, 40, 92).compact()
-                .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.blocks.tab.probability"))
-                .onClick(() -> switchTab(0)).build();
-        var tab1 = ui.button(RIGHT_X + 97, 40, 92).compact()
-                .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.blocks.tab.spawn"))
-                .onClick(() -> switchTab(1)).build();
-        var tab2 = ui.button(RIGHT_X + 194, 40, 92).compact()
-                .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.blocks.tab.conditions"))
-                .onClick(() -> switchTab(2)).build();
-        tab0.setSelected(activeTab == 0);
-        tab1.setSelected(activeTab == 1);
-        tab2.setSelected(activeTab == 2);
-        tab0.setEnabled(hasRule);
-        tab1.setEnabled(hasRule);
-        tab2.setEnabled(hasRule);
-        var pool = ui.button(RIGHT_X + 291, 40, 92).compact()
-                .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.blocks.pool"))
-                .onClick(this::openPoolEditor).build();
-        pool.setEnabled(hasRule);
-
-        if (hasRule) {
-            if (activeTab == 0) buildProbability(ui);
-            else if (activeTab == 1) buildSpawn(ui);
-            else buildConditions(ui);
-        }
+    protected List<HeaderAction> headerActions() {
+        return List.of(
+                HeaderAction.menu(tr("block_actions"), tip("block_actions"), this::blockMenu),
+                HeaderAction.button("global", tr("global"), tip("global"), () -> openChild(new GlobalSettingsScreen(config, this::changed))),
+                HeaderAction.button("save", KineticI18n.translatable("gui.entitycontrol.breakspawn.save"),
+                        KineticI18n.translatable("gui.entitycontrol.breakspawn.save.tooltip"), this::save).enabled(dirty()),
+                HeaderAction.more(() -> List.of(dirty()
+                        ? KineticOverlays.MenuItem.danger(tr("revert"), tip("revert"), this::revert)
+                        : KineticOverlays.MenuItem.disabled(tr("revert"), tip("revert"))))
+        );
     }
 
-    private void buildProbability(KineticUi ui) {
-        BreakSpawnConfig.BlockRule rule = selectedRule();
-        number(ui, 350, 88, 78, NumberType.DECIMAL, rule.baseChance * 100D, 0D, 100D,
-                number -> rule.baseChance = number.doubleValue() / 100D);
-        number(ui, 548, 88, 70, NumberType.DECIMAL, rule.chancePerFailure * 100D, 0D, 100D,
-                number -> rule.chancePerFailure = number.doubleValue() / 100D);
-        number(ui, 350, 120, 78, NumberType.DECIMAL, rule.maxChance * 100D, 0D, 100D,
-                number -> rule.maxChance = number.doubleValue() / 100D);
-        number(ui, 548, 120, 70, NumberType.INT, rule.resetAfterTicks, 0, null,
-                number -> rule.resetAfterTicks = number.intValue());
-
-        toggle(ui, 255, 158, 176, "gui.entitycontrol.breakspawn.blocks.enabled", rule.enabled, value -> rule.enabled = value);
-        toggle(ui, 442, 158, 176, "gui.entitycontrol.breakspawn.blocks.stacking", rule.stackingEnabled, value -> rule.stackingEnabled = value);
-        toggle(ui, 255, 183, 176, "gui.entitycontrol.breakspawn.blocks.reset_trigger", rule.resetOnTrigger, value -> rule.resetOnTrigger = value);
-        toggle(ui, 442, 183, 176, "gui.entitycontrol.breakspawn.blocks.reset_different", rule.resetOnDifferentBlock, value -> rule.resetOnDifferentBlock = value);
-    }
-
-    private void buildSpawn(KineticUi ui) {
-        BreakSpawnConfig.BlockRule rule = selectedRule();
-        number(ui, 350, 88, 78, NumberType.INT, rule.minSpawnCount, 0, null, n -> rule.minSpawnCount = n.intValue());
-        number(ui, 548, 88, 70, NumberType.INT, rule.maxSpawnCount, 0, null, n -> rule.maxSpawnCount = n.intValue());
-        number(ui, 350, 120, 78, NumberType.INT, rule.minDistance, 0, null, n -> rule.minDistance = n.intValue());
-        number(ui, 548, 120, 70, NumberType.INT, rule.horizontalRadius, 0, null, n -> rule.horizontalRadius = n.intValue());
-        number(ui, 350, 152, 78, NumberType.INT, rule.verticalRadius, 0, null, n -> rule.verticalRadius = n.intValue());
-        number(ui, 548, 152, 70, NumberType.INT, rule.maxSpawnAttempts, 1, null, n -> rule.maxSpawnAttempts = n.intValue());
-    }
-
-    private void buildConditions(KineticUi ui) {
-        BreakSpawnConfig.BlockRule rule = selectedRule();
-        ui.textField(350, 88, 268).maxLength(4096).value(rule.dimensions == null ? "" : rule.dimensions)
-                .onChange(value -> rule.dimensions = value).firstShownTextAsDefault().build();
-        ui.textField(350, 120, 268).maxLength(4096).value(rule.biomes == null ? "" : rule.biomes)
-                .onChange(value -> rule.biomes = value).firstShownTextAsDefault().build();
-        number(ui, 350, 152, 78, NumberType.INT, rule.minY, null, null, n -> rule.minY = n.intValue());
-        number(ui, 548, 152, 70, NumberType.INT, rule.maxY, null, null, n -> rule.maxY = n.intValue());
-        number(ui, 350, 184, 78, NumberType.INT, rule.minLight, 0, 15, n -> rule.minLight = n.intValue());
-        number(ui, 548, 184, 70, NumberType.INT, rule.maxLight, 0, 15, n -> rule.maxLight = n.intValue());
-    }
-
-    private void number(KineticUi ui, int x, int y, int width, NumberType type, Number initial,
-                        Number min, Number max, Consumer<Number> consumer) {
-        ui.numberField(x, y, width, type)
-                .allowNegative(min == null || min.doubleValue() < 0D)
-                .range(min, max)
-                .value(initial)
-                .onChange(raw -> {
-                    try {
-                        double value = Double.parseDouble(raw.trim());
-                        if (Double.isFinite(value)) consumer.accept(type == NumberType.INT ? (int) value : value);
-                    } catch (RuntimeException ignored) {
-                    }
-                })
-                .firstShownTextAsDefault().build();
-    }
-
-    private void toggle(KineticUi ui, int x, int y, int width, String key, boolean value, Consumer<Boolean> consumer) {
-        ui.toggle(x, y, width)
-                .value(value)
-                .labels(toggleLabel(key, true), toggleLabel(key, false))
-                .onChange(consumer)
-                .build();
-    }
-
-    private net.minecraft.network.chat.Component toggleLabel(String key, boolean value) {
-        return KineticI18n.translatable(key, KineticI18n.translatable(value
-                ? "gui.entitycontrol.breakspawn.switch.on"
-                : "gui.entitycontrol.breakspawn.switch.off"));
-    }
-
-    private void switchTab(int tab) {
-        activeTab = Math.max(0, Math.min(2, tab));
-        rebuild();
-    }
-
-    private void selectBlock(int index) {
-        if (index < 0 || index >= filteredBlocks.size()) return;
-        blockScrollOffset = blockGrid == null ? 0 : blockGrid.scrollOffset();
-        selectedBlockId = filteredBlocks.get(index);
-        rebuild();
-    }
-
-    private List<ItemGridItem> blockItems() {
-        List<ItemGridItem> items = new ArrayList<>(filteredBlocks.size());
-        for (String id : filteredBlocks) {
-            Block block = blockById(id);
-            ItemStack stack = block == null ? ItemStack.EMPTY : new ItemStack(block.asItem());
-            BreakSpawnConfig.BlockRule rule = config.blocks.get(id);
-            Component tooltip = block == null ? Component.literal(id)
-                    : block.getName().copy().append(Component.literal(" (" + id + ")"));
-            items.add(new ItemGridItem(stack, tooltip, true, id.equals(selectedBlockId), false,
-                    rule != null && rule.enabled ? ItemGridOutline.SUCCESS : ItemGridOutline.NONE));
-        }
+    private List<KineticOverlays.MenuItem> blockMenu() {
+        List<KineticOverlays.MenuItem> items = new ArrayList<>();
+        items.add(KineticOverlays.MenuItem.action(tr("add_block"), tip("add_block"), this::addBlock));
+        items.add(selectedRule() != null
+                ? KineticOverlays.MenuItem.danger(tr("remove_block"), tip("remove_block"), this::removeBlock)
+                : KineticOverlays.MenuItem.disabled(tr("remove_block"), tip("select_block")));
         return items;
     }
 
-    private void saveConfig() {
+    private void revert() {
+        BreakSpawnConfig.ConfigRoot saved = BreakSpawnConfig.GSON.fromJson(savedJson, BreakSpawnConfig.ConfigRoot.class);
+        if (saved != null) BreakSpawnConfig.restoreFromEditCopy(config, BreakSpawnConfig.copyForEdit(saved));
+        if (selectedBlockId != null && !config.blocks.containsKey(selectedBlockId)) selectedBlockId = null;
+        rebuild();
+    }
+
+    @Override
+    protected boolean onBack() {
+        if (!dirty()) return false;
+        openDialog(tr("unsaved.title"), tr("unsaved.message"), tr("unsaved.discard"),
+                KineticI18n.translatable("gui.entitycontrol.common.cancel"), () -> {
+                    revert();
+                    commitDraft();
+                    navigateBack();
+                }, () -> {
+                });
+        return true;
+    }
+
+    private void save() {
         BreakSpawnNetwork.saveConfig(BreakSpawnConfig.GSON.toJson(config));
     }
 
     public void handleSaveResult(boolean success) {
-        if (success) commitDraft();
+        if (!success) return;
+        savedJson = BreakSpawnConfig.GSON.toJson(config);
+        commitDraft();
+        changed();
     }
 
-    private void openBlockSelector() {
+    private void addBlock() {
         KineticSelectors.openItemSelectorWithOptions(
                 KineticSelectors.ItemSelectorOptions.itemsOnly(null, List.of(), stack -> stack.getItem() instanceof BlockItem),
                 selection -> {
@@ -225,97 +152,201 @@ public final class BlockRuleEditorScreen extends KineticPage {
                     ResourceLocation id = KineticRegistries.blocks().id(blockItem.getBlock());
                     if (id == null) return;
                     selectedBlockId = id.toString();
-                    config.blocks.computeIfAbsent(selectedBlockId,
-                            ignored -> BreakSpawnConfig.createBlockRuleFromDefaults(config.global));
-                    refreshBlocks(searchQuery);
-                    rebuild();
-                }
-        );
+                    config.blocks.computeIfAbsent(selectedBlockId, ignored -> BreakSpawnConfig.createBlockRuleFromDefaults(config.global));
+                    changed();
+                });
     }
 
-    private void openPoolEditor() {
-        BreakSpawnConfig.BlockRule rule = selectedRule();
-        if (rule != null && selectedBlockId != null) {
-            openChild(new BlockEntityPoolScreen(config, selectedBlockId, rule));
-        }
-    }
-
-    private void removeSelectedBlock() {
+    private void removeBlock() {
         if (selectedBlockId == null) return;
         config.blocks.remove(selectedBlockId);
         selectedBlockId = config.blocks.keySet().stream().findFirst().orElse(null);
-        refreshBlocks(searchQuery);
+        changed();
         rebuild();
     }
 
-    private BreakSpawnConfig.BlockRule selectedRule() {
-        return selectedBlockId == null ? null : config.blocks.get(selectedBlockId);
-    }
+    // ------------------------------------------------------------------ 内容
 
-    private void refreshBlocks(String query) {
-        String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
-        filteredBlocks.clear();
+    private List<ItemStack> blockStacks() {
+        visibleBlocks.clear();
+        String normalized = query.trim().toLowerCase(Locale.ROOT);
         for (String id : config.blocks.keySet()) {
-            Block block = blockById(id);
-            String name = block == null ? id : block.getName().getString();
-            String searchData = (id + " " + name + " " + KineticSearch.pinyin(name)).toLowerCase(Locale.ROOT);
-            if (normalized.isEmpty() || KineticSearch.match(searchData, normalized)) filteredBlocks.add(id);
+            String name = blockName(id).getString();
+            if (!normalized.isEmpty() && !KineticSearch.match((id + " " + name + " " + KineticSearch.pinyin(name))
+                    .toLowerCase(Locale.ROOT), normalized)) continue;
+            visibleBlocks.add(id);
         }
-        filteredBlocks.sort(Comparator.naturalOrder());
-        if (blockGrid != null) blockGrid.setItems(blockItems());
-    }
-
-    private Block blockById(String id) {
-        ResourceLocation location = KineticResourceIds.tryParse(id);
-        return location == null ? null : KineticRegistries.blocks().get(location);
+        List<ItemStack> stacks = new ArrayList<>();
+        for (String id : visibleBlocks) {
+            Block block = block(id);
+            stacks.add(block == null ? ItemStack.EMPTY : new ItemStack(block.asItem()));
+        }
+        return stacks;
     }
 
     @Override
-    protected void renderBackground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        KineticTheme.panel(graphics, 6, 6, 628, 348);
-        KineticTheme.panelAlt(graphics, RIGHT_X, LIST_Y, RIGHT_W, LIST_H);
-        graphics.text(title(), 14, 16, KineticTheme.current().text());
-        graphics.text(KineticI18n.translatable("gui.entitycontrol.breakspawn.blocks.step_block"), 12, 30, KineticTheme.current().text());
-        if (selectedRule() != null) {
-            graphics.text(KineticI18n.translatable("gui.entitycontrol.breakspawn.blocks.step_entity"), 244, 30, KineticTheme.current().text());
-            renderRightLabels(graphics);
-        } else {
-            graphics.centeredText(KineticI18n.translatable("gui.entitycontrol.breakspawn.blocks.select_hint"),
-                    RIGHT_X + RIGHT_W / 2, 178, KineticTheme.current().text(), false);
+    protected void buildContent(KineticUi ui, KineticLayout.Rect body) {
+        helpRect = null;
+        helpText = null;
+        KineticLayout.Split columns = KineticLayout.splitHorizontal(body, LIST_WIDTH, GAP);
+        KineticLayout.Rect left = section(columns.first(), tr("blocks", config.blocks.size()));
+        KineticLayout.Split rows = takeRow(left);
+        textInput(ui, rows.first(), query, KineticI18n.translatable("gui.entitycontrol.breakspawn.search.blocks.placeholder"),
+                tip("search"), value -> {
+                    query = value;
+                    blocks.update(blockStacks());
+                });
+        blocks.layout(this, rows.second(), blockStacks());
+
+        BreakSpawnConfig.BlockRule rule = selectedRule();
+        if (rule == null) {
+            helpRect = section(columns.second(), KineticI18n.translatable("gui.entitycontrol.breakspawn.blocks.select_hint"));
+            helpText = tr("help.blocks");
+            return;
+        }
+        KineticLayout.Split halves = halves(columns.second());
+        KineticLayout.Split leftCol = takeTop(halves.first(), PAD * 2 + 10 + GAP + ROW * 5);
+        KineticLayout.Split rightCol = takeTop(halves.second(), PAD * 2 + 10 + GAP + ROW * 6);
+
+        Form chance = form(section(leftCol.first(), tr("section.chance", blockName(selectedBlockId))), LABEL_WIDTH);
+        decimalField(ui, number(chance.row(tr("base_chance"), tip("base_chance"))), rule.baseChance * 100D, 0D, 100D,
+                tip("base_chance"), value -> {
+                    if (value == null) return;
+                    rule.baseChance = value / 100D;
+                    changed();
+                });
+        decimalField(ui, number(chance.row(tr("stack_increase"), tip("stack_increase"))), rule.chancePerFailure * 100D, 0D, 100D,
+                tip("stack_increase"), value -> {
+                    if (value == null) return;
+                    rule.chancePerFailure = value / 100D;
+                    changed();
+                });
+        decimalField(ui, number(chance.row(tr("max_chance"), tip("max_chance"))), rule.maxChance * 100D, 0D, 100D,
+                tip("max_chance"), value -> {
+                    if (value == null) return;
+                    rule.maxChance = value / 100D;
+                    changed();
+                });
+        intField(ui, number(chance.row(tr("reset_ticks"), tip("reset_ticks"))), rule.resetAfterTicks, 0, 1_000_000,
+                tip("reset_ticks"), value -> {
+                    if (value == null) return;
+                    rule.resetAfterTicks = value;
+                    changed();
+                });
+        toggleMenu(ui, compact(chance.row(tr("switches"), tip("switches"))), tr("switches.button"), tip("switches"), List.of(
+                new ToggleOption(tr("switch.enabled"), tip("switch.enabled"), () -> rule.enabled, value -> rule.enabled = value),
+                new ToggleOption(tr("switch.stacking"), tip("switch.stacking"), () -> rule.stackingEnabled, value -> rule.stackingEnabled = value),
+                new ToggleOption(tr("switch.reset_trigger"), tip("switch.reset_trigger"), () -> rule.resetOnTrigger,
+                        value -> rule.resetOnTrigger = value),
+                new ToggleOption(tr("switch.reset_different"), tip("switch.reset_different"), () -> rule.resetOnDifferentBlock,
+                        value -> rule.resetOnDifferentBlock = value)
+        ), true, this::changed);
+
+        Form conditions = form(section(leftCol.second(), tr("section.conditions")), LABEL_WIDTH);
+        textInput(ui, csv(conditions.row(tr("dimensions"), tip("dimensions"))), rule.dimensions,
+                KineticI18n.translatable("gui.entitycontrol.breakspawn.csv_hint"), tip("dimensions"), value -> {
+                    rule.dimensions = value.trim();
+                    changed();
+                });
+        textInput(ui, csv(conditions.row(tr("biomes"), tip("biomes"))), rule.biomes,
+                KineticI18n.translatable("gui.entitycontrol.breakspawn.csv_hint"), tip("biomes"), value -> {
+                    rule.biomes = value.trim();
+                    changed();
+                });
+        intPair(ui, conditions.row(tr("y_range"), tip("y_range")), rule.minY, rule.maxY, -2048, 4096,
+                value -> rule.minY = value, value -> rule.maxY = value);
+        intPair(ui, conditions.row(tr("light"), tip("light")), rule.minLight, rule.maxLight, 0, 15,
+                value -> rule.minLight = value, value -> rule.maxLight = value);
+
+        Form spawn = form(section(rightCol.first(), tr("section.spawn")), LABEL_WIDTH);
+        intPair(ui, spawn.row(tr("count"), tip("count")), rule.minSpawnCount, rule.maxSpawnCount, 0, 1024,
+                value -> rule.minSpawnCount = value, value -> rule.maxSpawnCount = value);
+        intRow(ui, spawn, "min_distance", rule.minDistance, 0, 1024, value -> rule.minDistance = value);
+        intRow(ui, spawn, "radius", rule.horizontalRadius, 0, 1024, value -> rule.horizontalRadius = value);
+        intRow(ui, spawn, "vertical_radius", rule.verticalRadius, 0, 1024, value -> rule.verticalRadius = value);
+        intRow(ui, spawn, "attempts", rule.maxSpawnAttempts, 1, 1024, value -> rule.maxSpawnAttempts = value);
+        actionButton(ui, compact(spawn.row(tr("pool"), tip("pool"))), tr("pool.button", rule.entityWeights.size()), tip("pool"), true,
+                () -> openChild(new BlockEntityPoolScreen(config, selectedBlockId, rule, this::changed)));
+        helpRect = rightCol.second();
+        helpText = KineticI18n.translatable("gui.entitycontrol.breakspawn.blocks.stack_hint");
+    }
+
+    private static KineticLayout.Rect csv(KineticLayout.Rect row) {
+        return new KineticLayout.Rect(row.x(), row.y(), Math.min(row.width(), 150), row.height());
+    }
+
+    private void intRow(KineticUi ui, Form form, String key, int value, int min, int max, java.util.function.IntConsumer setter) {
+        intField(ui, number(form.row(tr(key), tip(key))), value, min, max, tip(key), changed -> {
+            if (changed == null) return;
+            setter.accept(changed);
+            changed();
+        });
+    }
+
+    private void intPair(KineticUi ui, KineticLayout.Rect row, int minValue, int maxValue, int min, int max,
+                         java.util.function.IntConsumer minSetter, java.util.function.IntConsumer maxSetter) {
+        intField(ui, new KineticLayout.Rect(row.x(), row.y(), PAIR_WIDTH, H), minValue, min, max, tr("pair.min"), value -> {
+            if (value == null) return;
+            minSetter.accept(value);
+            changed();
+        });
+        intField(ui, new KineticLayout.Rect(row.x() + PAIR_WIDTH + GAP, row.y(), PAIR_WIDTH, H), maxValue, min, max, tr("pair.max"),
+                value -> {
+                    if (value == null) return;
+                    maxSetter.accept(value);
+                    changed();
+                });
+    }
+
+    // ------------------------------------------------------------------ 绘制与交互
+
+    @Override
+    protected void renderContent(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        int selected = selectedBlockId == null ? -1 : visibleBlocks.indexOf(selectedBlockId);
+        // 红框：规则关闭、刷怪池为空或方块不存在；绿框：规则启用且可以生成。
+        blocks.render(graphics, mouseX, mouseY, selected, index -> {
+            BreakSpawnConfig.BlockRule rule = config.blocks.get(visibleBlocks.get(index));
+            return rule == null || block(visibleBlocks.get(index)) == null || !rule.enabled || rule.entityWeights.isEmpty();
+        }, index -> {
+            BreakSpawnConfig.BlockRule rule = config.blocks.get(visibleBlocks.get(index));
+            return rule != null && rule.enabled && !rule.entityWeights.isEmpty();
+        });
+        if (helpRect != null && helpText != null) {
+            graphics.wrappedText(helpText, helpRect.x(), helpRect.y() + GAP, helpRect.width(), KineticTheme.current().text());
         }
     }
 
-    private void renderRightLabels(KineticGraphics graphics) {
-        if (activeTab == 0) {
-            label(graphics, "gui.entitycontrol.breakspawn.blocks.base_chance", 255, 94);
-            label(graphics, "gui.entitycontrol.breakspawn.blocks.stack_increase", 442, 94);
-            label(graphics, "gui.entitycontrol.breakspawn.blocks.max_chance", 255, 126);
-            label(graphics, "gui.entitycontrol.breakspawn.blocks.reset_ticks", 442, 126);
-            graphics.wrappedText(KineticI18n.translatable("gui.entitycontrol.breakspawn.blocks.stack_hint"), 255, 226, 355,
-                    KineticTheme.current().mutedText());
-        } else if (activeTab == 1) {
-            label(graphics, "gui.entitycontrol.breakspawn.min_count", 255, 94);
-            label(graphics, "gui.entitycontrol.breakspawn.max_count", 442, 94);
-            label(graphics, "gui.entitycontrol.breakspawn.min_distance", 255, 126);
-            label(graphics, "gui.entitycontrol.breakspawn.radius", 442, 126);
-            label(graphics, "gui.entitycontrol.breakspawn.vertical_radius", 255, 158);
-            label(graphics, "gui.entitycontrol.breakspawn.spawn_attempts", 442, 158);
-            graphics.wrappedText(KineticI18n.translatable("gui.entitycontrol.breakspawn.blocks.pool_hint"), 255, 214, 355,
-                    KineticTheme.current().mutedText());
-        } else {
-            label(graphics, "gui.entitycontrol.breakspawn.dimensions", 255, 94);
-            label(graphics, "gui.entitycontrol.breakspawn.biomes", 255, 126);
-            label(graphics, "gui.entitycontrol.breakspawn.min_y", 255, 158);
-            label(graphics, "gui.entitycontrol.breakspawn.max_y", 442, 158);
-            label(graphics, "gui.entitycontrol.breakspawn.min_light", 255, 190);
-            label(graphics, "gui.entitycontrol.breakspawn.max_light", 442, 190);
-            graphics.wrappedText(KineticI18n.translatable("gui.entitycontrol.breakspawn.csv_hint"), 255, 228, 355,
-                    KineticTheme.current().mutedText());
+    @Override
+    protected boolean contentTooltips(int mouseX, int mouseY) {
+        int index = blocks.indexAt(mouseX, mouseY);
+        if (index < 0 || index >= visibleBlocks.size()) return false;
+        String id = visibleBlocks.get(index);
+        BreakSpawnConfig.BlockRule rule = config.blocks.get(id);
+        List<Component> lines = new ArrayList<>();
+        lines.add(blockName(id));
+        lines.add(Component.literal(id));
+        if (rule != null) {
+            lines.add(tr("card.chance", String.format(Locale.ROOT, "%.1f", rule.baseChance * 100D)));
+            lines.add(tr("card.pool", rule.entityWeights.size()));
+            if (!rule.enabled) lines.add(tr("card.disabled"));
+            else if (rule.entityWeights.isEmpty()) lines.add(tr("card.empty_pool"));
         }
+        lines.add(tr("card.hint"));
+        tooltipLines(lines);
+        return true;
     }
 
-    private void label(KineticGraphics graphics, String key, int x, int y) {
-        graphics.text(KineticI18n.translatable(key), x, y, KineticTheme.current().text());
+    @Override
+    protected boolean contentClickCapture(MouseInput input) {
+        int index = blocks.indexAt(input.x(), input.y());
+        if (index < 0 || index >= visibleBlocks.size()) return false;
+        String id = visibleBlocks.get(index);
+        if (!id.equals(selectedBlockId)) {
+            selectedBlockId = id;
+            clearFocus();
+            rebuild();
+        }
+        if (input.button() == MouseButton.RIGHT) openMenu(input.x(), input.y(), blockMenu());
+        return true;
     }
-
 }

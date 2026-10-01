@@ -1,154 +1,150 @@
 package dev.xyat.entitycontrol.breakspawn.client.gui;
 
 import dev.xyat.entitycontrol.breakspawn.config.BreakSpawnConfig;
-import dev.xyat.kineticcore.api.client.gui.page.KineticPage;
+import dev.xyat.entitycontrol.client.gui.kit.EcPage;
+import dev.xyat.kineticcore.api.client.gui.layout.KineticLayout;
+import dev.xyat.kineticcore.api.client.gui.overlay.KineticOverlays;
 import dev.xyat.kineticcore.api.client.gui.render.KineticGraphics;
-import dev.xyat.kineticcore.api.client.gui.text.KineticText;
+import dev.xyat.kineticcore.api.client.gui.selector.KineticSelectors;
 import dev.xyat.kineticcore.api.client.gui.theme.KineticTheme;
 import dev.xyat.kineticcore.api.client.gui.ui.KineticUi;
-import dev.xyat.kineticcore.api.client.gui.ui.NumberType;
-import dev.xyat.kineticcore.api.client.gui.widget.KineticNumberField;
-import dev.xyat.kineticcore.api.client.gui.selector.KineticSelectors;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import dev.xyat.kineticcore.api.text.KineticI18n;
-import net.minecraft.nbt.TagParser;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public final class EquipmentEditorScreen extends KineticPage {
+import static dev.xyat.entitycontrol.breakspawn.client.gui.BlockRuleEditorScreen.tip;
+import static dev.xyat.entitycontrol.breakspawn.client.gui.BlockRuleEditorScreen.tr;
+
+/** 生成时的装备：每个槽位一行——物品（选择 / NBT / 清空）与掉落概率。 */
+public final class EquipmentEditorScreen extends EcPage {
     private static final String[] SLOTS = {"head", "chest", "legs", "feet", "mainhand", "offhand"};
-    private static final int[] CARD_X = {20, 225, 430, 20, 225, 430};
-    private static final int[] CARD_Y = {70, 70, 70, 190, 190, 190};
-    private static final int CARD_W = 190;
-    private static final int CARD_H = 105;
+    private static final int LABEL_WIDTH = 72;
 
     private final String entityId;
     private final BreakSpawnConfig.EntityRule rule;
-    private final Map<String, KineticNumberField> dropBoxes = new LinkedHashMap<>();
+    private final Runnable onChange;
+    private final Map<String, KineticLayout.Rect> icons = new LinkedHashMap<>();
+    private KineticLayout.Rect helpRect;
 
-    public EquipmentEditorScreen(String entityId, BreakSpawnConfig.EntityRule rule) {
+    public EquipmentEditorScreen(String entityId, BreakSpawnConfig.EntityRule rule, Runnable onChange) {
         super(KineticI18n.translatable("gui.entitycontrol.breakspawn.equipment.title"));
         this.entityId = entityId;
         this.rule = rule;
+        this.onChange = onChange;
+    }
+
+    private BreakSpawnConfig.EquipmentSpec spec(String slot) {
+        return rule.equipment.computeIfAbsent(slot, ignored -> new BreakSpawnConfig.EquipmentSpec());
+    }
+
+    private static ItemStack stack(BreakSpawnConfig.EquipmentSpec spec) {
+        if (spec == null || spec.itemId == null || spec.itemId.isBlank()) return ItemStack.EMPTY;
+        ResourceLocation id = KineticResourceIds.tryParse(spec.itemId);
+        Item item = id == null ? null : KineticRegistries.items().get(id);
+        return item == null ? ItemStack.EMPTY : new ItemStack(item, Math.max(1, spec.count));
     }
 
     @Override
-    protected void build(KineticUi ui) {
-        dropBoxes.clear();
-        for (int index = 0; index < SLOTS.length; index++) {
-            String slot = SLOTS[index];
-            int x = CARD_X[index];
-            int y = CARD_Y[index];
-            BreakSpawnConfig.EquipmentSpec spec = rule.equipment.computeIfAbsent(slot, ignored -> new BreakSpawnConfig.EquipmentSpec());
-            KineticNumberField dropBox = ui.numberField(x + 109, y + 27, 68, NumberType.DECIMAL)
-                    .allowNegative(false)
-                    .range(0D, 100D)
-                    .value(spec.dropChance * 100.0D)
-                    .onChange(value -> {
-                        try {
-                            double parsed = Double.parseDouble(value.trim());
-                            if (Double.isFinite(parsed)) spec.dropChance = Math.max(0D, Math.min(1D, parsed / 100D));
-                        } catch (RuntimeException ignored) {
-                        }
-                    })
-                    .firstShownTextAsDefault().build();
-            dropBoxes.put(slot, dropBox);
-
-            ui.button(x + 8, y + 72, 54).compact()
-                    .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.equipment.select"))
-                    .onClick(() -> openItemSelector(slot)).build();
-            ui.button(x + 67, y + 72, 54).compact()
-                    .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.equipment.nbt"))
-                    .onClick(() -> openNbtEditor(slot)).build();
-            ui.button(x + 126, y + 72, 54).compact()
-                    .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.equipment.clear"))
-                    .onClick(() -> clearSlot(slot)).build();
+    protected void buildContent(KineticUi ui, KineticLayout.Rect body) {
+        icons.clear();
+        KineticLayout.Split columns = halves(body);
+        Form form = form(section(columns.first(), tr("equipment.section")), LABEL_WIDTH);
+        for (String slot : SLOTS) {
+            BreakSpawnConfig.EquipmentSpec spec = rule.equipment.get(slot);
+            ItemStack stack = stack(spec);
+            KineticLayout.Rect row = form.row(KineticI18n.translatable("gui.entitycontrol.breakspawn.slot." + slot), tip("equipment.slot"));
+            icons.put(slot, new KineticLayout.Rect(row.x(), row.y(), 16, 16));
+            Component itemText = stack.isEmpty() ? KineticI18n.translatable("gui.entitycontrol.breakspawn.equipment.empty") : stack.getHoverName();
+            KineticLayout.Rect itemRect = new KineticLayout.Rect(row.x() + 16 + GAP, row.y(), CONTROL_WIDTH, H);
+            menuButton(ui, itemRect, itemText, tip("equipment.item"), true, () -> slotMenu(slot));
+            decimalField(ui, new KineticLayout.Rect(itemRect.x() + CONTROL_WIDTH + GAP, row.y(), NUMBER_WIDTH, H),
+                    spec == null ? 0D : spec.dropChance * 100D, 0D, 100D, tip("equipment.drop"), value -> {
+                        if (value == null) return;
+                        spec(slot).dropChance = Math.max(0D, Math.min(1D, value / 100D));
+                        onChange.run();
+                    });
         }
-        ui.button(430, 322, 190)
-                .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.back"))
-                .onClick(this::navigateBack).build();
+        helpRect = section(columns.second(), tr("equipment.help.title"));
     }
 
-    private void openItemSelector(String slot) {
-        KineticSelectors.openItemSelectorWithOptions(
-                KineticSelectors.ItemSelectorOptions.itemsOnly(null, List.of(), stack -> true),
+    private List<KineticOverlays.MenuItem> slotMenu(String slot) {
+        BreakSpawnConfig.EquipmentSpec spec = rule.equipment.get(slot);
+        boolean hasItem = !stack(spec).isEmpty();
+        List<KineticOverlays.MenuItem> items = new ArrayList<>();
+        items.add(KineticOverlays.MenuItem.action(tr("equipment.pick"), tip("equipment.pick"), () -> pickItem(slot)));
+        items.add(hasItem
+                ? KineticOverlays.MenuItem.action(tr("equipment.nbt"), tip("equipment.nbt"), () -> KineticSelectors.openNbtEditor(
+                spec.nbt == null ? "" : spec.nbt, value -> {
+                    spec(slot).nbt = value == null ? "" : value;
+                    onChange.run();
+                }))
+                : KineticOverlays.MenuItem.disabled(tr("equipment.nbt"), tip("equipment.pick_first")));
+        items.add(hasItem
+                ? KineticOverlays.MenuItem.danger(tr("equipment.clear"), tip("equipment.clear"), () -> {
+                    BreakSpawnConfig.EquipmentSpec target = spec(slot);
+                    target.itemId = "";
+                    target.nbt = "";
+                    target.count = 1;
+                    target.dropChance = 0D;
+                    onChange.run();
+                    rebuild();
+                })
+                : KineticOverlays.MenuItem.disabled(tr("equipment.clear"), tip("equipment.pick_first")));
+        return items;
+    }
+
+    private void pickItem(String slot) {
+        KineticSelectors.openItemSelectorWithOptions(KineticSelectors.ItemSelectorOptions.itemsOnly(null, List.of(), stack -> true),
                 selection -> {
                     if (!selection.isItem()) return;
                     ItemStack stack = selection.stack().copy();
                     ResourceLocation id = KineticRegistries.items().id(stack.getItem());
                     if (id == null) return;
-                    BreakSpawnConfig.EquipmentSpec spec = rule.equipment.computeIfAbsent(slot, ignored -> new BreakSpawnConfig.EquipmentSpec());
-                    spec.itemId = id.toString();
-                    spec.count = 1;
-                    spec.nbt = stack.hasTag() && stack.getTag() != null ? stack.getTag().toString() : "";
-                }
-        );
-    }
-
-    private void openNbtEditor(String slot) {
-        BreakSpawnConfig.EquipmentSpec spec = rule.equipment.computeIfAbsent(slot, ignored -> new BreakSpawnConfig.EquipmentSpec());
-        KineticSelectors.openNbtEditor(spec.nbt == null ? "" : spec.nbt,
-                value -> spec.nbt = value == null ? "" : value);
-    }
-
-    private void clearSlot(String slot) {
-        BreakSpawnConfig.EquipmentSpec spec = rule.equipment.computeIfAbsent(slot, ignored -> new BreakSpawnConfig.EquipmentSpec());
-        spec.itemId = "";
-        spec.nbt = "";
-        spec.count = 1;
-        spec.dropChance = 0.0D;
-        KineticNumberField dropBox = dropBoxes.get(slot);
-        if (dropBox != null) dropBox.setDoubleValue(0D);
+                    BreakSpawnConfig.EquipmentSpec target = spec(slot);
+                    target.itemId = id.toString();
+                    target.count = 1;
+                    target.nbt = stack.hasTag() && stack.getTag() != null ? stack.getTag().toString() : "";
+                    onChange.run();
+                });
     }
 
     @Override
-    protected void renderBackground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        KineticTheme.panel(graphics, 8, 8, 624, 344);
-        graphics.text(title(), 20, 18, KineticTheme.current().text());
-        graphics.text(entityId, 20, 38, KineticTheme.current().mutedText());
-        for (int index = 0; index < SLOTS.length; index++) {
-            renderCard(graphics, SLOTS[index], CARD_X[index], CARD_Y[index]);
-        }
-        graphics.text(KineticI18n.translatable("gui.entitycontrol.breakspawn.equipment.hint"), 20, 310,
-                KineticTheme.current().mutedText());
+    protected Component headerTitle() {
+        ResourceLocation id = KineticResourceIds.tryParse(entityId);
+        var type = id == null ? null : KineticRegistries.entityTypes().get(id);
+        return tr("equipment.title", type == null ? Component.literal(entityId) : type.getDescription());
     }
 
-    private void renderCard(KineticGraphics graphics, String slot, int x, int y) {
-        KineticTheme.panelAlt(graphics, x, y, CARD_W, CARD_H);
-        graphics.text(KineticI18n.translatable("gui.entitycontrol.breakspawn.slot." + slot), x + 8, y + 8,
-                KineticTheme.current().text());
-        BreakSpawnConfig.EquipmentSpec spec = rule.equipment.get(slot);
-        ItemStack stack = stackFromSpec(spec);
-        if (!stack.isEmpty()) {
-            graphics.item(stack, x + 8, y + 29);
-            String id = spec == null ? "" : spec.itemId;
-            graphics.text(KineticText.ellipsize(id, 78), x + 30, y + 33, KineticTheme.current().text());
-        } else {
-            graphics.text(KineticI18n.translatable("gui.entitycontrol.breakspawn.equipment.empty"), x + 8, y + 33,
-                    KineticTheme.current().text());
+    @Override
+    protected void renderContent(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        for (Map.Entry<String, KineticLayout.Rect> entry : icons.entrySet()) {
+            KineticLayout.Rect rect = entry.getValue();
+            ItemStack stack = stack(rule.equipment.get(entry.getKey()));
+            if (!stack.isEmpty()) graphics.item(stack, rect.x(), rect.y());
         }
-        graphics.text(KineticI18n.translatable("gui.entitycontrol.breakspawn.equipment.drop_chance"), x + 109, y + 16,
-                KineticTheme.current().text());
+        if (helpRect != null) {
+            graphics.wrappedText(tr("equipment.help"), helpRect.x(), helpRect.y(), helpRect.width(), KineticTheme.current().text());
+        }
     }
 
-    private ItemStack stackFromSpec(BreakSpawnConfig.EquipmentSpec spec) {
-        if (spec == null || spec.itemId == null || spec.itemId.isBlank()) return ItemStack.EMPTY;
-        ResourceLocation id = KineticResourceIds.tryParse(spec.itemId);
-        Item item = id == null ? null : KineticRegistries.items().get(id);
-        if (item == null) return ItemStack.EMPTY;
-        ItemStack stack = new ItemStack(item, 1);
-        if (spec.nbt != null && !spec.nbt.isBlank()) {
-            try {
-                stack.setTag(TagParser.parseTag(spec.nbt));
-            } catch (Exception ignored) {
+    @Override
+    protected boolean contentTooltips(int mouseX, int mouseY) {
+        for (Map.Entry<String, KineticLayout.Rect> entry : icons.entrySet()) {
+            ItemStack stack = stack(rule.equipment.get(entry.getKey()));
+            if (!stack.isEmpty() && entry.getValue().contains(mouseX, mouseY)) {
+                itemTooltip(stack);
+                return true;
             }
         }
-        return stack;
+        return false;
     }
 }

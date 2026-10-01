@@ -1,20 +1,17 @@
 package dev.xyat.entitycontrol.reset.client.gui;
 
+import dev.xyat.entitycontrol.client.gui.kit.EcPage;
+import dev.xyat.entitycontrol.client.gui.kit.EntityCardGrid;
 import dev.xyat.entitycontrol.reset.config.EntityReseConfig;
 import dev.xyat.entitycontrol.reset.config.EntityReseConfigGui;
 import dev.xyat.entitycontrol.reset.network.EntityReseRuleNetwork;
-import dev.xyat.kineticcore.api.client.gui.input.MouseDragInput;
 import dev.xyat.kineticcore.api.client.gui.input.MouseInput;
-import dev.xyat.kineticcore.api.client.gui.input.ScrollInput;
+import dev.xyat.kineticcore.api.client.gui.layout.KineticLayout;
 import dev.xyat.kineticcore.api.client.gui.overlay.KineticOverlays;
-import dev.xyat.kineticcore.api.client.gui.page.KineticPage;
 import dev.xyat.kineticcore.api.client.gui.render.KineticGraphics;
-import dev.xyat.kineticcore.api.client.gui.scroll.KineticScrollController;
 import dev.xyat.kineticcore.api.client.gui.theme.KineticTheme;
 import dev.xyat.kineticcore.api.client.gui.ui.KineticUi;
-import dev.xyat.kineticcore.api.client.gui.widget.KineticCustomControl;
-import dev.xyat.kineticcore.api.client.gui.widget.KineticEntityPreview;
-import dev.xyat.kineticcore.api.client.gui.widget.KineticTextField;
+import dev.xyat.kineticcore.api.client.gui.widget.KineticButton;
 import dev.xyat.kineticcore.api.client.search.KineticSearch;
 import dev.xyat.kineticcore.api.config.client.KTConfigApi;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
@@ -22,6 +19,7 @@ import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import dev.xyat.kineticcore.api.text.KineticI18n;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -32,332 +30,287 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-public final class EntityResetRuleListScreen extends KineticPage {
-    private static final int PANEL_X = 20;
-    private static final int PANEL_Y = 12;
-    private static final int PANEL_W = 600;
-    private static final int PANEL_H = 342;
-    private static final int COLS = 9;
-    private static final int CELL_W = 60;
-    private static final int CELL_H = 48;
-    private static final int VISIBLE_ROWS = 5;
-    private static final int GRID_W = COLS * CELL_W;
-    private static final int GRID_H = VISIBLE_ROWS * CELL_H;
-    private static final int SEARCH_X = PANEL_X + 16;
-    private static final int SEARCH_Y = PANEL_Y + 24;
-    private static final int SEARCH_W = 450;
-    private static final int BUTTON_W = 100;
-    private static final int BUTTON_X = PANEL_X + PANEL_W - BUTTON_W - 16;
-    private static final int BUTTON_Y = PANEL_Y + 24;
-    private static final int GRID_X = PANEL_X + 18;
-    private static final int GRID_Y = SEARCH_Y + 20 + 10;
-    private static final int SCROLL_X = GRID_X + GRID_W + 6;
-    private static final int SCROLL_W = 4;
+/**
+ * 实体重置规则：左侧 3D 卡片（绿框表示已有规则），右侧直接编辑选中实体的规则。
+ * 顶栏：返回 / 保存规则 / 更多 ▾（删除规则）。每条规则单独保存到服务器。
+ */
+public final class EntityResetRuleListScreen extends EcPage {
+    private static final int CARD = 40;
+    private static final int LABEL_WIDTH = 104;
 
     private final List<String> allEntityIds = new ArrayList<>();
-    private final List<String> filteredEntityIds = new ArrayList<>();
     private final Map<String, String> searchData = new HashMap<>();
-    private final KineticScrollController scroll = new KineticScrollController();
-    private final KineticEntityPreview preview = KineticEntityPreview.create();
+    private final EntityCardGrid cards = new EntityCardGrid(CARD);
 
-    private KineticTextField searchBox;
-    private String searchQuery = "";
-    private List<Component> deferredTooltip;
+    private String query = "";
+    private boolean onlyConfigured;
+    private String selectedId;
+    private int threshold = 1;
+    private boolean countRealDeath = true;
+    private boolean countPreventedDeath;
+    private boolean countCancelledDeath;
     private boolean syncRequested;
-    private boolean initialSyncPending;
+    private boolean waitingForSync;
+    private boolean waitingForServer;
+    private KineticLayout.Rect helpRect;
 
     public EntityResetRuleListScreen() {
         super(KineticI18n.translatable("gui.entitycontrol.reset.rule_list.title"));
         rebuildEntityData();
     }
 
-    @Override
-    protected void build(KineticUi ui) {
-        searchBox = ui.textField(SEARCH_X, SEARCH_Y, SEARCH_W)
-                .label(KineticI18n.translatable("gui.entitycontrol.reset.rule_list.search_hint"))
-                .placeholder(KineticI18n.translatable("gui.entitycontrol.reset.rule_list.search_hint"))
-                .value(searchQuery)
-                .maxLength(256)
-                .onChange(value -> {
-                    searchQuery = value == null ? "" : value;
-                    updateSearch(searchQuery);
-                })
-                .firstShownTextAsDefault().build();
-
-        ui.button(BUTTON_X, BUTTON_Y, BUTTON_W)
-                .text(KineticI18n.translatable("gui.entitycontrol.reset.rule_list.back"))
-                .onClick(this::navigateBack)
-                .build();
-
-        ui.add(new EntityGridControl(GRID_X - 4, GRID_Y - 4, GRID_W + 16, GRID_H + 8));
-        updateSearch(searchQuery);
-        requestServerRulesOnce();
+    private static MutableComponent tr(String key, Object... args) {
+        return KineticI18n.translatable("gui.entitycontrol.reset.editor." + key, args);
     }
 
-    private void requestServerRulesOnce() {
-        if (syncRequested || !KineticClientRuntime.connected()) return;
-        syncRequested = true;
-        initialSyncPending = true;
-        EntityReseRuleNetwork.requestRules();
-    }
+    // ------------------------------------------------------------------ 数据
 
     private void rebuildEntityData() {
-        buildEntityList();
-        buildSearchData();
-    }
-
-    private void buildEntityList() {
         allEntityIds.clear();
-        KineticRegistries.entityTypes().ids().stream()
-                .sorted(ResourceLocation::compareTo)
-                .forEach(id -> {
-                    EntityType<?> type = KineticRegistries.entityTypes().get(id);
-                    String value = id.toString();
-                    if (EntityReseConfig.hasRule(value)
-                            || (type != null && type.getCategory() != MobCategory.MISC)) {
-                        allEntityIds.add(value);
-                    }
-                });
-
-        for (String configuredId : EntityReseConfig.ENTITY_RULES_CACHE.keySet()) {
-            if (!allEntityIds.contains(configuredId)) allEntityIds.add(configuredId);
+        KineticRegistries.entityTypes().ids().stream().sorted(ResourceLocation::compareTo).forEach(id -> {
+            EntityType<?> type = KineticRegistries.entityTypes().get(id);
+            String value = id.toString();
+            if (EntityReseConfig.hasRule(value) || (type != null && type.getCategory() != MobCategory.MISC)) allEntityIds.add(value);
+        });
+        for (String configured : EntityReseConfig.ENTITY_RULES_CACHE.keySet()) {
+            if (!allEntityIds.contains(configured)) allEntityIds.add(configured);
         }
-    }
-
-    private void buildSearchData() {
         searchData.clear();
         for (String id : allEntityIds) {
-            String name = entityName(id);
-            String raw = id + " " + name;
+            String raw = id + " " + entityName(id).getString();
             searchData.put(id, (raw + " " + KineticSearch.pinyin(raw)).toLowerCase(Locale.ROOT));
         }
     }
 
-    private void updateSearch(String query) {
-        String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
-        filteredEntityIds.clear();
+    private List<String> keys() {
+        String normalized = query.trim().toLowerCase(Locale.ROOT);
+        List<String> result = new ArrayList<>();
         for (String id : allEntityIds) {
-            if (normalized.isEmpty()
-                    || KineticSearch.match(searchData.getOrDefault(id, id.toLowerCase(Locale.ROOT)), normalized)) {
-                filteredEntityIds.add(id);
-            }
+            if (onlyConfigured && !EntityReseConfig.hasRule(id)) continue;
+            if (!normalized.isEmpty() && !KineticSearch.match(searchData.getOrDefault(id, id), normalized)) continue;
+            result.add(id);
         }
-        filteredEntityIds.sort((left, right) -> {
-            int configuredCompare = Boolean.compare(
-                    EntityReseConfig.ENTITY_RULES_CACHE.containsKey(right),
-                    EntityReseConfig.ENTITY_RULES_CACHE.containsKey(left)
-            );
-            return configuredCompare != 0 ? configuredCompare : left.compareToIgnoreCase(right);
+        result.sort((left, right) -> {
+            int configured = Boolean.compare(EntityReseConfig.hasRule(right), EntityReseConfig.hasRule(left));
+            return configured != 0 ? configured : left.compareToIgnoreCase(right);
         });
-        scroll.reset();
-        updateScrollRange();
+        return result;
     }
 
-    private void updateScrollRange() {
-        int totalRows = (filteredEntityIds.size() + COLS - 1) / COLS;
-        scroll.update(totalRows, VISIBLE_ROWS);
-    }
-
-    private String entityName(String id) {
+    private static Component entityName(String id) {
         ResourceLocation location = KineticResourceIds.tryParse(id);
         EntityType<?> type = location == null ? null : KineticRegistries.entityTypes().get(location);
-        return type == null ? id : type.getDescription().getString();
+        return type == null ? Component.literal(id) : type.getDescription();
     }
 
-    private Component switchState(boolean enabled) {
-        return KineticI18n.translatable(enabled
+    /** 选中实体时把它的规则（没有规则时用默认值）读入表单。 */
+    private void loadRule() {
+        EntityReseConfig.EntityRule rule = selectedId == null ? null : EntityReseConfig.getRule(selectedId);
+        threshold = rule == null ? 1 : Math.max(1, rule.threshold);
+        countRealDeath = rule == null || rule.countRealDeath;
+        countPreventedDeath = rule != null && rule.countPreventedDeath;
+        countCancelledDeath = rule != null && rule.countCancelledDeath;
+    }
+
+    // ------------------------------------------------------------------ 外框
+
+    @Override
+    protected List<HeaderAction> headerActions() {
+        boolean ready = selectedId != null && !waitingForServer && !waitingForSync;
+        return List.of(
+                HeaderAction.button("save", tr("save"), tr("save.tooltip"), this::save).enabled(ready),
+                HeaderAction.more(() -> List.of(ready && EntityReseConfig.hasRule(selectedId)
+                        ? KineticOverlays.MenuItem.danger(tr("remove"), tr("remove.tooltip"), this::remove)
+                        : KineticOverlays.MenuItem.disabled(tr("remove"), tr("remove.none"))))
+        );
+    }
+
+    private void save() {
+        if (selectedId == null || waitingForServer) return;
+        if (!KineticClientRuntime.connected()) {
+            KineticOverlays.toast(KineticI18n.translatable("msg.entitycontrol.reset.rule_list.save_failed"));
+            return;
+        }
+        waitingForServer = true;
+        updateHeader();
+        EntityReseRuleNetwork.saveRule(selectedId, threshold, countRealDeath, countPreventedDeath, countCancelledDeath);
+    }
+
+    private void remove() {
+        if (selectedId == null || waitingForServer) return;
+        waitingForServer = true;
+        updateHeader();
+        EntityReseRuleNetwork.removeRule(selectedId);
+    }
+
+    private void updateHeader() {
+        KineticButton save = headerButton("save");
+        if (save != null) save.setEnabled(selectedId != null && !waitingForServer && !waitingForSync);
+    }
+
+    /** 服务器处理保存 / 删除后回调。 */
+    public void onServerOperationResult(byte result) {
+        waitingForServer = false;
+        rebuildEntityData();
+        if (result == EntityReseRuleNetwork.RESULT_SAVE_SUCCESS || result == EntityReseRuleNetwork.RESULT_REMOVE_SUCCESS) {
+            KTConfigApi.notifySaved(EntityReseConfigGui.PAGE_ID);
+            loadRule();
+        } else {
+            KineticOverlays.toast(KineticI18n.translatable("msg.entitycontrol.reset.rule_list.save_failed"));
+        }
+        if (isAttached()) rebuild();
+    }
+
+    /** 服务器发来最新规则列表。 */
+    public void onRemoteRulesUpdated() {
+        waitingForSync = false;
+        rebuildEntityData();
+        loadRule();
+        if (isAttached()) rebuild();
+    }
+
+    // ------------------------------------------------------------------ 内容
+
+    @Override
+    protected void buildContent(KineticUi ui, KineticLayout.Rect body) {
+        if (!syncRequested && KineticClientRuntime.connected()) {
+            syncRequested = true;
+            waitingForSync = true;
+            EntityReseRuleNetwork.requestRules();
+        }
+        helpRect = null;
+        KineticLayout.Split columns = KineticLayout.splitHorizontal(body, body.width() - 260 - GAP, GAP);
+        KineticLayout.Rect left = section(columns.first(),
+                tr("list", EntityReseConfig.ENTITY_RULES_CACHE.size(), allEntityIds.size()));
+        KineticLayout.Split rows = takeRow(left);
+        KineticLayout.Rect bar = rows.first();
+        int filterWidth = 56;
+        textInput(ui, new KineticLayout.Rect(bar.x(), bar.y(), Math.min(200, bar.width() - filterWidth - GAP), H), query,
+                KineticI18n.translatable("gui.entitycontrol.reset.rule_list.search_hint"), tr("search.tooltip"), value -> {
+                    query = value;
+                    cards.reset();
+                    cards.setKeys(keys());
+                });
+        menuButton(ui, new KineticLayout.Rect(bar.right() - filterWidth, bar.y(), filterWidth, H), tr("filter"), tr("filter.tooltip"),
+                true, () -> List.of(KineticOverlays.MenuItem.toggle(tr("filter.configured"), tr("filter.configured.tooltip"),
+                        onlyConfigured, () -> {
+                            onlyConfigured = !onlyConfigured;
+                            cards.reset();
+                            cards.setKeys(keys());
+                        })));
+        cards.types(id -> id)
+                .fallback(id -> Component.literal("?"))
+                .selected(id -> id.equals(selectedId))
+                .modified(EntityReseConfig::hasRule);
+        cards.layout(this, rows.second(), keys());
+
+        if (selectedId == null) {
+            helpRect = section(columns.second(), tr("none_selected"));
+            return;
+        }
+        boolean editable = !waitingForServer && !waitingForSync;
+        Component title = entityName(selectedId).copy().append(tr(EntityReseConfig.hasRule(selectedId) ? "state.configured" : "state.none"));
+        Form form = form(section(columns.second(), title), LABEL_WIDTH);
+        intField(ui, number(form.row(KineticI18n.translatable("gui.entitycontrol.reset.rule_edit.threshold"), tr("threshold.tooltip"))),
+                threshold, 1, 1_000_000, tr("threshold.tooltip"), value -> {
+                    if (value != null) threshold = value;
+                }).setEnabled(editable);
+        toggleMenu(ui, compact(form.row(tr("counts"), tr("counts.tooltip"))), tr("counts.button"), tr("counts.tooltip"), List.of(
+                new ToggleOption(tr("count.real"), KineticI18n.translatable("gui.entitycontrol.reset.rule_edit.count_real.tooltip"),
+                        () -> countRealDeath, value -> countRealDeath = value),
+                new ToggleOption(tr("count.prevented"), KineticI18n.translatable("gui.entitycontrol.reset.rule_edit.count_prevented.tooltip"),
+                        () -> countPreventedDeath, value -> countPreventedDeath = value),
+                new ToggleOption(tr("count.cancelled"), KineticI18n.translatable("gui.entitycontrol.reset.rule_edit.count_cancelled.tooltip"),
+                        () -> countCancelledDeath, value -> countCancelledDeath = value)
+        ), editable, null);
+        helpRect = form.remaining();
+    }
+
+    // ------------------------------------------------------------------ 绘制与交互
+
+    @Override
+    protected void renderContent(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        cards.render(graphics, mouseX, mouseY);
+        if (helpRect != null) {
+            Component text = waitingForSync ? tr("syncing") : tr(selectedId == null ? "help" : "help.rule");
+            graphics.wrappedText(text, helpRect.x(), helpRect.y() + GAP, helpRect.width(), KineticTheme.current().text());
+        }
+    }
+
+    @Override
+    protected boolean contentTooltips(int mouseX, int mouseY) {
+        String id = cards.keyAt(mouseX, mouseY);
+        if (id == null) return false;
+        List<Component> lines = new ArrayList<>();
+        lines.add(entityName(id));
+        lines.add(Component.literal(id));
+        EntityReseConfig.EntityRule rule = EntityReseConfig.getRule(id);
+        if (rule == null) {
+            lines.add(KineticI18n.translatable("gui.entitycontrol.reset.rule_list.rule.none"));
+        } else {
+            lines.add(KineticI18n.translatable("gui.entitycontrol.reset.rule_list.rule.threshold", rule.threshold));
+            lines.add(KineticI18n.translatable("gui.entitycontrol.reset.rule_list.rule.real", onOff(rule.countRealDeath)));
+            lines.add(KineticI18n.translatable("gui.entitycontrol.reset.rule_list.rule.prevented", onOff(rule.countPreventedDeath)));
+            lines.add(KineticI18n.translatable("gui.entitycontrol.reset.rule_list.rule.cancelled", onOff(rule.countCancelledDeath)));
+        }
+        lines.add(tr("card.hint"));
+        tooltipLines(lines);
+        return true;
+    }
+
+    private static Component onOff(boolean value) {
+        return KineticI18n.translatable(value
                 ? "gui.entitycontrol.reset.rule_list.rule.cancelled.on"
                 : "gui.entitycontrol.reset.rule_list.rule.cancelled.off");
     }
 
-    private List<Component> buildTooltip(String id) {
-        List<Component> tooltip = new ArrayList<>();
-        ResourceLocation location = KineticResourceIds.tryParse(id);
-        EntityType<?> type = location == null ? null : KineticRegistries.entityTypes().get(location);
-        tooltip.add(type == null ? Component.literal(id) : type.getDescription());
-        tooltip.add(Component.literal(id));
-
-        EntityReseConfig.EntityRule rule = EntityReseConfig.getRule(id);
-        if (rule == null) {
-            tooltip.add(KineticI18n.translatable("gui.entitycontrol.reset.rule_list.rule.none"));
+    @Override
+    protected boolean contentClickCapture(MouseInput input) {
+        String id = cards.keyAt(input.x(), input.y());
+        if (id == null) return false;
+        if (id.equals(selectedId)) return true;
+        if (formDirty()) {
+            openDialog(tr("unsaved.title"), tr("unsaved.message"), tr("unsaved.discard"),
+                    KineticI18n.translatable("gui.entitycontrol.common.cancel"), () -> select(id), () -> {
+                    });
         } else {
-            tooltip.add(KineticI18n.translatable("gui.entitycontrol.reset.rule_list.rule.configured"));
-            tooltip.add(KineticI18n.translatable(
-                    "gui.entitycontrol.reset.rule_list.rule.threshold", rule.threshold
-            ));
-            tooltip.add(KineticI18n.translatable(
-                    "gui.entitycontrol.reset.rule_list.rule.real", switchState(rule.countRealDeath)
-            ));
-            tooltip.add(KineticI18n.translatable(
-                    "gui.entitycontrol.reset.rule_list.rule.prevented", switchState(rule.countPreventedDeath)
-            ));
-            tooltip.add(KineticI18n.translatable(
-                    "gui.entitycontrol.reset.rule_list.rule.cancelled", switchState(rule.countCancelledDeath)
-            ));
+            select(id);
         }
-        tooltip.add(KineticI18n.translatable("gui.entitycontrol.reset.rule_list.left_click_hint"));
-        tooltip.add(KineticI18n.translatable("gui.entitycontrol.reset.rule_list.zoom_hint"));
-        return tooltip;
+        return true;
     }
 
-    private int entityIndex(double mouseX, double mouseY) {
-        if (mouseX < GRID_X || mouseX >= GRID_X + GRID_W || mouseY < GRID_Y || mouseY >= GRID_Y + GRID_H) return -1;
-        int column = (int) ((mouseX - GRID_X) / CELL_W);
-        int row = (int) ((mouseY - GRID_Y + scroll.visualShift(CELL_H)) / CELL_H);
-        if (column < 0 || column >= COLS || row < 0 || row >= VISIBLE_ROWS) return -1;
-        return scroll.smoothIndexOffset() * COLS + row * COLS + column;
+    private void select(String id) {
+        selectedId = id;
+        loadRule();
+        clearFocus();
+        rebuild();
     }
 
-    private void openRuleEditor(String entityId) {
-        if (!initialSyncPending) openChild(new EntityResetRuleEditScreen(this, entityId));
-    }
-
-    public void onServerOperationResult(byte result) {
-        rebuildEntityData();
-        updateSearch(searchQuery);
-        if (result == EntityReseRuleNetwork.RESULT_REMOVE_SUCCESS
-                || result == EntityReseRuleNetwork.RESULT_SAVE_SUCCESS) {
-            KTConfigApi.notifySaved(EntityReseConfigGui.PAGE_ID);
-        } else {
-            KineticOverlays.toast(KineticI18n.translatable("msg.entitycontrol.reset.rule_list.save_failed"));
-        }
-    }
-
-    public void onRemoteRulesUpdated() {
-        initialSyncPending = false;
-        rebuildEntityData();
-        updateSearch(searchQuery);
-    }
-
-    void onRuleSaved() {
-        rebuildEntityData();
-        updateSearch(searchQuery);
+    /** 表单与该实体当前规则（没有规则时为默认值）是否不同。 */
+    private boolean formDirty() {
+        if (selectedId == null) return false;
+        EntityReseConfig.EntityRule rule = EntityReseConfig.getRule(selectedId);
+        int savedThreshold = rule == null ? 1 : Math.max(1, rule.threshold);
+        boolean real = rule == null || rule.countRealDeath;
+        boolean prevented = rule != null && rule.countPreventedDeath;
+        boolean cancelled = rule != null && rule.countCancelledDeath;
+        boolean differs = threshold != savedThreshold || countRealDeath != real
+                || countPreventedDeath != prevented || countCancelledDeath != cancelled;
+        // 还没有规则的实体：只有改动了默认值才算未保存。
+        return differs;
     }
 
     @Override
-    protected void renderBackground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        KineticTheme.canvasBackground(graphics, width(), height());
-        KineticTheme.panel(graphics, PANEL_X, PANEL_Y, PANEL_W, PANEL_H);
-        graphics.centeredText(title(), width() / 2, 18, KineticTheme.current().text(), false);
-        graphics.text(
-                KineticI18n.translatable(
-                        "gui.entitycontrol.reset.rule_list.count",
-                        filteredEntityIds.size(),
-                        allEntityIds.size()
-                ),
-                PANEL_X + 18,
-                PANEL_Y + 9,
-                KineticTheme.current().text()
-        );
-    }
-
-    @Override
-    protected void renderTooltips(int mouseX, int mouseY) {
-        if (deferredTooltip != null) showTooltip(deferredTooltip);
+    protected boolean onBack() {
+        if (!formDirty()) return false;
+        openDialog(tr("unsaved.title"), tr("unsaved.message"), tr("unsaved.discard"),
+                KineticI18n.translatable("gui.entitycontrol.common.cancel"), this::navigateBack, () -> {
+                });
+        return true;
     }
 
     @Override
     protected void onRemoved() {
-        preview.clear();
-    }
-
-    private final class EntityGridControl extends KineticCustomControl {
-        private EntityGridControl(int x, int y, int width, int height) {
-            super(x, y, width, height);
-        }
-
-        @Override
-        protected void render(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
-            deferredTooltip = null;
-            updateScrollRange();
-            KineticTheme.itemGrid(graphics, GRID_X - 4, GRID_Y - 4, GRID_W + 8, GRID_H + 8);
-            KineticTheme.stateOutline(graphics, GRID_X - 4, GRID_Y - 4, GRID_W + 8, GRID_H + 8, false, false, false);
-
-            if (filteredEntityIds.isEmpty()) {
-                graphics.centeredText(
-                        KineticI18n.translatable("gui.entitycontrol.reset.rule_list.empty"),
-                        GRID_X + GRID_W / 2,
-                        GRID_Y + GRID_H / 2,
-                        KineticTheme.current().mutedText(),
-                        false
-                );
-            }
-
-            int firstRow = scroll.smoothIndexOffset();
-            int shift = scroll.visualShift(CELL_H);
-            int first = firstRow * COLS;
-            int last = Math.min(first + (VISIBLE_ROWS + 1) * COLS, filteredEntityIds.size());
-            graphics.clipped(GRID_X, GRID_Y, GRID_X + GRID_W, GRID_Y + GRID_H, () -> {
-                for (int index = first; index < last; index++) {
-                    int localIndex = index - first;
-                    int x = GRID_X + localIndex % COLS * CELL_W;
-                    int y = GRID_Y + localIndex / COLS * CELL_H - shift;
-                    String id = filteredEntityIds.get(index);
-                    boolean configured = EntityReseConfig.hasRule(id);
-                    boolean hovered = mouseX >= GRID_X && mouseX < GRID_X + GRID_W
-                            && mouseY >= GRID_Y && mouseY < GRID_Y + GRID_H
-                            && mouseX >= x && mouseX < x + CELL_W
-                            && mouseY >= y && mouseY < y + CELL_H;
-
-                    KineticTheme.itemSlot(graphics, x, y, CELL_W, CELL_H, 4, false, hovered, false);
-                    if (configured) {
-                        KineticTheme.indicatorOutline(
-                                graphics, x, y, CELL_W, CELL_H, KineticTheme.Indicator.SUCCESS, 2
-                        );
-                    }
-
-                    String stateKey = "entityrese:list:" + id;
-                    boolean rendered = preview.render(
-                            graphics, id, stateKey,
-                            x + 3, y + 3, CELL_W - 6, CELL_H - 6,
-                            hovered
-                    );
-                    int visibleTop = Math.max(y, GRID_Y);
-                    int visibleBottom = Math.min(y + CELL_H, GRID_Y + GRID_H);
-                    if (visibleBottom > visibleTop) {
-                        registerPreviewZoomArea(preview, stateKey, x, visibleTop, CELL_W, visibleBottom - visibleTop);
-                    }
-                    if (!rendered) {
-                        graphics.centeredText(
-                                KineticI18n.translatable("gui.entitycontrol.reset.rule_list.invalid_entity"),
-                                x + CELL_W / 2,
-                                y + CELL_H / 2 - 4,
-                                KineticTheme.current().text(),
-                                false
-                        );
-                    }
-                    if (hovered) deferredTooltip = buildTooltip(id);
-                }
-            });
-
-            scroll.render(graphics, mouseX, mouseY, SCROLL_X, GRID_Y, SCROLL_W, GRID_H, 18);
-        }
-
-        @Override
-        protected boolean onMouseClick(MouseInput input) {
-            if (scroll.beginDrag(
-                    input.x(), input.y(), input.button(), SCROLL_X, GRID_Y, SCROLL_W, GRID_H, 18, 2
-            )) return true;
-            if (!input.isLeft()) return false;
-            int index = entityIndex(input.x(), input.y());
-            if (index < 0 || index >= filteredEntityIds.size()) return false;
-            openRuleEditor(filteredEntityIds.get(index));
-            return true;
-        }
-
-        @Override
-        protected boolean onMouseDrag(MouseDragInput input) {
-            return scroll.drag(input.y(), GRID_Y, GRID_H, 18);
-        }
-
-        @Override
-        protected boolean onMouseRelease(MouseInput input) {
-            return scroll.release(input.button());
-        }
-
-        @Override
-        protected boolean onMouseScroll(ScrollInput input) {
-            return scroll.scroll(input.deltaY());
-        }
+        cards.clear();
     }
 }

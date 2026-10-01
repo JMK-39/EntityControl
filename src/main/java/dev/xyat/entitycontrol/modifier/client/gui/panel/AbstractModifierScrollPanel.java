@@ -35,7 +35,7 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
         this.w = w;
         this.h = h;
 
-        searchBox = ui.textField(x + 4, y + 4, parent.panelSearchWidth(w))
+        searchBox = ui.textField(x, y, parent.panelSearchWidth(w))
                 .label(getSearchHint())
                 .placeholder(getSearchHint())
                 .value(searchValue())
@@ -43,9 +43,9 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
                 .firstShownTextAsDefault().build();
 
         rowList = ui.add(new PanelRowList(
-                x + 2,
+                x,
                 y + listTopOffset(),
-                w - 4,
+                w,
                 getListHeight(),
                 rowStride()
         ));
@@ -88,11 +88,11 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
     protected abstract void updateSearch(String query);
 
     protected int getListHeight() {
-        return h - 30;
+        return h - listTopOffset();
     }
 
     protected int listTopOffset() {
-        return 28;
+        return 20;
     }
 
     protected int rowStride() {

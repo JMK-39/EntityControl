@@ -1,220 +1,121 @@
 package dev.xyat.entitycontrol.modifier.client.gui;
 
+import dev.xyat.entitycontrol.client.gui.kit.EcPage;
 import dev.xyat.entitycontrol.modifier.config.EntityModifierConfig;
-import dev.xyat.kineticcore.api.client.gui.input.MouseInput;
+import dev.xyat.kineticcore.api.client.gui.layout.KineticLayout;
 import dev.xyat.kineticcore.api.client.gui.overlay.KineticOverlays;
-import dev.xyat.kineticcore.api.client.gui.page.KineticPage;
 import dev.xyat.kineticcore.api.client.gui.render.KineticGraphics;
-import dev.xyat.kineticcore.api.client.gui.text.KineticText;
 import dev.xyat.kineticcore.api.client.gui.theme.KineticTheme;
 import dev.xyat.kineticcore.api.client.gui.ui.KineticUi;
-import dev.xyat.kineticcore.api.client.gui.ui.NumberType;
-import dev.xyat.kineticcore.api.client.gui.widget.KineticNumberField;
-import dev.xyat.kineticcore.api.client.gui.widget.list.KineticRowList;
 import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import dev.xyat.kineticcore.api.text.KineticI18n;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public final class BuffEditScreen extends KineticPage {
-    private static final int LIST_WIDTH = 330;
-    private static final int LIST_HEIGHT = 132;
-    private static final int ROW_HEIGHT = 22;
-    private static final int INLINE_BUTTON_WIDTH = 44;
+/**
+ * 单个药水效果的设置：概率、等级范围、限定维度。顶栏“应用”把设置写回主界面并返回（在主界面保存后生效）。
+ */
+public final class BuffEditScreen extends EcPage {
+    private static final int LABEL_WIDTH = 88;
+    private static final int PAIR_WIDTH = 50;
 
     private final EntityModifierScreen parent;
     private final String entityId;
     private final String effectId;
     private final EntityModifierConfig.PotionBuff buff;
-    private final List<String> addedDimensions = new ArrayList<>();
-    private final List<String> allDims = new ArrayList<>();
+    private final List<String> dimensions = new ArrayList<>();
+    private final List<String> allDimensions = new ArrayList<>();
+    private double chance;
+    private int minLevel;
+    private int maxLevel;
+    private KineticLayout.Rect helpRect;
 
-    private KineticNumberField chanceBox;
-    private KineticNumberField minBox;
-    private KineticNumberField maxBox;
-    private DimensionList dimensionList;
-
-    public BuffEditScreen(EntityModifierScreen parent, String entityId, String effectId,
-                          EntityModifierConfig.PotionBuff buff) {
+    public BuffEditScreen(EntityModifierScreen parent, String entityId, String effectId, EntityModifierConfig.PotionBuff buff) {
         super(KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff_edit"));
         this.parent = parent;
         this.entityId = entityId;
         this.effectId = effectId;
         this.buff = buff;
-
-        if (buff.dimensions != null && !buff.dimensions.isEmpty()) {
-            addedDimensions.addAll(Arrays.asList(buff.dimensions.split(",")));
+        this.chance = buff.chance;
+        this.minLevel = buff.minLevel;
+        this.maxLevel = buff.maxLevel;
+        if (buff.dimensions != null && !buff.dimensions.isBlank()) {
+            Arrays.stream(buff.dimensions.split(",")).map(String::trim).filter(value -> !value.isEmpty()).forEach(dimensions::add);
         }
+        KineticClientRuntime.knownLevels().forEach(key -> allDimensions.add(key.location().toString()));
+        for (String dimension : dimensions) if (!allDimensions.contains(dimension)) allDimensions.add(dimension);
+        allDimensions.sort(String::compareTo);
     }
 
-    private void refreshDimList() {
-        allDims.clear();
-        KineticClientRuntime.knownLevels().forEach(key -> allDims.add(key.location().toString()));
-        for (String dimension : addedDimensions) {
-            if (!allDims.contains(dimension)) allDims.add(dimension);
-        }
-        allDims.sort((left, right) -> {
-            boolean leftAdded = addedDimensions.contains(left);
-            boolean rightAdded = addedDimensions.contains(right);
-            if (leftAdded != rightAdded) return leftAdded ? -1 : 1;
-            return left.compareTo(right);
-        });
-        if (dimensionList != null) dimensionList.setItems(allDims);
+    private static MutableComponent tr(String key, Object... args) {
+        return KineticI18n.translatable("gui.entitycontrol.modifier.buff_editor." + key, args);
     }
 
     @Override
-    protected void build(KineticUi ui) {
-        int centerX = width() / 2;
-        int centerY = height() / 2;
-        Component chanceLabel = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.chance");
-        Component minLabel = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.min");
-        Component maxLabel = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.max");
-
-        int chanceLabelWidth = KineticText.width(chanceLabel);
-        int minLabelWidth = KineticText.width(minLabel);
-        int maxLabelWidth = KineticText.width(maxLabel);
-        int totalRowWidth = chanceLabelWidth + 5 + 40 + 15
-                + minLabelWidth + 5 + 30 + 15
-                + maxLabelWidth + 5 + 30;
-        int currentX = centerX - totalRowWidth / 2;
-        int topRowY = centerY - 70;
-
-        chanceBox = ui.numberField(currentX + chanceLabelWidth + 5, topRowY, 40, NumberType.DECIMAL)
-                .label(chanceLabel)
-                .allowNegative(false)
-                .range(0D, 1D)
-                .value(buff.chance)
-                .firstShownTextAsDefault().build();
-
-        currentX += chanceLabelWidth + 5 + 40 + 15;
-        minBox = ui.numberField(currentX + minLabelWidth + 5, topRowY, 30, NumberType.INT)
-                .label(minLabel)
-                .allowNegative(false)
-                .range(0, null)
-                .value(buff.minLevel)
-                .firstShownTextAsDefault().build();
-
-        currentX += minLabelWidth + 5 + 30 + 15;
-        maxBox = ui.numberField(currentX + maxLabelWidth + 5, topRowY, 30, NumberType.INT)
-                .label(maxLabel)
-                .allowNegative(false)
-                .range(0, null)
-                .value(buff.maxLevel)
-                .firstShownTextAsDefault().build();
-
-        refreshDimList();
-        int listX = centerX - 165;
-        int listY = centerY - 35;
-        dimensionList = ui.add(new DimensionList(listX, listY, LIST_WIDTH, LIST_HEIGHT));
-        dimensionList.setItems(allDims);
-
-        ui.button(centerX - 75, centerY + 115, 65)
-                .text(KineticI18n.translatable("gui.entitycontrol.modifier.modifier.save"))
-                .onClick(this::save)
-                .build();
-        ui.button(centerX + 10, centerY + 115, 65)
-                .text(KineticI18n.translatable("gui.entitycontrol.modifier.config.back"))
-                .onClick(this::navigateBack)
-                .build();
+    protected Component headerTitle() {
+        return tr("title", effectId);
     }
 
-    private void save() {
-        Double chance = chanceBox == null ? null : chanceBox.getDoubleValue();
-        Integer minLevel = minBox == null ? null : minBox.getIntValue();
-        Integer maxLevel = maxBox == null ? null : maxBox.getIntValue();
-        if (chance == null || minLevel == null || maxLevel == null || maxLevel < minLevel) {
+    @Override
+    protected List<HeaderAction> headerActions() {
+        return List.of(HeaderAction.button("apply", tr("apply"), tr("apply.tooltip"), this::apply));
+    }
+
+    private void apply() {
+        if (maxLevel < minLevel) {
             KineticOverlays.toast(KineticI18n.translatable("msg.entitycontrol.modifier.invalid_number"));
-            if (maxBox != null) maxBox.flashValidationError();
             return;
         }
-
         buff.chance = chance;
         buff.minLevel = minLevel;
         buff.maxLevel = maxLevel;
-        buff.dimensions = String.join(",", addedDimensions);
-        parent.getLocalData()
-                .computeIfAbsent(entityId, key -> new EntityModifierConfig.EntityEditData())
-                .buffs
-                .put(effectId, buff);
-    }
-
-    private void toggleDimension(String dimension) {
-        if (!addedDimensions.remove(dimension)) addedDimensions.add(dimension);
-        refreshDimList();
+        buff.dimensions = String.join(",", dimensions);
+        parent.getLocalData().computeIfAbsent(entityId, key -> new EntityModifierConfig.EntityEditData()).buffs.put(effectId, buff);
+        KineticOverlays.toast(tr("applied"));
+        navigateBack();
     }
 
     @Override
-    protected void renderBackground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        int centerX = width() / 2;
-        int centerY = height() / 2;
-        KineticTheme.panel(graphics, centerX - 180, centerY - 120, 360, 265);
-        graphics.centeredText(title(), centerX, centerY - 110, KineticTheme.current().text(), false);
-        graphics.centeredText(effectId, centerX, centerY - 95, KineticTheme.current().text(), false);
-
-        Component chanceLabel = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.chance");
-        Component minLabel = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.min");
-        Component maxLabel = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.max");
-        int chanceLabelWidth = KineticText.width(chanceLabel);
-        int minLabelWidth = KineticText.width(minLabel);
-        int maxLabelWidth = KineticText.width(maxLabel);
-        int totalRowWidth = chanceLabelWidth + 5 + 40 + 15
-                + minLabelWidth + 5 + 30 + 15
-                + maxLabelWidth + 5 + 30;
-        int currentX = centerX - totalRowWidth / 2;
-
-        graphics.text(chanceLabel, currentX, centerY - 64, KineticTheme.current().text());
-        currentX += chanceLabelWidth + 5 + 40 + 15;
-        graphics.text(minLabel, currentX, centerY - 64, KineticTheme.current().text());
-        currentX += minLabelWidth + 5 + 30 + 15;
-        graphics.text(maxLabel, currentX, centerY - 64, KineticTheme.current().text());
-
-        KineticTheme.panelAlt(graphics, centerX - 165, centerY - 35, LIST_WIDTH, LIST_HEIGHT);
+    protected void buildContent(KineticUi ui, KineticLayout.Rect body) {
+        KineticLayout.Split columns = halves(body);
+        Form form = form(section(columns.first(), tr("section")), LABEL_WIDTH);
+        decimalField(ui, number(form.row(KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.chance"), tr("chance.tooltip"))),
+                chance, 0D, 1D, tr("chance.tooltip"), value -> {
+                    if (value != null) chance = value;
+                });
+        KineticLayout.Rect levels = form.row(tr("levels"), tr("levels.tooltip"));
+        intField(ui, new KineticLayout.Rect(levels.x(), levels.y(), PAIR_WIDTH, H), minLevel, 0, 255,
+                KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.min"), value -> {
+                    if (value != null) minLevel = value;
+                });
+        intField(ui, new KineticLayout.Rect(levels.x() + PAIR_WIDTH + GAP, levels.y(), PAIR_WIDTH, H), maxLevel, 0, 255,
+                KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.max"), value -> {
+                    if (value != null) maxLevel = value;
+                });
+        List<ToggleOption> options = new ArrayList<>();
+        for (String dimension : allDimensions) {
+            options.add(new ToggleOption(Component.literal(dimension), tr("dimension.tooltip"), () -> dimensions.contains(dimension),
+                    value -> {
+                        if (value) {
+                            if (!dimensions.contains(dimension)) dimensions.add(dimension);
+                        } else {
+                            dimensions.remove(dimension);
+                        }
+                    }));
+        }
+        toggleMenu(ui, compact(form.row(tr("dimensions"), tr("dimension.tooltip"))), tr("dimensions.button"), tr("dimension.tooltip"),
+                options, !options.isEmpty(), null);
+        helpRect = section(columns.second(), tr("help.title"));
     }
 
-    private final class DimensionList extends KineticRowList<String> {
-        private DimensionList(int x, int y, int width, int height) {
-            super(x, y, width, height, ROW_HEIGHT);
-        }
-
-        @Override
-        protected void renderRow(KineticGraphics graphics, String dimension, int index, int x, int y, int width,
-                                 int height, boolean hovered, boolean selected) {
-            Component label = KineticI18n.translatable(
-                    "gui.entitycontrol.modifier.modifier.dimension_name",
-                    KineticText.ellipsize(dimension, Math.max(30, width - INLINE_BUTTON_WIDTH - 18))
-            );
-            graphics.text(label, x + 6, y + 7, KineticTheme.current().text());
-
-            boolean added = addedDimensions.contains(dimension);
-            int buttonX = x + width - INLINE_BUTTON_WIDTH - 5;
-            boolean buttonHovered = mouseX() >= buttonX && mouseX() < buttonX + INLINE_BUTTON_WIDTH
-                    && mouseY() >= y + 3 && mouseY() < y + height - 3;
-            KineticTheme.button(
-                    graphics,
-                    buttonX,
-                    y + 3,
-                    INLINE_BUTTON_WIDTH,
-                    height - 6,
-                    KineticI18n.translatable(added
-                            ? "gui.entitycontrol.modifier.modifier.buff.dim_remove_btn"
-                            : "gui.entitycontrol.modifier.modifier.buff.dim_add_btn"),
-                    buttonHovered,
-                    true,
-                    added
-            );
-        }
-
-        @Override
-        protected boolean onRowClick(String dimension, int index, MouseInput input) {
-            if (!input.isLeft()) return false;
-            int rowY = rowTop(index);
-            int buttonX = controlX() + rowsWidth() - INLINE_BUTTON_WIDTH - 5;
-            if (!input.inside(buttonX, rowY + 3, INLINE_BUTTON_WIDTH, rowHeight() - 6)) return false;
-            toggleDimension(dimension);
-            return true;
+    @Override
+    protected void renderContent(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        if (helpRect != null) {
+            graphics.wrappedText(tr("help"), helpRect.x(), helpRect.y(), helpRect.width(), KineticTheme.current().text());
         }
     }
 }

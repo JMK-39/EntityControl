@@ -1,21 +1,21 @@
 package dev.xyat.entitycontrol.breakspawn.client.gui;
 
 import dev.xyat.entitycontrol.breakspawn.config.BreakSpawnConfig;
+import dev.xyat.entitycontrol.client.gui.kit.EcPage;
+import dev.xyat.entitycontrol.client.gui.kit.TextRowList;
 import dev.xyat.kineticcore.api.client.gui.input.MouseInput;
-import dev.xyat.kineticcore.api.client.gui.page.KineticPage;
+import dev.xyat.kineticcore.api.client.gui.layout.KineticLayout;
+import dev.xyat.kineticcore.api.client.gui.overlay.KineticOverlays;
 import dev.xyat.kineticcore.api.client.gui.render.KineticGraphics;
-import dev.xyat.kineticcore.api.client.gui.text.KineticText;
 import dev.xyat.kineticcore.api.client.gui.theme.KineticTheme;
 import dev.xyat.kineticcore.api.client.gui.ui.KineticUi;
-import dev.xyat.kineticcore.api.client.gui.ui.NumberType;
-import dev.xyat.kineticcore.api.client.gui.widget.KineticNumberField;
-import dev.xyat.kineticcore.api.client.gui.widget.KineticTextField;
-import dev.xyat.kineticcore.api.client.gui.widget.list.KineticRowList;
 import dev.xyat.kineticcore.api.client.search.KineticSearch;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
 import dev.xyat.kineticcore.api.text.KineticI18n;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -23,251 +23,193 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
-public final class AttributeRangeScreen extends KineticPage {
-    private static final int LIST_X = 20;
-    private static final int LIST_Y = 70;
-    private static final int LIST_W = 380;
-    private static final int LIST_H = 255;
-    private static final int ROW_H = 22;
+import static dev.xyat.entitycontrol.breakspawn.client.gui.BlockRuleEditorScreen.tip;
+import static dev.xyat.entitycontrol.breakspawn.client.gui.BlockRuleEditorScreen.tr;
+
+/** 生成时的随机属性：左侧属性列表（绿框表示已设置范围），右侧设置最小 / 最大值。 */
+public final class AttributeRangeScreen extends EcPage {
+    private static final int LABEL_WIDTH = 88;
 
     private final String entityId;
     private final BreakSpawnConfig.EntityRule rule;
-    private final List<Attribute> allAttributes = new ArrayList<>();
-    private final List<Attribute> filtered = new ArrayList<>();
+    private final Runnable onChange;
+    private final List<String> attributeIds = new ArrayList<>();
+    private final TextRowList list = new TextRowList();
     private LivingEntity previewEntity;
-    private KineticTextField searchBox;
-    private KineticNumberField minBox;
-    private KineticNumberField maxBox;
-    private AttributeList attributeList;
-    private Attribute selected;
-    private boolean loadingFields;
+    private String query = "";
+    private String selected;
+    private KineticLayout.Rect helpRect;
 
-    public AttributeRangeScreen(String entityId, BreakSpawnConfig.EntityRule rule) {
+    public AttributeRangeScreen(String entityId, BreakSpawnConfig.EntityRule rule, Runnable onChange) {
         super(KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.title"));
         this.entityId = entityId;
         this.rule = rule;
-        buildPreviewEntity();
-        buildAttributeList();
-        refreshFilter("");
-    }
-
-    private void buildPreviewEntity() {
+        this.onChange = onChange;
         var level = KineticClientRuntime.currentLevel();
-        if (level == null) return;
         ResourceLocation id = KineticResourceIds.tryParse(entityId);
         EntityType<?> type = id == null ? null : KineticRegistries.entityTypes().get(id);
-        if (type == null) return;
-        try {
-            Entity entity = type.create(level);
-            if (entity instanceof LivingEntity living) previewEntity = living;
-        } catch (Throwable ignored) {
+        if (level != null && type != null) {
+            try {
+                Entity entity = type.create(level);
+                if (entity instanceof LivingEntity living) previewEntity = living;
+            } catch (Throwable ignored) {
+            }
         }
-    }
-
-    private void buildAttributeList() {
-        allAttributes.clear();
         for (Attribute attribute : KineticRegistries.attributes().values()) {
-            ResourceLocation id = KineticRegistries.attributes().id(attribute);
-            if (id == null) continue;
+            ResourceLocation attributeId = KineticRegistries.attributes().id(attribute);
+            if (attributeId == null) continue;
             if (previewEntity == null || previewEntity.getAttributes().hasAttribute(attribute)
-                    || rule.attributes.containsKey(id.toString())) {
-                allAttributes.add(attribute);
+                    || rule.attributes.containsKey(attributeId.toString())) {
+                attributeIds.add(attributeId.toString());
             }
         }
-        allAttributes.sort(Comparator.comparing(attribute -> {
-            ResourceLocation id = KineticRegistries.attributes().id(attribute);
-            return id == null ? "" : id.toString();
-        }));
     }
 
-    @Override
-    protected void build(KineticUi ui) {
-        searchBox = ui.textField(LIST_X, 40, LIST_W)
-                .label(KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.search"))
-                .placeholder(KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.search.placeholder"))
-                .maxLength(128)
-                .value("")
-                .onChange(this::refreshFilter)
-                .firstShownTextAsDefault().build();
-
-        attributeList = ui.add(new AttributeList(LIST_X, LIST_Y, LIST_W, LIST_H));
-        attributeList.setOnSelect(index -> {
-            selected = index >= 0 && index < attributeList.items().size() ? attributeList.items().get(index) : null;
-            updateFieldState();
-        });
-        attributeList.setItems(filtered);
-
-        minBox = ui.numberField(495, 132, 120, NumberType.DECIMAL)
-                .allowNegative(true)
-                .onChange(value -> updateSelectedRange(true, value))
-                .firstShownTextAsDefault()
-                .build();
-        maxBox = ui.numberField(495, 169, 120, NumberType.DECIMAL)
-                .allowNegative(true)
-                .onChange(value -> updateSelectedRange(false, value))
-                .firstShownTextAsDefault()
-                .build();
-
-        ui.button(420, 211, 195)
-                .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.use_default"))
-                .onClick(this::useDefaultValue).build();
-        ui.button(420, 236, 195)
-                .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.clear"))
-                .onClick(this::clearSelected).build();
-        ui.button(420, 305, 195)
-                .text(KineticI18n.translatable("gui.entitycontrol.breakspawn.back"))
-                .onClick(this::navigateBack).build();
-        updateFieldState();
+    private static Attribute attribute(String id) {
+        ResourceLocation location = KineticResourceIds.tryParse(id);
+        return location == null ? null : KineticRegistries.attributes().get(location);
     }
 
-    private void refreshFilter(String query) {
-        String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
-        filtered.clear();
-        for (Attribute attribute : allAttributes) {
-            ResourceLocation id = KineticRegistries.attributes().id(attribute);
-            if (id == null) continue;
-            String name = KineticI18n.translatable(attribute.getDescriptionId()).getString();
-            String searchData = (id + " " + name + " " + KineticSearch.pinyin(name)).toLowerCase(Locale.ROOT);
-            if (normalized.isEmpty() || KineticSearch.match(searchData, normalized)) filtered.add(attribute);
-        }
-        filtered.sort((left, right) -> {
-            ResourceLocation leftId = KineticRegistries.attributes().id(left);
-            ResourceLocation rightId = KineticRegistries.attributes().id(right);
-            boolean leftEdited = leftId != null && rule.attributes.containsKey(leftId.toString());
-            boolean rightEdited = rightId != null && rule.attributes.containsKey(rightId.toString());
-            if (leftEdited != rightEdited) return leftEdited ? -1 : 1;
-            return String.valueOf(leftId).compareTo(String.valueOf(rightId));
-        });
-        if (attributeList != null) {
-            attributeList.setItems(filtered);
-            int selectedIndex = selected == null ? -1 : filtered.indexOf(selected);
-            attributeList.setSelectedIndex(selectedIndex);
-        }
+    private static Component attributeName(String id) {
+        Attribute attribute = attribute(id);
+        return attribute == null ? Component.literal(id) : KineticI18n.translatable(attribute.getDescriptionId());
     }
 
-    private void updateSelectedRange(boolean min, String raw) {
-        if (loadingFields || selected == null) return;
-        ResourceLocation id = KineticRegistries.attributes().id(selected);
-        if (id == null) return;
-        try {
-            double value = Double.parseDouble(raw.trim());
-            if (!Double.isFinite(value)) return;
-            BreakSpawnConfig.AttributeRange range = rule.attributes.computeIfAbsent(id.toString(), ignored -> {
-                BreakSpawnConfig.AttributeRange created = new BreakSpawnConfig.AttributeRange();
-                double base = getDefaultValue(selected);
-                created.min = base;
-                created.max = base;
-                return created;
-            });
-            if (min) range.min = value;
-            else range.max = value;
-            if (attributeList != null) attributeList.setItems(filtered);
-        } catch (RuntimeException ignored) {
-        }
-    }
-
-    private void useDefaultValue() {
-        if (selected == null) return;
-        ResourceLocation id = KineticRegistries.attributes().id(selected);
-        if (id == null) return;
-        double value = getDefaultValue(selected);
-        BreakSpawnConfig.AttributeRange range = new BreakSpawnConfig.AttributeRange();
-        range.min = value;
-        range.max = value;
-        rule.attributes.put(id.toString(), range);
-        updateFieldState();
-        refreshFilter(searchBox == null ? "" : searchBox.textValue());
-    }
-
-    private void clearSelected() {
-        if (selected == null) return;
-        ResourceLocation id = KineticRegistries.attributes().id(selected);
-        if (id != null) rule.attributes.remove(id.toString());
-        updateFieldState();
-        refreshFilter(searchBox == null ? "" : searchBox.textValue());
-    }
-
-    private void updateFieldState() {
-        if (minBox == null || maxBox == null) return;
-        loadingFields = true;
-        try {
-            boolean active = selected != null;
-            minBox.setEnabled(active);
-            maxBox.setEnabled(active);
-            if (!active) {
-                minBox.setTextValue("");
-                maxBox.setTextValue("");
-                return;
-            }
-            ResourceLocation id = KineticRegistries.attributes().id(selected);
-            BreakSpawnConfig.AttributeRange range = id == null ? null : rule.attributes.get(id.toString());
-            double base = getDefaultValue(selected);
-            minBox.setDoubleValue(range == null ? base : range.min);
-            maxBox.setDoubleValue(range == null ? base : range.max);
-        } finally {
-            loadingFields = false;
-        }
-    }
-
-    private double getDefaultValue(Attribute attribute) {
+    private double baseValue(String id) {
+        Attribute attribute = attribute(id);
+        if (attribute == null) return 0D;
         if (previewEntity != null && previewEntity.getAttributes().hasAttribute(attribute)) {
             return previewEntity.getAttributes().getBaseValue(attribute);
         }
         return attribute.getDefaultValue();
     }
 
-    @Override
-    protected void renderBackground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        KineticTheme.panel(graphics, 8, 8, 624, 344);
-        KineticTheme.panelAlt(graphics, LIST_X, LIST_Y, LIST_W, LIST_H);
-        KineticTheme.panelAlt(graphics, 410, LIST_Y, 210, LIST_H);
-        graphics.text(title(), 20, 18, KineticTheme.current().text());
-        renderDetails(graphics);
+    private List<TextRowList.Row> rows() {
+        String normalized = query.trim().toLowerCase(Locale.ROOT);
+        List<String> ids = new ArrayList<>();
+        for (String id : attributeIds) {
+            String name = attributeName(id).getString();
+            if (!normalized.isEmpty() && !KineticSearch.match((id + " " + name + " " + KineticSearch.pinyin(name))
+                    .toLowerCase(Locale.ROOT), normalized)) continue;
+            ids.add(id);
+        }
+        ids.sort((left, right) -> {
+            boolean a = rule.attributes.containsKey(left);
+            boolean b = rule.attributes.containsKey(right);
+            return a != b ? (a ? -1 : 1) : left.compareTo(right);
+        });
+        List<TextRowList.Row> rows = new ArrayList<>();
+        for (String id : ids) {
+            BreakSpawnConfig.AttributeRange range = rule.attributes.get(id);
+            Component text = attributeName(id).copy();
+            if (range != null) {
+                text = text.copy().append(Component.literal("  " + format(range.min) + " ~ " + format(range.max)).withStyle(ChatFormatting.AQUA));
+            }
+            rows.add(new TextRowList.Row(id, text));
+        }
+        return rows;
     }
 
-    private void renderDetails(KineticGraphics graphics) {
+    private static String format(double value) {
+        return java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+    }
+
+    @Override
+    protected Component headerTitle() {
+        ResourceLocation id = KineticResourceIds.tryParse(entityId);
+        EntityType<?> type = id == null ? null : KineticRegistries.entityTypes().get(id);
+        return tr("attributes.title", type == null ? Component.literal(entityId) : type.getDescription());
+    }
+
+    @Override
+    protected List<HeaderAction> headerActions() {
+        boolean has = selected != null;
+        return List.of(HeaderAction.more(() -> List.of(
+                has ? KineticOverlays.MenuItem.action(KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.use_default"),
+                        tip("attributes.use_default"), () -> {
+                            double base = baseValue(selected);
+                            BreakSpawnConfig.AttributeRange range = new BreakSpawnConfig.AttributeRange();
+                            range.min = base;
+                            range.max = base;
+                            rule.attributes.put(selected, range);
+                            onChange.run();
+                            rebuild();
+                        })
+                        : KineticOverlays.MenuItem.disabled(KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.use_default"),
+                        tip("attributes.select_first")),
+                has && rule.attributes.containsKey(selected)
+                        ? KineticOverlays.MenuItem.danger(KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.clear"),
+                        tip("attributes.clear"), () -> {
+                            rule.attributes.remove(selected);
+                            onChange.run();
+                            rebuild();
+                        })
+                        : KineticOverlays.MenuItem.disabled(KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.clear"),
+                        tip("attributes.select_first")))));
+    }
+
+    @Override
+    protected void buildContent(KineticUi ui, KineticLayout.Rect body) {
+        KineticLayout.Split columns = halves(body);
+        KineticLayout.Rect left = section(columns.first(), tr("attributes.list", rule.attributes.size()));
+        KineticLayout.Split rows = takeRow(left);
+        textInput(ui, rows.first(), query, KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.search.placeholder"),
+                tip("search"), value -> {
+                    query = value;
+                    list.update(rows());
+                });
+        list.layout(this, rows.second(), rows());
+
         if (selected == null) {
-            graphics.centeredText(KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.select_hint"),
-                    515, 95, KineticTheme.current().text(), false);
+            helpRect = section(columns.second(), KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.select_hint"));
             return;
         }
-        ResourceLocation id = KineticRegistries.attributes().id(selected);
-        String name = KineticI18n.translatable(selected.getDescriptionId()).getString();
-        graphics.text(KineticText.ellipsize(name, 190), 420, 82, KineticTheme.current().text());
-        if (id != null) graphics.text(KineticText.ellipsize(id.toString(), 190), 420, 99, KineticTheme.current().mutedText());
-        graphics.text(KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.min"), 420, 138, KineticTheme.current().text());
-        graphics.text(KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.max"), 420, 175, KineticTheme.current().text());
-        graphics.wrappedText(KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.random_hint"), 420, 272, 190,
-                KineticTheme.current().mutedText());
+        String id = selected;
+        BreakSpawnConfig.AttributeRange range = rule.attributes.get(id);
+        double base = baseValue(id);
+        Form form = form(section(columns.second(), attributeName(id)), LABEL_WIDTH);
+        decimalField(ui, number(form.row(tr("attributes.min"), tip("attributes.min"))), range == null ? base : range.min,
+                -1.0E9D, 1.0E9D, tip("attributes.min"), value -> update(id, value, true));
+        decimalField(ui, number(form.row(tr("attributes.max"), tip("attributes.max"))), range == null ? base : range.max,
+                -1.0E9D, 1.0E9D, tip("attributes.max"), value -> update(id, value, false));
+        helpRect = form.remaining();
     }
 
-    private final class AttributeList extends KineticRowList<Attribute> {
-        private AttributeList(int x, int y, int width, int height) {
-            super(x, y, width, height, ROW_H);
-        }
+    private void update(String id, Double value, boolean min) {
+        if (value == null) return;
+        BreakSpawnConfig.AttributeRange range = rule.attributes.computeIfAbsent(id, ignored -> {
+            BreakSpawnConfig.AttributeRange created = new BreakSpawnConfig.AttributeRange();
+            created.min = baseValue(id);
+            created.max = created.min;
+            return created;
+        });
+        if (min) range.min = value;
+        else range.max = value;
+        onChange.run();
+        list.update(rows());
+    }
 
-        @Override
-        protected void renderRow(KineticGraphics graphics, Attribute attribute, int index, int x, int y, int width,
-                                 int height, boolean hovered, boolean selectedRow) {
-            ResourceLocation id = KineticRegistries.attributes().id(attribute);
-            if (id == null) return;
-            String name = KineticI18n.translatable(attribute.getDescriptionId()).getString();
-            graphics.text(KineticText.ellipsize(name, 165), x + 5, y + 6, KineticTheme.current().text());
-            int idColor = rule.attributes.containsKey(id.toString())
-                    ? KineticTheme.current().translatedText()
-                    : KineticTheme.current().mutedText();
-            graphics.text(KineticText.ellipsize(id.toString(), 175), x + 188, y + 6, idColor);
+    @Override
+    protected void renderContent(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        list.render(graphics, mouseX, mouseY, id -> id.equals(selected), rule.attributes::containsKey, id -> attribute(id) == null);
+        if (helpRect != null) {
+            Component text = selected == null ? tr("attributes.help")
+                    : KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.random_hint").copy().append("\n")
+                    .append(tr("attributes.base", format(baseValue(selected))));
+            graphics.wrappedText(text, helpRect.x(), helpRect.y() + GAP, helpRect.width(), KineticTheme.current().text());
         }
+    }
 
-        @Override
-        protected boolean onRowClick(Attribute attribute, int index, MouseInput input) {
-            if (!input.isLeft()) return false;
-            select(index);
-            return true;
-        }
+    @Override
+    protected boolean contentClickCapture(MouseInput input) {
+        TextRowList.Row row = list.rowAt(input.x(), input.y());
+        if (row == null) return false;
+        selected = row.key();
+        clearFocus();
+        rebuild();
+        return true;
     }
 }
