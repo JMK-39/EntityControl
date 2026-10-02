@@ -388,7 +388,7 @@ public final class SpawnerControlScreen extends EcPage {
         ui.toggle(rect.x(), rect.y(), rect.width()).value(value)
                 .labels(tr("on"), tr("off"))
                 .tooltip(tip(tipKey))
-                .onChange(onChange::accept)
+                .onChange(onChange)
                 .build();
     }
 

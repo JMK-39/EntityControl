@@ -24,6 +24,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.inventory.Slot;
 
+import java.util.Comparator;
 import java.util.List;
 
 public class DummyScreen extends KineticContainerPage<DummyMenu> {
@@ -173,7 +174,7 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
                     }
                     return new KineticSuggestion(id, translation);
                 })
-                .sorted((left, right) -> left.value().compareTo(right.value()))
+                .sorted(Comparator.comparing(KineticSuggestion::value))
                 .toList();
     }
 
@@ -275,9 +276,7 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
                     case 5 -> EMPTY_SHIELD;
                     default -> null;
                 };
-                if (icon != null) {
-                    graphics.texture(icon, leftPos() + 21 + i * 18, topPos() + 8, 0, 0, 16, 16);
-                }
+                graphics.texture(icon, leftPos() + 21 + i * 18, topPos() + 8, 0, 0, 16, 16);
             }
         }
     }

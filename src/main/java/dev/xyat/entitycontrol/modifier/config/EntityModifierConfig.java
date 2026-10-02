@@ -140,7 +140,7 @@ public class EntityModifierConfig {
         for (Map.Entry<String, JsonElement> entry : object.entrySet()) {
             String entityId = normalizeResourceId(entry.getKey());
             if (entityId == null && !"__global__".equals(entry.getKey())) {
-                ModifierModule.LOGGER.warn("Removed malformed entity modifier config entry: {}", entry.getKey());
+                ModifierModule.LOGGER.warn("Removed entity modifier config entry with an invalid entity ID: {}", entry.getKey());
                 continue;
             }
 
@@ -149,12 +149,12 @@ public class EntityModifierConfig {
                 EntityEditData parsed = GSON.fromJson(entry.getValue(), EntityEditData.class);
                 EntityEditData normalized = normalizeStructure(parsed);
                 if (normalized == null) {
-                    ModifierModule.LOGGER.warn("Removed malformed entity modifier config entry: {}", entry.getKey());
+                    ModifierModule.LOGGER.warn("Removed entity modifier config entry with an invalid data structure: {}", entry.getKey());
                     continue;
                 }
                 loaded.put(key, normalized);
             } catch (Exception e) {
-                ModifierModule.LOGGER.warn("Removed malformed entity modifier config entry: {}", entry.getKey());
+                ModifierModule.LOGGER.warn("Failed to parse entity modifier config entry: {}", entry.getKey(), e);
             }
         }
 
@@ -239,7 +239,7 @@ public class EntityModifierConfig {
                 return null;
             }
             if (seen.add(dimensionId)) {
-                if (normalized.length() > 0) {
+                if (!normalized.isEmpty()) {
                     normalized.append(',');
                 }
                 normalized.append(dimensionId);
@@ -336,7 +336,7 @@ public class EntityModifierConfig {
                     if (dimensionKey == null || !dimensions.contains(dimensionKey)) {
                         return null;
                     }
-                    if (normalizedDimensions.length() > 0) {
+                    if (!normalizedDimensions.isEmpty()) {
                         normalizedDimensions.append(',');
                     }
                     normalizedDimensions.append(dimensionKey);

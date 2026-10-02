@@ -294,10 +294,9 @@ public final class EntityResetRuleListScreen extends EcPage {
         boolean real = rule == null || rule.countRealDeath;
         boolean prevented = rule != null && rule.countPreventedDeath;
         boolean cancelled = rule != null && rule.countCancelledDeath;
-        boolean differs = threshold != savedThreshold || countRealDeath != real
-                || countPreventedDeath != prevented || countCancelledDeath != cancelled;
         // 还没有规则的实体：只有改动了默认值才算未保存。
-        return differs;
+        return threshold != savedThreshold || countRealDeath != real
+                || countPreventedDeath != prevented || countCancelledDeath != cancelled;
     }
 
     @Override

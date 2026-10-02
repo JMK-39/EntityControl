@@ -68,8 +68,10 @@ public final class ItemSlotGrid {
         render(graphics, mouseX, mouseY, index -> index == selected, error, modified);
     }
 
-    /** 多选版本：{@code selected} 为真的格子画选中框。 */
-    /** 选中 = 橘黄，悬停 = 蓝色，数据有问题 = 红色，修改过 / 已启用 = 绿色（见 {@link EcPage#stateBorder}）。 */
+    /**
+     * 多选版本：{@code selected} 为真的格子画选中框。
+     * 选中 = 橘黄，悬停 = 蓝色，数据有问题 = 红色，修改过 / 已启用 = 绿色（见 {@link EcPage#stateBorder}）。
+     */
     public void render(KineticGraphics graphics, int mouseX, int mouseY, IntPredicate selected, IntPredicate error,
                        IntPredicate modified) {
         if (area == null) return;

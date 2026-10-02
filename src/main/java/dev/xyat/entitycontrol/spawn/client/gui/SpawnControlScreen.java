@@ -37,7 +37,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.function.Consumer;
 
 /**
  * 自然生成控制。顶栏：返回 / 当前页 ▾（生成规则 · 群系 · 分类）/ 配置方案 ▾ / 开关 ▾ / 保存 / 更多 ▾。
@@ -215,7 +214,7 @@ public final class SpawnControlScreen extends EcPage {
             result.add(id);
         }
         Comparator<String> order = Comparator
-                .comparing((String id) -> BiomeSpawnConfig.isEntityIdValid(id))
+                .comparing(BiomeSpawnConfig::isEntityIdValid)
                 .thenComparing(id -> !edited(id))
                 .thenComparing(id -> "misc".equals(normalizeCategory(profile.entities.get(id).category)))
                 .thenComparing(id -> normalizeCategory(profile.entities.get(id).category))
@@ -709,10 +708,9 @@ public final class SpawnControlScreen extends EcPage {
     private static int defaultWeight(String category) {
         return switch (category) {
             case "monster" -> 100;
-            case "creature" -> 60;
+            case "creature", "water_creature" -> 60;
             case "ambient" -> 30;
             case "axolotls", "underground_water_creature" -> 80;
-            case "water_creature" -> 60;
             case "water_ambient" -> 50;
             default -> 20;
         };

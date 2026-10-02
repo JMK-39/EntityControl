@@ -5,6 +5,7 @@ import dev.xyat.entitycontrol.modifier.config.EntityModifierConfig;
 import dev.xyat.kineticcore.api.client.gui.input.MouseInput;
 import dev.xyat.kineticcore.api.client.gui.overlay.KineticOverlays;
 import dev.xyat.kineticcore.api.client.gui.render.KineticGraphics;
+import dev.xyat.kineticcore.api.client.gui.state.EditedEntryTracker;
 import dev.xyat.kineticcore.api.client.gui.text.KineticText;
 import dev.xyat.kineticcore.api.client.gui.theme.KineticTheme;
 import dev.xyat.kineticcore.api.client.gui.ui.KineticUi;
@@ -40,6 +41,7 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
     );
 
     private KineticNumberField attrValueBox;
+    private final EditedEntryTracker<Attribute> editedAttributes = new EditedEntryTracker<>();
     private KineticButton modeButton;
     private KineticButton deleteButton;
     private String selectedAttribute;
@@ -256,6 +258,7 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
 
     @Override
     public void onEntitySelected(String entityId, LivingEntity previewEntity) {
+        editedAttributes.clear();
         selectedAttribute = null;
         selectedMode = null;
         clearValueSilently();
@@ -286,7 +289,7 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
             StringBuilder result = new StringBuilder();
             for (String part : id.getPath().replace('.', '_').split("_")) {
                 if (part.isEmpty()) continue;
-                if (result.length() > 0) result.append(' ');
+                if (!result.isEmpty()) result.append(' ');
                 result.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
             }
             return result.toString();
@@ -297,6 +300,10 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
     @Override
     protected void updateSearch(String query) {
         String q = query == null ? "" : query.toLowerCase(Locale.ROOT);
+        editedAttributes.refresh(KineticRegistries.attributes().values(), attribute -> {
+            ResourceLocation id = KineticRegistries.attributes().id(attribute);
+            return id != null && isAttrModified(id.toString(), attribute);
+        });
         displayList = KineticRegistries.attributes().values().stream()
                 .filter(attribute -> {
                     ResourceLocation id = KineticRegistries.attributes().id(attribute);
@@ -304,7 +311,7 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
                             || id.toString().toLowerCase(Locale.ROOT).contains(q)
                             || getReadableName(attribute, id).toLowerCase(Locale.ROOT).contains(q));
                 })
-                .sorted((left, right) -> {
+                .sorted(editedAttributes.comparator((left, right) -> {
                     ResourceLocation leftId = Objects.requireNonNull(KineticRegistries.attributes().id(left));
                     ResourceLocation rightId = Objects.requireNonNull(KineticRegistries.attributes().id(right));
                     int leftRank = COMMON_ATTRIBUTES.indexOf(leftId.toString());
@@ -317,11 +324,8 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
                     boolean leftVanilla = "minecraft".equals(leftId.getNamespace());
                     boolean rightVanilla = "minecraft".equals(rightId.getNamespace());
                     if (leftVanilla != rightVanilla) return leftVanilla ? -1 : 1;
-                    boolean leftModified = isAttrModified(leftId.toString(), left);
-                    boolean rightModified = isAttrModified(rightId.toString(), right);
-                    if (leftModified != rightModified) return leftModified ? -1 : 1;
                     return leftId.toString().compareTo(rightId.toString());
-                })
+                }))
                 .toList();
         refreshRows();
 
@@ -353,6 +357,9 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
         ResourceLocation id = KineticRegistries.attributes().id(attr);
         String attrId = id == null ? "" : id.toString();
         String namespace = id == null ? "minecraft" : id.getNamespace();
+        boolean modified = isAttrModified(attrId, attr);
+        EcPage.stateBorder(graphics, rowX, rowY + 1, rowWidth, rowHeight - 2,
+                selected, hovered, false, modified);
 
         Component namespaceText = KineticI18n.translatable(
                 "minecraft".equals(namespace)
@@ -377,7 +384,6 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
         double displayValue = previewEntity != null && previewEntity.getAttributes().hasAttribute(attr)
                 ? previewEntity.getAttributes().getBaseValue(attr)
                 : attr.getDefaultValue();
-        boolean modified = isAttrModified(attrId, attr);
         if (selectedEntityId != null && parent.getLocalData().containsKey(selectedEntityId)) {
             EntityModifierConfig.EntityEditData data = parent.getLocalData().get(selectedEntityId);
             if (data.attributes.containsKey(attrId)) displayValue = data.attributes.get(attrId);

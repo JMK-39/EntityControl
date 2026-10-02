@@ -11,7 +11,6 @@ import net.minecraft.world.entity.Entity;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.function.ToIntFunction;
 
 /**
  * 生物 3D 模型卡片网格（纯绘制，不占用控件）：方形卡片只显示模型，名称等详情放在页面的悬停提示中。

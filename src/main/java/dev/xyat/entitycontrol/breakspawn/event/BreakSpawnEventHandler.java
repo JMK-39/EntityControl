@@ -190,7 +190,7 @@ public final class BreakSpawnEventHandler {
         if (!rule.stackingEnabled || failures <= 0 || rule.chancePerFailure <= 0.0D) {
             return Math.min(base, max);
         }
-        double chance = base + Math.max(0, failures) * rule.chancePerFailure;
+        double chance = base + failures * rule.chancePerFailure;
         return Math.max(0.0D, Math.min(max, chance));
     }
 
@@ -203,13 +203,13 @@ public final class BreakSpawnEventHandler {
             return false;
         }
         ResourceLocation dimensionId = level.dimension().location();
-        if (!matchesCsv(rule.dimensions, dimensionId)) {
+        if (failsCsv(rule.dimensions, dimensionId)) {
             return false;
         }
         ResourceLocation biomeId = level.registryAccess()
                 .registryOrThrow(Registries.BIOME)
                 .getKey(level.getBiome(pos).value());
-        if (!matchesCsv(rule.biomes, biomeId)) {
+        if (failsCsv(rule.biomes, biomeId)) {
             return false;
         }
         int light = level.getMaxLocalRawBrightness(pos);
@@ -284,10 +284,10 @@ public final class BreakSpawnEventHandler {
             if (brokenPos.getY() < rule.minY || brokenPos.getY() > rule.maxY) {
                 continue;
             }
-            if (!matchesCsv(rule.dimensions, dimensionId)) {
+            if (failsCsv(rule.dimensions, dimensionId)) {
                 continue;
             }
-            if (!matchesCsv(rule.biomes, biomeId)) {
+            if (failsCsv(rule.biomes, biomeId)) {
                 continue;
             }
             if (failsAllowedBlock(rule.allowedBlocks, blockId)) {
@@ -301,23 +301,23 @@ public final class BreakSpawnEventHandler {
         return result;
     }
 
-    private static boolean matchesCsv(String csv, ResourceLocation current) {
+    private static boolean failsCsv(String csv, ResourceLocation current) {
         if (csv == null || csv.isBlank()) {
-            return true;
+            return false;
         }
         if (current == null) {
-            return false;
+            return true;
         }
         for (String value : BreakSpawnConfig.splitCsv(csv)) {
             if (current.toString().equals(value)) {
-                return true;
+                return false;
             }
         }
-        return false;
+        return true;
     }
 
     private static boolean failsAllowedBlock(String csv, ResourceLocation current) {
-        return csv != null && !csv.isBlank() && !matchesCsv(csv, current);
+        return csv != null && !csv.isBlank() && failsCsv(csv, current);
     }
 
     private static boolean matchesBlockedBlock(String csv, ResourceLocation current) {

@@ -44,6 +44,7 @@ public final class PlacedBlockTracker extends SavedData {
     }
 
     @Override
+    @Nonnull
     public CompoundTag save(@Nonnull CompoundTag tag) {
         long[] values = new long[positions.size()];
         int index = 0;

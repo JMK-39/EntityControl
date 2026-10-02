@@ -49,7 +49,6 @@ public class CuriosScreen extends KineticPage {
     private final KineticScrollController curioScroll = new KineticScrollController();
 
     private int totalSlots;
-    private int maxRows;
     private int visibleRows;
     private int panelW;
     private int panelH;
@@ -76,9 +75,9 @@ public class CuriosScreen extends KineticPage {
         int cy = height() / 2;
 
         this.totalSlots = CuriosCompat.getSlotCount(dummy);
-        this.maxRows = Math.max(1, (int) Math.ceil((double) this.totalSlots / COLUMNS));
-        this.visibleRows = Math.max(1, Math.min(MAX_VISIBLE_ROWS, this.maxRows));
-        this.curioScroll.updateRange(Math.max(0, this.maxRows - this.visibleRows), this.maxRows, this.visibleRows);
+        int maxRows = Math.max(1, (int) Math.ceil((double) this.totalSlots / COLUMNS));
+        this.visibleRows = Math.min(MAX_VISIBLE_ROWS, maxRows);
+        this.curioScroll.updateRange(Math.max(0, maxRows - this.visibleRows), maxRows, this.visibleRows);
 
         this.gridViewW = COLUMNS * SLOT_SIZE;
         this.gridViewH = visibleRows * SLOT_SIZE;
@@ -270,7 +269,7 @@ public class CuriosScreen extends KineticPage {
                     int displayIdx = i - startIdx;
                     int x = gridStartX + (displayIdx % COLUMNS) * SLOT_SIZE;
                     int y = gridStartY + (displayIdx / COLUMNS) * SLOT_SIZE;
-                    if (inside(mouseX, mouseY, x, y, SLOT_SIZE, SLOT_SIZE)) {
+                    if (inside(mouseX, mouseY, x, y)) {
                         return new HoverInfo(CuriosCompat.getCurioItem(dummy, i), true);
                     }
                 }
@@ -281,7 +280,7 @@ public class CuriosScreen extends KineticPage {
                 for (int i = 0; i < 36; i++) {
                     int px = inventorySlotX(i);
                     int py = inventorySlotY(i);
-                    if (inside(mouseX, mouseY, px, py, SLOT_SIZE, SLOT_SIZE)) {
+                    if (inside(mouseX, mouseY, px, py)) {
                         return new HoverInfo(inv.getItem(i), false);
                     }
                 }
@@ -417,8 +416,8 @@ public class CuriosScreen extends KineticPage {
             return playerInvY + (row == 3 ? 72 : 14 + row * 18);
         }
 
-        private boolean inside(double mouseX, double mouseY, int x, int y, int width, int height) {
-            return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+        private boolean inside(double mouseX, double mouseY, int x, int y) {
+            return mouseX >= x && mouseX < x + SLOT_SIZE && mouseY >= y && mouseY < y + SLOT_SIZE;
         }
     }
 }

@@ -6,7 +6,6 @@ import dev.xyat.entitycontrol.spawn.SpawnModule;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import dev.xyat.kineticcore.api.runtime.KineticPlatform;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.Entity;
@@ -442,10 +441,10 @@ public class SpawnerConfig {
         if (previousConfig == null || previousBackupFile == null) {
             return false;
         }
-        if (!writeJsonAtomic(CONFIG_PATH, dataToSave)) {
+        if (writeJsonFailed(CONFIG_PATH, dataToSave)) {
             return false;
         }
-        if (!writeJsonAtomic(BACKUP_PATH, backupToSave)) {
+        if (writeJsonFailed(BACKUP_PATH, backupToSave)) {
             restoreFile(CONFIG_PATH, previousConfig);
             restoreFile(BACKUP_PATH, previousBackupFile);
             return false;
@@ -487,7 +486,7 @@ public class SpawnerConfig {
         }
     }
 
-    private static boolean writeJsonAtomic(Path path, Object value) {
+    private static boolean writeJsonFailed(Path path, Object value) {
         try {
             Files.createDirectories(BASE_DIR);
             Path tempPath = path.resolveSibling(path.getFileName() + ".tmp");
@@ -504,10 +503,10 @@ public class SpawnerConfig {
             } catch (Exception ignored) {
                 Files.move(tempPath, path, StandardCopyOption.REPLACE_EXISTING);
             }
-            return true;
+            return false;
         } catch (Exception e) {
             SpawnModule.LOGGER.error("Failed to save {}", path.getFileName(), e);
-            return false;
+            return true;
         }
     }
 

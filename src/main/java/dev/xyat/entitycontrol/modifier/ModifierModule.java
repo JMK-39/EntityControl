@@ -17,6 +17,10 @@ public final class ModifierModule {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public ModifierModule() {
+        install();
+    }
+
+    public static void install() {
         ModifierEventHandler.register();
         EntityModifierConfig.load();
         KTServerConfigApi.registerActionPage("entitycontrol:modifier");

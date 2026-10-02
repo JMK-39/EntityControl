@@ -135,7 +135,7 @@ public final class BreakSpawnConfig {
     public static BlockRule createBlockRuleFromDefaults(GlobalSettings global) {
         BlockRule rule = new BlockRule();
         if (global != null) {
-            rule.baseChance = clamp(global.triggerChance, 0.0D, 1.0D);
+            rule.baseChance = clampChance(global.triggerChance);
             rule.minSpawnCount = Math.max(0, global.minSpawnCount);
             rule.maxSpawnCount = Math.max(rule.minSpawnCount, global.maxSpawnCount);
             rule.minDistance = Math.max(0, global.minDistance);
@@ -235,8 +235,8 @@ public final class BreakSpawnConfig {
         if (source == null) {
             return null;
         }
-        source.dimensions = normalizeResourceList(source.dimensions, false);
-        source.biomes = normalizeResourceList(source.biomes, false);
+        source.dimensions = normalizeResourceList(source.dimensions);
+        source.biomes = normalizeResourceList(source.biomes);
         if (source.entityWeights == null) {
             source.entityWeights = new TreeMap<>();
         }
@@ -256,10 +256,10 @@ public final class BreakSpawnConfig {
             return null;
         }
         source.spawnMode = normalizeSpawnMode(source.spawnMode);
-        source.dimensions = normalizeResourceList(source.dimensions, false);
-        source.biomes = normalizeResourceList(source.biomes, false);
-        source.allowedBlocks = normalizeResourceList(source.allowedBlocks, false);
-        source.blockedBlocks = normalizeResourceList(source.blockedBlocks, false);
+        source.dimensions = normalizeResourceList(source.dimensions);
+        source.biomes = normalizeResourceList(source.biomes);
+        source.allowedBlocks = normalizeResourceList(source.allowedBlocks);
+        source.blockedBlocks = normalizeResourceList(source.blockedBlocks);
         source.customName = source.customName == null ? "" : source.customName;
         source.entityNbt = source.entityNbt == null ? "" : source.entityNbt.trim();
         if (source.attributes == null) {
@@ -498,7 +498,7 @@ public final class BreakSpawnConfig {
         return false;
     }
 
-    private static String normalizeResourceList(String raw, boolean keepInvalid) {
+    private static String normalizeResourceList(String raw) {
         if (raw == null || raw.isBlank()) {
             return "";
         }
@@ -507,8 +507,6 @@ public final class BreakSpawnConfig {
             String normalized = normalizeResourceId(part);
             if (normalized != null) {
                 values.add(normalized);
-            } else if (keepInvalid && !part.isBlank()) {
-                values.add(part.trim());
             }
         }
         return String.join(",", values);
@@ -577,7 +575,7 @@ public final class BreakSpawnConfig {
         return result;
     }
 
-    private static double clamp(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
+    private static double clampChance(double value) {
+        return Math.max(0.0D, Math.min(1.0D, value));
     }
 }

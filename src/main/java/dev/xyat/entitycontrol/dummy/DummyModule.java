@@ -19,6 +19,10 @@ public final class DummyModule {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public DummyModule() {
+        install();
+    }
+
+    public static void install() {
         DummyConfig.register();
         KTServerConfigApi.register(KTServerConfigSpec.builder("entitycontrol:server")
                 .stringList("equipment_blacklist",

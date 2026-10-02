@@ -1,6 +1,5 @@
 package dev.xyat.entitycontrol.reset.event;
 
-import dev.xyat.entitycontrol.reset.ResetModule;
 import dev.xyat.entitycontrol.reset.config.EntityReseConfig;
 import dev.xyat.kineticcore.api.entity.event.KineticLivingEvents;
 import dev.xyat.kineticcore.api.event.KineticEventPriority;

@@ -14,6 +14,10 @@ public final class BreakSpawnModule {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public BreakSpawnModule() {
+        install();
+    }
+
+    public static void install() {
         BreakSpawnConfig.load();
         KTServerConfigApi.registerActionPage(BreakSpawnConfigGui.PAGE_ID);
         BreakSpawnNetwork.register();

@@ -12,10 +12,10 @@ public final class EntityControl {
     public static final String MODID = "entitycontrol";
 
     public EntityControl() {
-        new ModifierModule();
-        new ResetModule();
-        new DummyModule();
-        new SpawnModule();
-        new BreakSpawnModule();
+        ModifierModule.install();
+        ResetModule.install();
+        DummyModule.install();
+        SpawnModule.install();
+        BreakSpawnModule.install();
     }
 }

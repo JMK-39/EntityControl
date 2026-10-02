@@ -31,7 +31,7 @@ public final class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
             StringBuilder result = new StringBuilder();
             for (String part : id.getPath().replace('.', '_').split("_")) {
                 if (part.isEmpty()) continue;
-                if (result.length() > 0) result.append(' ');
+                if (!result.isEmpty()) result.append(' ');
                 result.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
             }
             return result.toString();

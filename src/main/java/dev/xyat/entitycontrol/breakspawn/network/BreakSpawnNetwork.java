@@ -118,15 +118,14 @@ public final class BreakSpawnNetwork {
             CHANNEL.sendToPlayer(player, new SaveConfigResultPacket(false));
             return;
         }
-        if (!BreakSpawnConfig.save(validated)) {
+        if (BreakSpawnConfig.save(validated)) {
+            BreakSpawnConfig.CURRENT = validated;
+            BreakSpawnEventHandler.resetRuntimeState();
+            CHANNEL.sendToPlayer(player, new SaveConfigResultPacket(true));
+        } else {
             player.sendSystemMessage(KineticI18n.translatable("msg.entitycontrol.breakspawn.save_failed"));
             CHANNEL.sendToPlayer(player, new SaveConfigResultPacket(false));
-            return;
         }
-
-        BreakSpawnConfig.CURRENT = validated;
-        BreakSpawnEventHandler.resetRuntimeState();
-        CHANNEL.sendToPlayer(player, new SaveConfigResultPacket(true));
     }
 
     public record RequestOpenEditorPacket() {

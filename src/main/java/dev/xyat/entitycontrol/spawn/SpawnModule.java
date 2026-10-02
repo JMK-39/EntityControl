@@ -16,6 +16,10 @@ public final class SpawnModule {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public SpawnModule() {
+        install();
+    }
+
+    public static void install() {
         SpawnerConfig.load();
         KTServerConfigApi.registerActionPage(SpawnConfigGui.PAGE_ID);
         BiomeSpawnConfig.loadGlobals();

@@ -261,10 +261,10 @@ public final class BlockRuleEditorScreen extends EcPage {
         Form spawn = form(section(rightCol.first(), tr("section.spawn")), LABEL_WIDTH);
         intPair(ui, spawn.row(tr("count"), tip("count")), rule.minSpawnCount, rule.maxSpawnCount, 0, 1024,
                 value -> rule.minSpawnCount = value, value -> rule.maxSpawnCount = value);
-        intRow(ui, spawn, "min_distance", rule.minDistance, 0, 1024, value -> rule.minDistance = value);
-        intRow(ui, spawn, "radius", rule.horizontalRadius, 0, 1024, value -> rule.horizontalRadius = value);
-        intRow(ui, spawn, "vertical_radius", rule.verticalRadius, 0, 1024, value -> rule.verticalRadius = value);
-        intRow(ui, spawn, "attempts", rule.maxSpawnAttempts, 1, 1024, value -> rule.maxSpawnAttempts = value);
+        intRow(ui, spawn, "min_distance", rule.minDistance, 0, value -> rule.minDistance = value);
+        intRow(ui, spawn, "radius", rule.horizontalRadius, 0, value -> rule.horizontalRadius = value);
+        intRow(ui, spawn, "vertical_radius", rule.verticalRadius, 0, value -> rule.verticalRadius = value);
+        intRow(ui, spawn, "attempts", rule.maxSpawnAttempts, 1, value -> rule.maxSpawnAttempts = value);
         actionButton(ui, compact(spawn.row(tr("pool"), tip("pool"))), tr("pool.button", rule.entityWeights.size()), tip("pool"), true,
                 () -> openChild(new BlockEntityPoolScreen(config, selectedBlockId, rule, this::changed)));
         helpRect = rightCol.second();
@@ -275,8 +275,8 @@ public final class BlockRuleEditorScreen extends EcPage {
         return new KineticLayout.Rect(row.x(), row.y(), Math.min(row.width(), 150), row.height());
     }
 
-    private void intRow(KineticUi ui, Form form, String key, int value, int min, int max, java.util.function.IntConsumer setter) {
-        intField(ui, number(form.row(tr(key), tip(key))), value, min, max, tip(key), changed -> {
+    private void intRow(KineticUi ui, Form form, String key, int value, int min, java.util.function.IntConsumer setter) {
+        intField(ui, number(form.row(tr(key), tip(key))), value, min, 1024, tip(key), changed -> {
             if (changed == null) return;
             setter.accept(changed);
             changed();

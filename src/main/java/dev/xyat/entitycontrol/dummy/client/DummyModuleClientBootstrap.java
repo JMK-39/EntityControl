@@ -18,9 +18,7 @@ public final class DummyModuleClientBootstrap {
         DummyConfigGui.load();
         KineticClientRenderers.registerEntityRenderer(DummyInit.DUMMY, DummyRenderTest::new);
         KineticClientMenus.register(DummyInit.DUMMY_MENU, DummyScreen::new);
-        KineticModLifecycle.onClientSetup(() -> {
-            DummyTextManager.register();
-        });
+        KineticModLifecycle.onClientSetup(DummyTextManager::register);
         KineticClientEvents.onHudRender(KineticClientEvents.HudStage.END, DeathSummaryOverlay::render);
     }
 }

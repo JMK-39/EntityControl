@@ -33,9 +33,7 @@ public final class EntityModifierNetworkClient {
     public static synchronized void register() {
         if (registered) return;
         KineticClientEvents.onTick(KineticClientEvents.TickPhase.END, EntityModifierNetworkClient::flushPending);
-        KineticClientEvents.onLogout(() -> {
-            PENDING.clear();
-        });
+        KineticClientEvents.onLogout(PENDING::clear);
         registered = true;
     }
 

@@ -50,9 +50,9 @@ public class GlobalDamageHandler {
     }
 
     private static class CombatSession {
-        int targetId;
+        final int targetId;
         float total;
-        long start;
+        final long start;
         long last;
         int hits;
 

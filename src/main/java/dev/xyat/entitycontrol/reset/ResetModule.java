@@ -17,6 +17,10 @@ public final class ResetModule {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public ResetModule() {
+        install();
+    }
+
+    public static void install() {
         KineticModLifecycle.onCommonSetup(EntityReseConfig::load);
 
         KTServerConfigApi.register(KTServerConfigSpec.builder("entitycontrol:entityrese")
