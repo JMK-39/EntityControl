@@ -1,0 +1,208 @@
+// 附属架构检查：compileJava 之前扫描附属源码，附属绕过 KineticCore 已提供的 GUI API 时直接让构建失败。
+// Addon architecture check: before compileJava, scan the addon's main sources and fail the build when code bypasses
+// a capability the KineticCore API already provides (internal packages, raw vanilla screens and widgets, vanilla
+// GUI types that have a Kinetic replacement, vanilla navigation, raw translations). Where the API has no
+// equivalent, the addon may build its own, declared in build.gradle (see below). This turns the hard rules of
+// docs/KineticCore-GUI-API-v2-Migration.md into a build error instead of a review checklist.
+//
+// 用法 / Usage: copy this file to the addon's gradle/ directory and add to build.gradle
+//     apply from: 'gradle/kinetic-addon-architecture.gradle'
+// Run on demand with `gradlew checkKineticAddonArchitecture`; compileJava depends on it.
+//
+// Mixins: files carrying @Mixin, and files under a `mixin`/`mixins` package directory, run inside vanilla code and
+// may use vanilla GUI types (GuiGraphics, widgets, textures). They still may not touch KineticCore internals or
+// build raw translations.
+//
+// Exceptions are per file and per rule, and live in build.gradle where review sees them. Set them AFTER the
+// apply line; each value is the list of rule ids (shown in the failure output) allowed in that file:
+//     ext.kineticArchitectureAllow = [
+//             'src/main/java/com/example/compat/jei/ExampleCategory.java': ['vanilla-gui-type'],
+//     ]
+
+import java.util.regex.Pattern
+
+def kineticAddonRules = [
+        // id, applies to mixins, pattern, replacement hint
+        [id: 'kinetic-internal', mixins: true,
+         pattern: ~/\bdev\.xyat\.kineticcore\.(?:internal|feature)\b/,
+         hint: 'KineticCore internal and feature packages are not API; use dev.xyat.kineticcore.api'],
+        [id: 'raw-screen', mixins: false,
+         pattern: ~/\bextends\s+(?:net\.minecraft\.[\w.]+\.)?(?:Screen|AbstractContainerScreen|KineticScreen|KineticNativeScreen|KineticContainerScreen)\b/,
+         hint: 'extend KineticPage / KineticContainerPage / KineticHudEditorPage'],
+        [id: 'raw-widget-class', mixins: false,
+         pattern: ~/\bextends\s+(?:net\.minecraft\.[\w.]+\.)?(?:AbstractWidget|AbstractButton|Button|ImageButton|EditBox|MultiLineEditBox|AbstractSliderButton|Checkbox|ObjectSelectionList|ContainerObjectSelectionList|AbstractSelectionList)\b/,
+         hint: 'extend KineticCustomControl or KineticRowList, or use a ui.* builder'],
+        [id: 'raw-widget', mixins: false,
+         pattern: ~/\bButton\.builder\s*\(|\bnew\s+(?:Button|ImageButton|EditBox|MultiLineEditBox|Checkbox|ConfirmScreen|AlertScreen)\s*\(|\bCycleButton\.(?:builder|onOffBuilder|booleanBuilder)\s*\(|\bTooltip\.create\s*\(/,
+         hint: 'use ui.button / ui.textField / ui.toggle / ui.cycle, .tooltip(...), and openDialog(...)'],
+        [id: 'widget-lifecycle', mixins: false,
+         pattern: ~/\b(?:addRenderableWidget|addRenderableOnly|addWidget|removeWidget|clearWidgets|rebuildWidgets)\s*\(|\bthis\.init\s*\(\s*\)/,
+         hint: 'controls are registered by ui.* builders in build(KineticUi); call rebuild() to rebuild'],
+        [id: 'screen-navigation', mixins: false,
+         pattern: ~/\.setScreen\s*\(|\bMenuScreens\.register\s*\(|\bNetworkHooks\.openScreen\s*\(/,
+         hint: 'use openChild(...), KineticGui.open / closeScreen, KineticClientMenus.register, KineticMenus.open'],
+        // Only vanilla GUI types with a Kinetic replacement. Screen types such as Screen, PauseScreen or
+        // InventoryScreen stay importable: the API hands out vanilla screens and instanceof checks have no replacement.
+        [id: 'vanilla-gui-type', mixins: false,
+         pattern: ~/(?m)^\s*import\s+net\.minecraft\.client\.gui\.(?:GuiGraphics|Font|components\.(?:\*|AbstractWidget|AbstractButton|Button|ImageButton|PlainTextButton|EditBox|MultiLineEditBox|Checkbox|CycleButton|AbstractSliderButton|Tooltip|StringWidget|MultiLineTextWidget|ObjectSelectionList|AbstractSelectionList|ContainerObjectSelectionList)|screens\.(?:ConfirmScreen|AlertScreen)|screens\.inventory\.tooltip\.ClientTooltipComponent)\s*;/,
+         hint: 'use KineticGraphics, KineticText, ui.* builders and controls, openDialog(...) or KineticTooltipComponent'],
+        [id: 'vanilla-modifier-keys', mixins: false,
+         pattern: ~/\bScreen\.has(?:Shift|Control|Alt)Down\s*\(/,
+         hint: 'use KineticClientRuntime.shiftModifierDown() / controlModifierDown() / altModifierDown()'],
+        [id: 'raw-translation', mixins: true,
+         pattern: ~/\bComponent\.translatable\s*\(|\bKineticText\.translatable\s*\(/,
+         hint: 'use KineticI18n.translatable(...)'],
+        [id: 'texture-handle', mixins: false, keepStrings: true,
+         pattern: ~/\b(?:new\s+ResourceLocation|ResourceLocation\.(?:tryParse|fromNamespaceAndPath|parse))\s*\([^;]*textures\//,
+         hint: 'use KineticTexture; ResourceLocation stays fine as a business or registry ID'],
+]
+
+// Blanks comments, and string/char literals unless keepStrings, preserving line breaks for line numbers.
+def kineticAddonMask = { String source, boolean keepStrings ->
+    StringBuilder out = new StringBuilder(source.length())
+    int i = 0
+    while (i < source.length()) {
+        char ch = source.charAt(i)
+        if (source.startsWith('//', i)) {
+            while (i < source.length() && source.charAt(i) != ('\n' as char)) { out.append(' '); i++ }
+        } else if (source.startsWith('/*', i)) {
+            int end = source.indexOf('*/', i + 2)
+            end = end < 0 ? source.length() : end + 2
+            while (i < end) { out.append(source.charAt(i) == ('\n' as char) ? '\n' : ' '); i++ }
+        } else if (source.startsWith('"""', i)) {
+            int end = source.indexOf('"""', i + 3)
+            end = end < 0 ? source.length() : end + 3
+            while (i < end) {
+                char c = source.charAt(i)
+                out.append(keepStrings || c == ('\n' as char) ? c : ' ' as char)
+                i++
+            }
+        } else if (ch == ('"' as char) || ch == ('\'' as char)) {
+            char quote = ch
+            out.append(ch)
+            i++
+            while (i < source.length() && source.charAt(i) != quote && source.charAt(i) != ('\n' as char)) {
+                int width = source.charAt(i) == ('\\' as char) && i + 1 < source.length() ? 2 : 1
+                for (int k = 0; k < width; k++) {
+                    out.append(keepStrings ? source.charAt(i) : ' ' as char)
+                    i++
+                }
+            }
+            if (i < source.length() && source.charAt(i) == quote) { out.append(quote); i++ }
+        } else {
+            out.append(ch)
+            i++
+        }
+    }
+    out.toString()
+}
+
+def kineticAddonLine = { String source, int index ->
+    int line = 1
+    for (int i = 0; i < index; i++) if (source.charAt(i) == ('\n' as char)) line++
+    line
+}
+
+// Project-relative path with '/' separators; absolute when the source lives on another drive or root.
+def kineticAddonDisplayPath = { File root, File file ->
+    String path
+    try {
+        path = root.toPath().relativize(file.toPath()).toString()
+    } catch (IllegalArgumentException ignored) {
+        path = file.absolutePath
+    }
+    path.replace('\\', '/')
+}
+
+// ext.kineticArchitectureAllow as path -> sorted rule ids, with '/' separators.
+def kineticAddonAllowances = { ->
+    def configured = project.findProperty('kineticArchitectureAllow')
+    if (configured == null) return new TreeMap<String, SortedSet<String>>()
+    if (!(configured instanceof Map)) {
+        throw new GradleException("ext.kineticArchitectureAllow must be a map of file path to a list of rule ids")
+    }
+    TreeMap<String, SortedSet<String>> allowances = new TreeMap<>()
+    for (Map.Entry<?, ?> entry : (configured as Map<?, ?>).entrySet()) {
+        SortedSet<String> ids = new TreeSet<>()
+        for (Object id : (entry.value as Collection<?>)) ids.add(String.valueOf(id))
+        allowances.put(String.valueOf(entry.key).replace('\\', '/'), ids)
+    }
+    allowances
+}
+
+def kineticAddonCheck = tasks.register('checkKineticAddonArchitecture') {
+    group = 'verification'
+    description = 'Fails when addon sources bypass KineticCore GUI APIs (see docs/KineticCore-GUI-API-v2-Migration.md).'
+
+    def javaSources = sourceSets.main.java
+    inputs.files(javaSources).withPropertyName('addonJavaSources')
+    inputs.property('kineticArchitectureAllow', providers.provider { kineticAddonAllowances().toString() })
+    def rootDirectory = project.projectDir
+
+    doLast {
+        TreeMap<String, SortedSet<String>> allow = kineticAddonAllowances()
+        Set<String> knownRules = new HashSet<>(kineticAddonRules.collect { String.valueOf(it.id) })
+        List<String> violations = []
+        Set<String> usedAllowances = new HashSet<>()
+
+        for (Map.Entry<String, SortedSet<String>> entry : allow.entrySet()) {
+            if (!new File(rootDirectory, entry.key).isFile()) {
+                violations.add("kineticArchitectureAllow names a missing file: ${entry.key}".toString())
+            }
+            for (String id : entry.value) {
+                if (!knownRules.contains(id)) {
+                    violations.add("kineticArchitectureAllow names an unknown rule '${id}' for ${entry.key}".toString())
+                }
+            }
+        }
+
+        javaSources.files.findAll { it.name.endsWith('.java') }.sort { it.absolutePath }.each { File file ->
+            String relative = kineticAddonDisplayPath(rootDirectory, file)
+            String source = file.getText('UTF-8')
+            String code = kineticAddonMask(source, false)
+            String codeWithStrings = null
+            boolean mixin = code =~ /@Mixin\s*\(/ || relative ==~ /(?:.*\/)?mixins?\/.*/
+            Set<String> allowed = allow.getOrDefault(relative, Collections.emptySortedSet())
+
+            kineticAddonRules.each { Map rule ->
+                if (mixin && !rule.mixins) return
+                String text = code
+                if (rule.keepStrings) {
+                    if (codeWithStrings == null) codeWithStrings = kineticAddonMask(source, true)
+                    text = codeWithStrings
+                }
+                def matcher = (rule.pattern as Pattern).matcher(text)
+                while (matcher.find()) {
+                    if (allowed.contains(rule.id)) {
+                        usedAllowances.add("${relative}|${rule.id}".toString())
+                        continue
+                    }
+                    int line = kineticAddonLine(text, matcher.start())
+                    String snippet = source.readLines()[line - 1].trim()
+                    violations.add("[${rule.id}] ${relative}:${line}: ${snippet}\n      -> ${rule.hint}".toString())
+                }
+            }
+        }
+
+        for (Map.Entry<String, SortedSet<String>> entry : allow.entrySet()) {
+            for (String id : entry.value) {
+                if (knownRules.contains(id) && !usedAllowances.contains("${entry.key}|${id}".toString())) {
+                    violations.add("kineticArchitectureAllow entry is no longer needed, remove it: ${entry.key} -> ${id}".toString())
+                }
+            }
+        }
+
+        if (!violations.isEmpty()) {
+            throw new GradleException(
+                    "Kinetic addon architecture check failed (${violations.size()}):\n - " + violations.join('\n - ')
+                            + "\n\nThe KineticCore API already provides these capabilities; addons must use it."
+                            + "\nSee docs/KineticCore-GUI-API-v2-Migration.md (hard rules, sections 11 and 14)."
+                            + "\nA real exception goes in build.gradle: ext.kineticArchitectureAllow = ['<path>': ['<rule id>']]"
+            )
+        }
+    }
+}
+
+tasks.named('compileJava').configure {
+    dependsOn kineticAddonCheck
+}
