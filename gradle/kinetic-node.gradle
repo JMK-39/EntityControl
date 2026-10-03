@@ -265,3 +265,6 @@ apply from: rootProject.file('gradle/kinetic-core-dependency.gradle')
 
 
 apply from: rootProject.file('gradle/kinetic-runtime-validation.gradle')
+
+// English and Chinese must expose exactly the same authored translation keys.
+apply from: rootProject.file('gradle/kinetic-language-validation.gradle')

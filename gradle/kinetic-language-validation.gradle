@@ -1,0 +1,43 @@
+import groovy.json.JsonSlurper
+
+// Keep one authored public key namespace in both locales, including version overlays.
+def languageModId = project.property('mod_id').toString()
+def mainLanguages = rootProject.file("src/main/resources/assets/${languageModId}/lang")
+def overridesRoot = rootProject.file('versions')
+def validatePair = { File directory, String label ->
+    File english = new File(directory, 'en_us.json')
+    File chinese = new File(directory, 'zh_cn.json')
+    if (!english.isFile() || !chinese.isFile()) throw new GradleException("${label}: both en_us.json and zh_cn.json are required / 中英文文件必须成对存在")
+    def en = new JsonSlurper().parse(english, 'UTF-8')
+    def zh = new JsonSlurper().parse(chinese, 'UTF-8')
+    if (!(en instanceof Map) || !(zh instanceof Map)) throw new GradleException("${label}: language JSON must be an object")
+    def englishOnly = (en.keySet() - zh.keySet()).toSorted()
+    def chineseOnly = (zh.keySet() - en.keySet()).toSorted()
+    if (!englishOnly.isEmpty() || !chineseOnly.isEmpty()) throw new GradleException("${label}: language keys differ / 中英文完整键名不一致; en-only=${englishOnly}; zh-only=${chineseOnly}")
+    [en_us: en, zh_cn: zh].each { locale, entries ->
+        entries.each { key, value ->
+            if (!(value instanceof String)) throw new GradleException("${label}/${locale}: ${key} must have a string value")
+            if (key ==~ /.*\.formatted(?:\.original|\.part\.\d+)?$/) throw new GradleException("${label}/${locale}: generated language key is forbidden / 禁止派生格式语言键: ${key}")
+        }
+    }
+    logger.lifecycle("Language keys verified / 中英文键名一致: ${label} (${en.size()} keys per locale)")
+}
+def verifyLanguages = tasks.register('validateLanguageKeys') {
+    group = 'verification'
+    description = 'Require exact English/Chinese keys and reject generated formatting keys.'
+    inputs.dir mainLanguages
+    inputs.files rootProject.file('gradle/kinetic-language-validation.gradle')
+    if (overridesRoot.isDirectory()) inputs.files fileTree(overridesRoot) { include '*/lang/*.json' }
+    doLast {
+        validatePair(mainLanguages, "${languageModId}/source")
+        if (overridesRoot.isDirectory()) overridesRoot.listFiles().findAll { it.isDirectory() && new File(it, 'lang').isDirectory() }.sort { it.name }.each {
+            validatePair(new File(it, 'lang'), "${languageModId}/${it.name}/overrides")
+        }
+    }
+}
+tasks.named('processResources').configure {
+    dependsOn verifyLanguages
+    inputs.file rootProject.file('gradle/kinetic-language-validation.gradle')
+    doLast { validatePair(new File(destinationDir, "assets/${languageModId}/lang"), "${languageModId}/${project.name}/packaged") }
+}
+tasks.named('check').configure { dependsOn verifyLanguages }
