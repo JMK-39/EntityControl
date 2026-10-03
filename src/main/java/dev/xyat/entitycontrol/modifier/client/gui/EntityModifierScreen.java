@@ -24,7 +24,11 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobCategory;
+//? if >=1.21 {
+/*import net.minecraft.tags.EntityTypeTags;
+*///?} else {
 import net.minecraft.world.entity.MobType;
+//?}
 import net.minecraft.world.entity.NeutralMob;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 
@@ -171,8 +175,16 @@ public final class EntityModifierScreen extends EcPage {
             ResourceLocation attributeId = KineticResourceIds.tryParse(entry.getKey());
             Attribute attribute = attributeId == null ? null : KineticRegistries.attributes().get(attributeId);
             if (attribute == null) continue;
+//? if >=1.21 {
+/*            double base = info.entity().getAttributes().hasAttribute(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attribute))
+*///?} else {
             double base = info.entity().getAttributes().hasAttribute(attribute)
+//?}
+//? if >=1.21 {
+/*                    ? info.entity().getAttributes().getBaseValue(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attribute)) : attribute.getDefaultValue();
+*///?} else {
                     ? info.entity().getAttributes().getBaseValue(attribute) : attribute.getDefaultValue();
+//?}
             if (Math.abs(entry.getValue() - base) > 0.0001D) return true;
         }
         return false;
@@ -187,7 +199,11 @@ public final class EntityModifierScreen extends EcPage {
                 || category == MobCategory.UNDERGROUND_WATER_CREATURE || category == MobCategory.AXOLOTLS) {
             return CategoryFilter.AQUATIC;
         }
+//? if >=1.21 {
+/*        if (entity.getType().is(EntityTypeTags.UNDEAD)) return CategoryFilter.UNDEAD;
+*///?} else {
         if (entity.getMobType() == MobType.UNDEAD) return CategoryFilter.UNDEAD;
+//?}
         if (entity instanceof NeutralMob) return CategoryFilter.NEUTRAL;
         if (category == MobCategory.MONSTER) return CategoryFilter.MONSTER;
         if (category == MobCategory.CREATURE) return CategoryFilter.FRIENDLY;

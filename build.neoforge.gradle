@@ -1,0 +1,55 @@
+// Build script for NeoForge nodes (Minecraft 1.20.5 and newer): Mojang names at runtime,
+// so the shipped JAR is the plain jar output and Mixins need no refmap.
+
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'net.neoforged.moddev'
+}
+
+apply from: rootProject.file('gradle/kinetic-node.gradle')
+
+neoForge {
+    version = project.property('neoforge_version').toString()
+    // The regression checks under src/test use Minecraft classes.
+    addModdingDependenciesTo sourceSets.test
+
+    runs {
+        configureEach {
+            // One game directory per Minecraft version, so worlds and configs are never opened by the wrong version.
+            gameDirectory = rootProject.file("run-${project.name}")
+            // ModDevGradle writes its own log4j config for NeoForge runs, at INFO unless told otherwise.
+            logLevel = org.slf4j.event.Level.DEBUG
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            systemProperty 'forge.logging.console.level', 'debug'
+        }
+
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', kineticModId
+            // -Pkinetic_quick_play=<save folder> joins that world straight away, for checking that a player can join.
+            if (project.findProperty('kinetic_quick_play')) {
+                programArguments.addAll('--quickPlaySingleplayer', project.property('kinetic_quick_play').toString())
+            }
+        }
+
+        server {
+            server()
+            systemProperty 'neoforge.enabledGameTestNamespaces', kineticModId
+            programArgument '--nogui'
+        }
+    }
+
+    mods {
+        "${kineticModId}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+kineticConfigureReleaseJar(tasks.named('jar', Jar))
+
+dependencies {
+    implementation 'maven.modrinth:jade:eYz2YBGT'
+    implementation 'maven.modrinth:curios:yohfFbgD'
+}

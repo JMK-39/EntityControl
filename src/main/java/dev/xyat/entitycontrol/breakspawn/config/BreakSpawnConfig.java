@@ -103,7 +103,11 @@ public final class BreakSpawnConfig {
 
     public static final class EquipmentSpec {
         public String itemId = "";
+//? if >=1.21 {
+/*        public String components = "";
+*///?} else {
         public String nbt = "";
+//?}
         public int count = 1;
         public double dropChance = 0.0D;
     }
@@ -464,7 +468,11 @@ public final class BreakSpawnConfig {
             }
             if (!spec.nbt.isEmpty()) {
                 try {
+//? if >=1.21 {
+/*                    dev.xyat.entitycontrol.breakspawn.data.EquipmentData.compile(spec.itemId, spec.nbt);
+*///?} else {
                     TagParser.parseTag(spec.nbt);
+//?}
                 } catch (Exception e) {
                     return null;
                 }

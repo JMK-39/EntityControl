@@ -6,13 +6,15 @@ on:
       - master
     paths:
       - '.github/workflows/auto-release.yml'
-      - 'build.gradle'
+      - 'build.*.gradle'
       - 'gradle.properties'
       - 'gradle/**'
       - 'gradlew'
       - 'gradlew.bat'
       - 'settings.gradle'
+      - 'stonecutter.gradle'
       - 'src/**'
+      - 'versions/**'
   workflow_dispatch:
 
 permissions:
@@ -31,16 +33,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Java 17
+      # Gradle runs on Java 21, and 1.20.1 and 1.21.1 both compile for Java 21.
+      - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
-      - name: Set up Gradle 8.8
+      - name: Set up Gradle 9.8.0
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.8'
+          gradle-version: '9.8.0'
 
       - name: Set release version and artifact name
         id: release
@@ -59,36 +62,48 @@ jobs:
             echo "mod_id=$mod_id"
             echo "mod_name=$mod_name"
             echo "version=$version"
-            echo "artifact=build/release/$mod_id-$version.jar"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Build mod JAR
+      # Builds one JAR per enabled Minecraft version: <mod_id>-<loader>-<minecraft>-<version>.jar.
+      - name: Build mod JARs
         env:
           VERSION: ${{ steps.release.outputs.version }}
           TZ: Asia/Shanghai
         run: >-
-          gradle build --no-daemon --stacktrace
+          gradle buildAll --no-daemon --stacktrace
           -Puse_auto_version=false
           -Pmod_version="$VERSION"
           -Poutput_mods_dir=build/release
 
-      - name: Check release artifact
+      - name: Check release artifacts
         env:
-          ARTIFACT: ${{ steps.release.outputs.artifact }}
-        run: test -s "$ARTIFACT"
+          MOD_ID: ${{ steps.release.outputs.mod_id }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          shopt -s nullglob
+          artifacts=(build/release/"$MOD_ID"-*-"$VERSION".jar)
+          if [ ${#artifacts[@]} -eq 0 ]; then
+            echo "No release JARs in build/release" >&2
+            exit 1
+          fi
+          for artifact in "${artifacts[@]}"; do
+            test -s "$artifact"
+            echo "$artifact"
+          done
 
       - name: Publish GitHub Release
         env:
-          ARTIFACT: ${{ steps.release.outputs.artifact }}
+          MOD_ID: ${{ steps.release.outputs.mod_id }}
           MOD_NAME: ${{ steps.release.outputs.mod_name }}
           VERSION: ${{ steps.release.outputs.version }}
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="v$VERSION"
+          artifacts=(build/release/"$MOD_ID"-*-"$VERSION".jar)
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$tag" "$ARTIFACT" --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload "$tag" "${artifacts[@]}" --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "$tag" "$ARTIFACT" \
+            gh release create "$tag" "${artifacts[@]}" \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "$MOD_NAME $VERSION" \

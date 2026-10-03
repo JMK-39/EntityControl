@@ -1,0 +1,15 @@
+{
+  "gui.entitycontrol.components.title": "Edit item components",
+  "gui.entitycontrol.components.hint": "Use native [components], e.g. [damage=5,custom_data={sample:1}]",
+  "gui.entitycontrol.components.invalid": "Invalid component syntax",
+  "gui.entitycontrol.components.save": "Save",
+  "gui.entitycontrol.components.back": "Back",
+  "gui.entitycontrol.breakspawn.equipment.nbt": "§9components",
+  "gui.entitycontrol.breakspawn.equipment.hint": "§bItem selection and components editing directly use the selectors and editors supplied by KineticCore.",
+  "gui.entitycontrol.breakspawn.ui.equipment.slot.tooltip": "Left: the item (click to pick, edit components or clear). Right: drop chance on death (percent).",
+  "gui.entitycontrol.breakspawn.ui.equipment.item.tooltip": "Click to pick an item, edit its components or clear the slot.",
+  "gui.entitycontrol.breakspawn.ui.equipment.pick.tooltip": "Choose from the item selector; the item's own components is kept.",
+  "gui.entitycontrol.breakspawn.ui.equipment.nbt": "Edit components…",
+  "gui.entitycontrol.breakspawn.ui.equipment.nbt.tooltip": "Edit the components of this item.",
+  "gui.entitycontrol.breakspawn.ui.equipment.help": "One item per slot: click the item button to pick an item, edit its components or clear it; the number on the right is the drop chance on death. Changes go straight into the editor draft and take effect after Save on the main page."
+}

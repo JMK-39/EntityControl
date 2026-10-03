@@ -33,17 +33,6 @@ set APP_HOME=%DIRNAME%
 @rem Resolve any "." and ".." in APP_HOME to make it shorter.
 for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
 
-set WRAPPER_JAR=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
-if not exist "%WRAPPER_JAR%" (
-    if not exist "%APP_HOME%\gradle\wrapper" mkdir "%APP_HOME%\gradle\wrapper"
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/gradle/gradle/v8.8/gradle/wrapper/gradle-wrapper.jar' -OutFile '%WRAPPER_JAR%'"
-    if errorlevel 1 (
-        echo.
-        echo ERROR: Failed to download the Gradle 8.8 wrapper JAR.
-        exit /b 1
-    )
-)
-
 @rem Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
 set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
 

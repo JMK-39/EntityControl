@@ -32,8 +32,15 @@ public class DummyRenderTest extends LivingEntityRenderer<DummyEntityTest, Villa
         return VILLAGER_TEXTURE;
     }
 
+//? if >=1.21 {
+/*    @Override
+    protected void renderNameTag(@NotNull DummyEntityTest entity, @NotNull Component displayName, @NotNull PoseStack poseStack, @NotNull MultiBufferSource buffer, int packedLight, float partialTick) {
+        super.renderNameTag(entity, displayName, poseStack, buffer, packedLight, partialTick);
+    }
+*///?} else {
     @Override
     protected void renderNameTag(@NotNull DummyEntityTest entity, @NotNull Component displayName, @NotNull PoseStack poseStack, @NotNull MultiBufferSource buffer, int packedLight) {
         super.renderNameTag(entity, displayName, poseStack, buffer, packedLight);
     }
+//?}
 }

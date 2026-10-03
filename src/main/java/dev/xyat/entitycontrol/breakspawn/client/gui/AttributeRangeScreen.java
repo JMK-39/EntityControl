@@ -61,7 +61,11 @@ public final class AttributeRangeScreen extends EcPage {
         for (Attribute attribute : KineticRegistries.attributes().values()) {
             ResourceLocation attributeId = KineticRegistries.attributes().id(attribute);
             if (attributeId == null) continue;
+//? if >=1.21 {
+/*            if (previewEntity == null || previewEntity.getAttributes().hasAttribute(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attribute))
+*///?} else {
             if (previewEntity == null || previewEntity.getAttributes().hasAttribute(attribute)
+//?}
                     || rule.attributes.containsKey(attributeId.toString())) {
                 attributeIds.add(attributeId.toString());
             }
@@ -81,8 +85,16 @@ public final class AttributeRangeScreen extends EcPage {
     private double baseValue(String id) {
         Attribute attribute = attribute(id);
         if (attribute == null) return 0D;
+//? if >=1.21 {
+/*        if (previewEntity != null && previewEntity.getAttributes().hasAttribute(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attribute))) {
+*///?} else {
         if (previewEntity != null && previewEntity.getAttributes().hasAttribute(attribute)) {
+//?}
+//? if >=1.21 {
+/*            return previewEntity.getAttributes().getBaseValue(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attribute));
+*///?} else {
             return previewEntity.getAttributes().getBaseValue(attribute);
+//?}
         }
         return attribute.getDefaultValue();
     }

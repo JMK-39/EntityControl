@@ -1,0 +1,21 @@
+if (project.property('loader') == 'neoforge') {
+    def metadata = layout.buildDirectory.dir('runtime-validation')
+    def writeMetadata = tasks.register('writeRuntimeValidationMetadata') {
+        inputs.property 'fixtureCurioTag', 'minecraft:diamond'
+        outputs.dir metadata
+        doLast {
+            File target = new File(metadata.get().asFile, 'META-INF/neoforge.mods.toml')
+            target.parentFile.mkdirs()
+            File tag = new File(metadata.get().asFile, 'data/curios/tags/item/curio.json')
+            tag.parentFile.mkdirs()
+            tag.setText('{"replace":false,"values":["minecraft:diamond"]}', 'UTF-8')
+            target.setText('modLoader="javafml"\nloaderVersion="[1,)"\nlicense="LGPLv3"\n[[mods]]\nmodId="entitycontrol_validation"\nversion="1.0.0"\ndisplayName="EntityControl runtime validation"\n', 'UTF-8')
+        }
+    }
+    tasks.register('runtimeValidationJar', Jar) {
+        dependsOn 'testClasses', writeMetadata
+        from(sourceSets.test.output) { include 'dev/xyat/entitycontrolvalidation/*.class' }
+        from metadata
+        archiveFileName = 'entitycontrol-validation.jar'
+    }
+}

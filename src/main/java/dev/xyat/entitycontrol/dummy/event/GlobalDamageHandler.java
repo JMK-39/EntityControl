@@ -469,7 +469,11 @@ public class GlobalDamageHandler {
 
         if (event.entity() instanceof ItemEntity itemEntity) {
             ItemStack droppedStack = itemEntity.getItem();
-            if (!droppedStack.isEmpty() && droppedStack.hasTag() && droppedStack.getTag() != null && droppedStack.getTag().getBoolean("KTDummyItem")) {
+            //? if >=1.21 {
+/*if (!droppedStack.isEmpty() && droppedStack.getOrDefault(net.minecraft.core.component.DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.EMPTY).copyTag().getBoolean("KTDummyItem")) {
+*///?} else {
+if (!droppedStack.isEmpty() && droppedStack.hasTag() && droppedStack.getTag() != null && droppedStack.getTag().getBoolean("KTDummyItem")) {
+//?}
                 event.cancel();
                 itemEntity.discard();
             }

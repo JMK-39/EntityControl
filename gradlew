@@ -85,20 +85,6 @@ done
 APP_BASE_NAME=${0##*/}
 APP_HOME=$( cd "${APP_HOME:-./}" && pwd -P ) || exit
 
-WRAPPER_JAR="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
-if [ ! -f "$WRAPPER_JAR" ]; then
-    mkdir -p "$APP_HOME/gradle/wrapper"
-    WRAPPER_URL="https://raw.githubusercontent.com/gradle/gradle/v8.8/gradle/wrapper/gradle-wrapper.jar"
-    if command -v curl >/dev/null 2>&1; then
-        curl -fL --retry 3 --connect-timeout 15 -o "$WRAPPER_JAR" "$WRAPPER_URL" || exit 1
-    elif command -v wget >/dev/null 2>&1; then
-        wget -O "$WRAPPER_JAR" "$WRAPPER_URL" || exit 1
-    else
-        echo "ERROR: gradle-wrapper.jar is missing and neither curl nor wget is available." >&2
-        exit 1
-    fi
-fi
-
 # Use the maximum available, or set MAX_FD != -1 to use that value.
 MAX_FD=maximum
 

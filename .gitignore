@@ -29,3 +29,11 @@ src/generated/resources/.cache/
 Thumbs.db
 
 /CF_UPDATE_LOG.md
+
+run-*/
+versions/*/build/
+versions/*/src/
+.superpowers/
+
+# Generated ModDev IDE launches
+.vscode/

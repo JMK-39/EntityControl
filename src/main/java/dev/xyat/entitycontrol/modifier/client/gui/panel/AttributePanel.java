@@ -143,8 +143,16 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
         ResourceLocation id = KineticResourceIds.tryParse(selectedAttribute);
         Attribute attribute = id == null ? null : KineticRegistries.attributes().get(id);
         if (attribute == null) return 0.0D;
+//? if >=1.21 {
+/*        return previewEntity != null && previewEntity.getAttributes().hasAttribute(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attribute))
+*///?} else {
         return previewEntity != null && previewEntity.getAttributes().hasAttribute(attribute)
+//?}
+//? if >=1.21 {
+/*                ? previewEntity.getAttributes().getBaseValue(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attribute))
+*///?} else {
                 ? previewEntity.getAttributes().getBaseValue(attribute)
+//?}
                 : attribute.getDefaultValue();
     }
 
@@ -273,8 +281,16 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
             if (data.attributeRules.containsKey(attrId)) return true;
             Map<String, Double> attrs = data.attributes;
             if (attrs.containsKey(attrId)) {
+//? if >=1.21 {
+/*                double defaultVal = previewEntity != null && previewEntity.getAttributes().hasAttribute(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attr))
+*///?} else {
                 double defaultVal = previewEntity != null && previewEntity.getAttributes().hasAttribute(attr)
+//?}
+//? if >=1.21 {
+/*                        ? previewEntity.getAttributes().getBaseValue(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attr))
+*///?} else {
                         ? previewEntity.getAttributes().getBaseValue(attr)
+//?}
                         : attr.getDefaultValue();
                 return Math.abs(attrs.get(attrId) - defaultVal) > 0.0001D;
             }
@@ -381,8 +397,16 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
         );
         graphics.text(nameText.getString(), nameX, rowY + 6, KineticTheme.current().text());
 
+//? if >=1.21 {
+/*        double displayValue = previewEntity != null && previewEntity.getAttributes().hasAttribute(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attr))
+*///?} else {
         double displayValue = previewEntity != null && previewEntity.getAttributes().hasAttribute(attr)
+//?}
+//? if >=1.21 {
+/*                ? previewEntity.getAttributes().getBaseValue(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attr))
+*///?} else {
                 ? previewEntity.getAttributes().getBaseValue(attr)
+//?}
                 : attr.getDefaultValue();
         if (selectedEntityId != null && parent.getLocalData().containsKey(selectedEntityId)) {
             EntityModifierConfig.EntityEditData data = parent.getLocalData().get(selectedEntityId);
@@ -449,8 +473,16 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
         }
         selectedMode = null;
 
+//? if >=1.21 {
+/*        double displayValue = previewEntity != null && previewEntity.getAttributes().hasAttribute(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attr))
+*///?} else {
         double displayValue = previewEntity != null && previewEntity.getAttributes().hasAttribute(attr)
+//?}
+//? if >=1.21 {
+/*                ? previewEntity.getAttributes().getBaseValue(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attr))
+*///?} else {
                 ? previewEntity.getAttributes().getBaseValue(attr)
+//?}
                 : attr.getDefaultValue();
         if (selectedEntityId != null && parent.getLocalData().containsKey(selectedEntityId)) {
             EntityModifierConfig.EntityEditData data = parent.getLocalData().get(selectedEntityId);

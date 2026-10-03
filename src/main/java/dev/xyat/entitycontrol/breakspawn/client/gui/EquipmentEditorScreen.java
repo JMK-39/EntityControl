@@ -50,7 +50,13 @@ public final class EquipmentEditorScreen extends EcPage {
         if (spec == null || spec.itemId == null || spec.itemId.isBlank()) return ItemStack.EMPTY;
         ResourceLocation id = KineticResourceIds.tryParse(spec.itemId);
         Item item = id == null ? null : KineticRegistries.items().get(id);
+//? if >=1.21 {
+/*        if (item == null) return ItemStack.EMPTY;
+        try { var stack = dev.xyat.entitycontrol.breakspawn.data.EquipmentData.compile(spec.itemId, spec.nbt); stack.setCount(Math.max(1, spec.count)); return stack; }
+        catch (RuntimeException invalid) { return new ItemStack(item, Math.max(1, spec.count)); }
+*///?} else {
         return item == null ? ItemStack.EMPTY : new ItemStack(item, Math.max(1, spec.count));
+//?}
     }
 
     @Override
@@ -82,11 +88,18 @@ public final class EquipmentEditorScreen extends EcPage {
         List<KineticOverlays.MenuItem> items = new ArrayList<>();
         items.add(KineticOverlays.MenuItem.action(tr("equipment.pick"), tip("equipment.pick"), () -> pickItem(slot)));
         items.add(hasItem
+//? if >=1.21 {
+/*                ? KineticOverlays.MenuItem.action(tr("equipment.nbt"), tip("equipment.nbt"), () -> openChild(new ComponentsEditorPage(spec.itemId, spec.nbt, value -> {
+                    spec(slot).nbt = value;
+                    onChange.run();
+                })))
+*///?} else {
                 ? KineticOverlays.MenuItem.action(tr("equipment.nbt"), tip("equipment.nbt"), () -> KineticSelectors.openNbtEditor(
                 spec.nbt == null ? "" : spec.nbt, value -> {
                     spec(slot).nbt = value == null ? "" : value;
                     onChange.run();
                 }))
+//?}
                 : KineticOverlays.MenuItem.disabled(tr("equipment.nbt"), tip("equipment.pick_first")));
         items.add(hasItem
                 ? KineticOverlays.MenuItem.danger(tr("equipment.clear"), tip("equipment.clear"), () -> {
@@ -112,7 +125,11 @@ public final class EquipmentEditorScreen extends EcPage {
                     BreakSpawnConfig.EquipmentSpec target = spec(slot);
                     target.itemId = id.toString();
                     target.count = 1;
+//? if >=1.21 {
+/*                    target.nbt = dev.xyat.entitycontrol.breakspawn.data.EquipmentData.format(stack);
+*///?} else {
                     target.nbt = stack.hasTag() && stack.getTag() != null ? stack.getTag().toString() : "";
+//?}
                     onChange.run();
                 });
     }

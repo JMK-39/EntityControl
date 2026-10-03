@@ -1,0 +1,267 @@
+import java.text.SimpleDateFormat
+
+// Build logic shared by every Minecraft version node (versions/<node>/).
+// build.<loader>.gradle applies this right after its loader plugin, then hands the task that produces
+// the shipped JAR to kineticConfigureReleaseJar.
+// Paths point at the root project: every node builds the one source tree in src/.
+
+def getDynamicVersion() {
+    if (rootProject.ext.has('kineticBuildVersion')) return rootProject.ext.kineticBuildVersion
+    def useAuto = project.findProperty('use_auto_version')?.toString() ?: 'false'
+    def resolved
+    if (useAuto.toBoolean()) {
+        def formatter = new SimpleDateFormat("yy.M.d")
+        formatter.timeZone = TimeZone.getTimeZone('Asia/Shanghai')
+        resolved = formatter.format(new Date())
+    } else {
+        resolved = project.findProperty('mod_version')?.toString() ?: "0.0.0"
+    }
+    rootProject.ext.kineticBuildVersion = resolved
+    return resolved
+}
+
+def pVersion = getDynamicVersion()
+def pGroup = project.findProperty('mod_group_id')?.toString() ?: "dev.xyat.entitycontrol"
+def pModId = project.findProperty('mod_id')?.toString() ?: "entitycontrol"
+def pLoader = project.property('loader').toString()
+def pMinecraft = project.property('minecraft_version').toString()
+// java_version is the Java the node's Minecraft version runs on: it sets the bytecode level and the usable
+// language features and JDK API. Every node is compiled and checked with at least JDK 21, the JDK Gradle
+// itself runs on, so one JDK covers 1.20.1 and 1.21.1.
+def pJava = project.property('java_version').toString() as int
+def pToolchain = Math.max(21, pJava)
+
+ext.kineticModId = pModId
+ext.kineticJavaVersion = pToolchain
+
+version = pVersion
+group = pGroup
+
+base {
+    archivesName.set(pModId)
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(pToolchain)
+
+tasks.withType(JavaCompile).configureEach {
+    options.release.set(pJava)
+}
+
+configurations.configureEach {
+    resolutionStrategy.cacheDynamicVersionsFor 99999, 'days'
+    resolutionStrategy.cacheChangingModulesFor 99999, 'days'
+}
+
+def mixinConfigList = fileTree(
+        dir: rootProject.file('src/main/resources'),
+        include: 'entitycontrol.*.mixins.json'
+).files.collect { File file -> file.name }.sort()
+
+ext.kineticMixinConfigs = mixinConfigList
+
+sourceSets.main.resources {
+    srcDir rootProject.file('src/generated/resources')
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+    maven { url = 'https://maven.architectury.dev/'; content { includeGroup 'dev.architectury' } }
+    maven { url = 'https://api.modrinth.com/maven'; content { includeGroup 'maven.modrinth' } }
+    maven { url = 'https://cursemaven.com'; content { includeGroup 'curse.maven' } }
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    def replaceProperties = [
+            minecraft_version      : pMinecraft,
+            minecraft_version_range: project.findProperty('minecraft_version_range')?.toString(),
+            forge_version          : project.findProperty('forge_version')?.toString(),
+            forge_version_range    : project.findProperty('forge_version_range')?.toString(),
+            neoforge_version       : project.findProperty('neoforge_version')?.toString(),
+            neoforge_version_range : project.findProperty('neoforge_version_range')?.toString(),
+            loader_version_range   : project.findProperty('loader_version_range')?.toString(),
+            pack_format            : project.property('pack_format').toString(),
+            // From 1.20.2 the mod pack also serves data, whose format differs from the resource format.
+            pack_supported_formats : project.findProperty('pack_supported_formats')
+                    ? ",\n    \"supported_formats\": [${project.property('pack_supported_formats')}]" : '',
+            mod_id                 : pModId,
+            mod_name               : project.findProperty('mod_name')?.toString(),
+            mod_license            : project.findProperty('mod_license')?.toString(),
+            mod_version            : pVersion,
+            mod_authors            : project.findProperty('mod_authors')?.toString(),
+            mod_description        : project.findProperty('mod_description')?.toString(),
+            kineticcore_version_range: project.property('kineticcore_version_range').toString(),
+            // NeoForge lists Mixin configs in neoforge.mods.toml; Forge reads the MixinConfigs manifest attribute.
+            mixin_configs          : mixinConfigList.collect { "[[mixins]]\nconfig=\"${it}\"" }.join('\n\n')
+    ].findAll { it.value != null }
+
+    inputs.properties replaceProperties
+
+    // Only this node's packaged language files receive the version-specific terminology.
+    def languageOverrides = rootProject.file("versions/${project.name}/lang")
+    inputs.files(fileTree(languageOverrides) { include '*.json' })
+    doLast {
+        fileTree(languageOverrides) { include '*.json' }.each { File overrides ->
+            File target = new File(destinationDir, "assets/${pModId}/lang/${overrides.name}")
+            def json = new groovy.json.JsonSlurper().parse(target)
+            json.putAll(new groovy.json.JsonSlurper().parse(overrides))
+            target.setText(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(json)), 'UTF-8')
+        }
+    }
+
+    // Forge reads META-INF/mods.toml, NeoForge 1.20.5+ reads META-INF/neoforge.mods.toml.
+    exclude pLoader == 'forge' ? 'META-INF/neoforge.mods.toml' : 'META-INF/mods.toml'
+
+    filesMatching(['META-INF/mods.toml', 'META-INF/neoforge.mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties + [
+                project: project,
+                file   : [jarVersion: pVersion]
+        ]
+    }
+
+    // The Mixin configs in src/ declare JAVA_17, which NeoForge nodes raise to their Java version in the
+    // packaged copy. Forge 1.20.1 ships Mixin 0.8.5, which does not know JAVA_21 and only requires that its
+    // ASM can read the mixin classes, so Forge nodes keep JAVA_17.
+    if (pJava > 17 && pLoader != 'forge') {
+        filesMatching('entitycontrol.*.mixins.json') {
+            filter { String line -> line.replaceAll(/"compatibilityLevel"\s*:\s*"JAVA_\d+"/, "\"compatibilityLevel\": \"JAVA_${pJava}\"") }
+        }
+    }
+
+    // Mixins whose target does not exist on this node (unavailable_mixins in versions/<node>/gradle.properties,
+    // entries as written in the Mixin configs) are left out of the packaged configs. NeoForge runs on Mojang names
+    // and has no refmap, so its configs drop the refmap entry.
+    def unavailableMixins = (project.findProperty('unavailable_mixins')?.toString() ?: '')
+            .split(',').collect { it.trim() }.findAll { !it.isEmpty() }
+    boolean dropRefmap = pLoader != 'forge'
+    inputs.property 'unavailableMixins', unavailableMixins
+    def mixinOutput = destinationDir
+    doLast {
+        if (unavailableMixins.isEmpty() && !dropRefmap) return
+        fileTree(mixinOutput) { include 'entitycontrol.*.mixins.json' }.each { File config ->
+            def json = new groovy.json.JsonSlurper().parse(config)
+            ['mixins', 'client', 'server'].each { String side ->
+                if (json[side] instanceof List) json[side] = json[side].findAll { !(it in unavailableMixins) }
+            }
+            if (pLoader != 'forge' && config.name == 'entitycontrol.entityrese.mixins.json') {
+                json.mixins.add('DummyCategoryPredicateMixin')
+            }
+            if (dropRefmap) json.remove('refmap')
+            config.setText(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(json)), 'UTF-8')
+        }
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes([
+                'Specification-Title'       : pModId,
+                'Specification-Vendor'      : project.findProperty('mod_authors')?.toString() ?: "Unknown",
+                'Specification-Version'     : '1',
+                'Implementation-Title'      : rootProject.name,
+                'Implementation-Version'    : pVersion,
+                'Implementation-Vendor'     : project.findProperty('mod_authors')?.toString() ?: "Unknown",
+                'Implementation-Timestamp'  : new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+        // Forge finds Mixin configs in the manifest; NeoForge only reads [[mixins]] in neoforge.mods.toml.
+        if (pLoader == 'forge' && !mixinConfigList.isEmpty()) attributes('MixinConfigs': mixinConfigList.join(','))
+    }
+}
+
+// Names and places the JAR that players install: <mod_id>-<loader>-<minecraft>-<version>.jar,
+// for example kineticcore-forge-1.20.1-26.10.2.jar.
+ext.kineticConfigureReleaseJar = { TaskProvider<? extends Jar> releaseJar ->
+    releaseJar.configure {
+        def customOutputDir = project.findProperty('output_mods_dir')
+        if (customOutputDir) {
+            def outputPath = customOutputDir.toString()
+            def windowsAbsolutePath = outputPath.length() >= 3
+                    && Character.isLetter(outputPath.charAt(0))
+                    && outputPath.charAt(1) == (':' as char)
+                    && (outputPath.charAt(2) == ('/' as char) || outputPath.charAt(2) == ('\\' as char))
+            def runningOnWindows = System.getProperty('os.name').toLowerCase().contains('windows')
+
+            // The shared Windows output directory is not a valid path on Linux CI runners.
+            // Keep the configured path on Windows and use the root build/libs elsewhere.
+            if (windowsAbsolutePath && !runningOnWindows) {
+                destinationDirectory.set(rootProject.layout.buildDirectory.dir('libs'))
+            } else {
+                // A relative path such as build/release is relative to the repository root, not to versions/<node>/.
+                destinationDirectory.set(rootProject.file(outputPath))
+            }
+        } else {
+            destinationDirectory.set(rootProject.layout.buildDirectory.dir('libs'))
+        }
+
+        archiveFileName.set("${pModId}-${pLoader}-${pMinecraft}-${pVersion}.jar")
+    }
+}
+
+tasks.register('runClientIDE') {
+    group = 'build'
+    description = 'Start the development client (wrapper around runClient)'
+    dependsOn 'runClient'
+}
+
+tasks.register('runServerIDE') {
+    group = 'build'
+    description = 'Start the development server (wrapper around runServer)'
+    dependsOn 'runServer'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs.addAll(['-nowarn', '-Xlint:none', '-Xmaxerrs', '100000'])
+}
+
+// src/test holds main-method regression suites run by the check* tasks, not JUnit tests.
+tasks.named('test', Test).configure {
+    failOnNoDiscoveredTests = false
+}
+
+configurations {
+    kineticMixinCheck
+}
+
+dependencies {
+    kineticMixinCheck 'org.ow2.asm:asm-tree:9.7.1'
+}
+
+tasks.register('checkKineticMixinTargets', Exec) {
+    group = 'verification'
+    description = 'Checks that every Mixin target method and field exists in this node\'s Minecraft version.'
+    dependsOn 'classes', 'processResources'
+    def launcher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(pToolchain) }
+    def checker = rootProject.file('gradle/KineticMixinTargetCheck.java')
+    def classesDir = sourceSets.main.java.classesDirectory
+    def resourcesDir = sourceSets.main.output.resourcesDir
+    def compileClasspath = sourceSets.main.compileClasspath
+    def toolClasspath = configurations.kineticMixinCheck
+    def classpathFile = layout.buildDirectory.file('tmp/checkKineticMixinTargets/classpath.txt')
+    // Mixins that already miss their target and are tracked separately: "<MixinClass>.<member>", comma-separated.
+    def knownIssues = project.findProperty('known_mixin_issues')?.toString() ?: ''
+    inputs.file(checker)
+    doFirst {
+        File file = classpathFile.get().asFile
+        file.parentFile.mkdirs()
+        file.setText(compileClasspath.files.join(File.pathSeparator), 'UTF-8')
+        def command = [launcher.get().executablePath.asFile.absolutePath, '-cp', toolClasspath.asPath, checker.absolutePath,
+                       classesDir.get().asFile.absolutePath, "--classpath-file=${file.absolutePath}",
+                       "--configs=${resourcesDir.absolutePath}", "--known=${knownIssues}"]
+        if (pLoader == 'forge') command += '--srg-runtime'
+        commandLine command
+    }
+}
+
+tasks.named('check').configure {
+    dependsOn tasks.named('checkKineticMixinTargets')
+}
+
+
+apply from: rootProject.file('gradle/kinetic-addon-architecture.gradle')
+ext.kineticArchitectureAllow = [:]
+apply from: rootProject.file('gradle/kinetic-addon-reobf-verification.gradle')
+apply from: rootProject.file('gradle/kinetic-core-dependency.gradle')
+
+
+apply from: rootProject.file('gradle/kinetic-runtime-validation.gradle')

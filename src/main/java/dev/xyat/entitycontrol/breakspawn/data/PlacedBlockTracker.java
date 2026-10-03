@@ -14,11 +14,15 @@ public final class PlacedBlockTracker extends SavedData {
     private final Set<Long> positions = new HashSet<>();
 
     public static PlacedBlockTracker get(ServerLevel level) {
+//? if >=1.21 {
+/*        return level.getDataStorage().computeIfAbsent(new SavedData.Factory<>(PlacedBlockTracker::new, (tag, registries) -> load(tag), null), DATA_NAME);
+*///?} else {
         return level.getDataStorage().computeIfAbsent(
                 PlacedBlockTracker::load,
                 PlacedBlockTracker::new,
                 DATA_NAME
         );
+//?}
     }
 
     public static PlacedBlockTracker load(CompoundTag tag) {
@@ -45,7 +49,11 @@ public final class PlacedBlockTracker extends SavedData {
 
     @Override
     @Nonnull
+//? if >=1.21 {
+/*    public CompoundTag save(@Nonnull CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+*///?} else {
     public CompoundTag save(@Nonnull CompoundTag tag) {
+//?}
         long[] values = new long[positions.size()];
         int index = 0;
         for (Long value : positions) {

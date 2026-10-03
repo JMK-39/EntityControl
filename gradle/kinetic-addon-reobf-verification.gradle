@@ -3,10 +3,10 @@
 // descriptor in the released (reobfuscated) core JAR. Catches the NoSuchMethodError class of bugs that a successful
 // compileJava cannot.
 //
-// 用法 / Usage (build.gradle, BEFORE the dependencies block):
-//     apply from: 'gradle/kinetic-addon-reobf-verification.gradle'
-// and inside dependencies, next to fg.deobf(kineticcore):
-//     kineticCoreReobf "dev.xyat.kineticcore:kineticcore:${kineticCoreVersion}"
+// Applied from gradle/kinetic-node.gradle for both loader nodes.
+// kinetic-core-dependency.gradle adds the selected release JAR to kineticCoreReobf.
+// Forge compiles with modImplementation; NeoForge uses implementation.
+// The final artifact is reobfJar for Forge and jar for NeoForge.
 // 本地核心构建可用 -Pkineticcore_jar=<path to reobf kineticcore jar> 覆盖。
 // Override with -Pkineticcore_jar=<path to a locally built reobf kineticcore jar>.
 
@@ -20,10 +20,11 @@ configurations {
 tasks.register('checkKineticReobfRefs', Exec) {
     group = 'verification'
     description = 'Checks method references into KineticCore in the final (reobf) addon JAR.'
-    dependsOn 'reobfJar'
-    def launcher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
-    def checker = file('gradle/KineticReobfCheck.java')
-    def finalJar = tasks.named('jar').flatMap { it.archiveFile }
+    def releaseTask = tasks.named(project.property('loader') == 'forge' ? 'reobfJar' : 'jar', Jar)
+    dependsOn releaseTask
+    def launcher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    def checker = rootProject.file('gradle/KineticReobfCheck.java')
+    def finalJar = releaseTask.flatMap { it.archiveFile }
     def coreJars = configurations.kineticCoreReobf
     inputs.file(checker)
     doFirst {

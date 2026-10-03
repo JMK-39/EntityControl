@@ -1,0 +1,15 @@
+{
+  "gui.entitycontrol.components.title": "编辑物品数据组件",
+  "gui.entitycontrol.components.hint": "使用原生 [组件] 写法，例如 [damage=5,custom_data={sample:1}]",
+  "gui.entitycontrol.components.invalid": "数据组件语法无效",
+  "gui.entitycontrol.components.save": "保存",
+  "gui.entitycontrol.components.back": "返回",
+  "gui.entitycontrol.breakspawn.equipment.nbt": "§9数据组件",
+  "gui.entitycontrol.breakspawn.equipment.hint": "§b物品选择和数据组件编辑直接使用KineticCore提供的选择器与数据组件编辑器。",
+  "gui.entitycontrol.breakspawn.ui.equipment.slot.tooltip": "左：物品（点击选择、编辑 数据组件 或清空）；右：死亡时掉落的概率（百分比）。",
+  "gui.entitycontrol.breakspawn.ui.equipment.item.tooltip": "点击选择物品、编辑 数据组件 或清空这个槽位。",
+  "gui.entitycontrol.breakspawn.ui.equipment.pick.tooltip": "从物品选择器中选择，物品自带的 数据组件 会一并保存。",
+  "gui.entitycontrol.breakspawn.ui.equipment.nbt": "编辑 数据组件…",
+  "gui.entitycontrol.breakspawn.ui.equipment.nbt.tooltip": "编辑这件装备的 数据组件。",
+  "gui.entitycontrol.breakspawn.ui.equipment.help": "每个槽位一件装备：点物品按钮选择物品、编辑 数据组件 或清空；右边的数字是死亡时掉落的概率。修改会直接进入编辑器草稿，回到主界面保存后生效。"
+}

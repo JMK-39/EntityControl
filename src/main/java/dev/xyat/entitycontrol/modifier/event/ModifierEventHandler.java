@@ -128,7 +128,11 @@ public final class ModifierEventHandler {
         if (attributeId == null) return;
         Attribute attribute = KineticRegistries.attributes().get(attributeId);
         if (attribute == null) return;
+//? if >=1.21 {
+/*        AttributeInstance originalInstance = living.getAttributes().getInstance(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attribute));
+*///?} else {
         AttributeInstance originalInstance = living.getAttributes().getInstance(attribute);
+//?}
         boolean inserted = originalInstance == null;
         double base = inserted ? attribute.getDefaultValue() : originalInstance.getBaseValue();
         double result = ModifierMath.calculate(base, mode, parameter);
@@ -159,7 +163,11 @@ public final class ModifierEventHandler {
         Attribute attribute = KineticRegistries.attributes().get(attributeId);
         if (attribute == null) return false;
         if (original.getBoolean("added")) return KineticEntityAttributes.removeRuntimeInstance(living, attribute);
+//? if >=1.21 {
+/*        AttributeInstance instance = living.getAttributes().getInstance(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attribute));
+*///?} else {
         AttributeInstance instance = living.getAttributes().getInstance(attribute);
+//?}
         if (instance != null) instance.setBaseValue(original.getDouble("base"));
         // Maximum-health changes are reconciled once after all rules have been applied.
         return false;
@@ -182,7 +190,11 @@ public final class ModifierEventHandler {
             ResourceLocation key = KineticResourceIds.tryParse(id);
             if (key == null) continue;
             Attribute attr = KineticRegistries.attributes().get(key);
+//? if >=1.21 {
+/*            AttributeInstance instance = attr == null ? null : living.getAttributes().getInstance(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attr));
+*///?} else {
             AttributeInstance instance = attr == null ? null : living.getAttributes().getInstance(attr);
+//?}
             if (instance != null) dynamic.put(id, instance.getBaseValue());
         }
         if (!dynamic.isEmpty()) EntityModifierNetwork.sendAttributeChanges(player, living, dynamic, Set.of());
@@ -207,7 +219,11 @@ public final class ModifierEventHandler {
             int min = Math.max(1, buff.minLevel);
             int max = Math.max(min, buff.maxLevel);
             int level = min + (max > min ? living.level().random.nextInt(max - min + 1) : 0);
+//? if >=1.21 {
+/*            living.addEffect(new MobEffectInstance(net.minecraft.core.registries.BuiltInRegistries.MOB_EFFECT.wrapAsHolder(effect), -1, level - 1, false, false, true));
+*///?} else {
             living.addEffect(new MobEffectInstance(effect, -1, level - 1, false, false, true));
+//?}
         }
     }
 }

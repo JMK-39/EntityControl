@@ -465,7 +465,11 @@ public final class BreakSpawnEventHandler {
         living.moveTo(pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D, random.nextFloat() * 360.0F, 0.0F);
         if (living instanceof Mob mob) {
             try {
+//? if >=1.21 {
+/*                mob.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.TRIGGERED, null);
+*///?} else {
                 mob.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.TRIGGERED, null, null);
+//?}
             } catch (Throwable ignored) {
             }
         }
@@ -515,13 +519,21 @@ public final class BreakSpawnEventHandler {
             if (attribute == null || range == null) {
                 continue;
             }
+//? if >=1.21 {
+/*            AttributeInstance instance = living.getAttributes().getInstance(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attribute));
+*///?} else {
             AttributeInstance instance = living.getAttributes().getInstance(attribute);
+//?}
             if (instance == null) {
                 continue;
             }
             double value = randomRange(random, range.min, range.max);
             instance.setBaseValue(value);
+//? if >=1.21 {
+/*            if (attribute == Attributes.MAX_HEALTH.value()) {
+*///?} else {
             if (attribute == Attributes.MAX_HEALTH) {
+//?}
                 healthChanged = true;
             }
         }
@@ -555,7 +567,12 @@ public final class BreakSpawnEventHandler {
             ItemStack stack = new ItemStack(item, Math.max(1, spec.count));
             if (spec.nbt != null && !spec.nbt.isBlank()) {
                 try {
+//? if >=1.21 {
+/*                    stack = dev.xyat.entitycontrol.breakspawn.data.EquipmentData.compile(spec.itemId, spec.nbt);
+                    stack.setCount(Math.max(1, spec.count));
+*///?} else {
                     stack.setTag(TagParser.parseTag(spec.nbt));
+//?}
                 } catch (Exception ignored) {
                 }
             }

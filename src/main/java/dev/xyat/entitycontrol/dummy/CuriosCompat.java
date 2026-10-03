@@ -42,6 +42,19 @@ public final class CuriosCompat {
         return LoadedCurios.setCurioItem(entity, index, stack);
     }
 
+//? if >=1.21 {
+/*    public static net.minecraft.nbt.Tag savePreset(LivingEntity entity) {
+        if (!isAvailable()) return null;
+        return CuriosApi.getCuriosInventory(entity).map(ICuriosItemHandler::writeTag).orElse(null);
+    }
+
+    public static void loadPreset(LivingEntity entity, net.minecraft.nbt.Tag saved) {
+        if (isAvailable() && saved != null) CuriosApi.getCuriosInventory(entity).ifPresent(handler -> {
+            handler.readTag(saved);
+            handler.reset();
+        });
+    }
+*///?}
     private static final class LoadedCurios {
         private LoadedCurios() {
         }
@@ -52,12 +65,16 @@ public final class CuriosCompat {
                 if (extraSlots <= 0) return;
 
                 Multimap<String, AttributeModifier> map = LinkedHashMultimap.create();
-                map.put("curio", new AttributeModifier(
+                //? if >=1.21 {
+/*map.put("curio", new AttributeModifier(dev.xyat.kineticcore.api.resource.KineticResourceIds.of("entitycontrol", "dummy_curio_slots"), extraSlots, AttributeModifier.Operation.ADDITION));
+*///?} else {
+map.put("curio", new AttributeModifier(
                         DUMMY_CURIO_UUID,
                         "Dummy Curio Slots",
                         extraSlots,
                         AttributeModifier.Operation.ADDITION
                 ));
+//?}
                 handler.addPermanentSlotModifiers(map);
             });
         }

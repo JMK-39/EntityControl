@@ -111,7 +111,7 @@ def kineticAddonDisplayPath = { File root, File file ->
     } catch (IllegalArgumentException ignored) {
         path = file.absolutePath
     }
-    path.replace('\\', '/')
+    path.replace('\\', '/').replaceFirst(/^versions\/[^\/]+\/build\/generated\/stonecutter\//, 'src/')
 }
 
 // ext.kineticArchitectureAllow as path -> sorted rule ids, with '/' separators.
@@ -137,7 +137,7 @@ def kineticAddonCheck = tasks.register('checkKineticAddonArchitecture') {
     def javaSources = sourceSets.main.java
     inputs.files(javaSources).withPropertyName('addonJavaSources')
     inputs.property('kineticArchitectureAllow', providers.provider { kineticAddonAllowances().toString() })
-    def rootDirectory = project.projectDir
+    def rootDirectory = rootProject.projectDir
 
     doLast {
         TreeMap<String, SortedSet<String>> allow = kineticAddonAllowances()

@@ -69,9 +69,13 @@ public class DummyEntityTest extends Mob implements MenuProvider {
     public void updateEquipment() {
         for (int i = 0; i < 6; i++) {
             ItemStack stack = inventory.getItem(i);
-            if (!stack.isEmpty() && !stack.getOrCreateTag().getBoolean("KTDummyItem")) {
+            //? if >=1.21 {
+/*if (!stack.isEmpty()) net.minecraft.world.item.component.CustomData.update(net.minecraft.core.component.DataComponents.CUSTOM_DATA, stack, tag -> tag.putBoolean("KTDummyItem", true));
+*///?} else {
+if (!stack.isEmpty() && !stack.getOrCreateTag().getBoolean("KTDummyItem")) {
                 stack.getOrCreateTag().putBoolean("KTDummyItem", true);
             }
+//?}
         }
         super.setItemSlot(EquipmentSlot.HEAD, inventory.getItem(0));
         super.setItemSlot(EquipmentSlot.CHEST, inventory.getItem(1));
@@ -119,7 +123,11 @@ public class DummyEntityTest extends Mob implements MenuProvider {
                 if (!stack.isEmpty()) {
                     CompoundTag itemTag = new CompoundTag();
                     itemTag.putByte("Slot", (byte) i);
-                    stack.save(itemTag);
+                    //? if >=1.21 {
+/*itemTag.merge((CompoundTag) stack.save(this.registryAccess()));
+*///?} else {
+stack.save(itemTag);
+//?}
                     list.add(itemTag);
                 }
             }
@@ -139,11 +147,16 @@ public class DummyEntityTest extends Mob implements MenuProvider {
             preset.put("Attributes", attrs);
             preset.put("AttributeOverrides", this.attributeOverrides.copy());
 
+//? if >=1.21 {
+/*            Tag curios = CuriosCompat.savePreset(this);
+            if (curios != null) preset.put("CuriosInventory", curios);
+*///?} else {
             CompoundTag entityData = new CompoundTag();
             this.saveWithoutId(entityData);
             if (entityData.contains("ForgeCaps")) {
                 preset.put("ForgeCaps", entityData.getCompound("ForgeCaps"));
             }
+//?}
 
             player.getPersistentData().put("entitycontrolDummyPreset", preset);
         }
@@ -159,7 +172,11 @@ public class DummyEntityTest extends Mob implements MenuProvider {
             for (int i = 0; i < list.size(); i++) {
                 CompoundTag itemTag = list.getCompound(i);
                 int slot = itemTag.getByte("Slot") & 255;
-                if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemStack.of(itemTag));
+                //? if >=1.21 {
+/*if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemStack.parseOptional(this.registryAccess(), itemTag));
+*///?} else {
+if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemStack.of(itemTag));
+//?}
             }
         }
 
@@ -170,14 +187,29 @@ public class DummyEntityTest extends Mob implements MenuProvider {
 
         if (preset.contains("Attributes")) {
             CompoundTag attrs = preset.getCompound("Attributes");
+//? if >=1.21 {
+/*            if (attrs.contains("MaxHealth")) this.setAttributeBaseValue(Attributes.MAX_HEALTH.value(), attrs.getDouble("MaxHealth"));
+*///?} else {
             if (attrs.contains("MaxHealth")) this.setAttributeBaseValue(Attributes.MAX_HEALTH, attrs.getDouble("MaxHealth"));
+//?}
+//? if >=1.21 {
+/*            if (attrs.contains("Armor")) this.setAttributeBaseValue(Attributes.ARMOR.value(), attrs.getDouble("Armor"));
+*///?} else {
             if (attrs.contains("Armor")) this.setAttributeBaseValue(Attributes.ARMOR, attrs.getDouble("Armor"));
+//?}
+//? if >=1.21 {
+/*            if (attrs.contains("ArmorToughness")) this.setAttributeBaseValue(Attributes.ARMOR_TOUGHNESS.value(), attrs.getDouble("ArmorToughness"));
+*///?} else {
             if (attrs.contains("ArmorToughness")) this.setAttributeBaseValue(Attributes.ARMOR_TOUGHNESS, attrs.getDouble("ArmorToughness"));
+//?}
         }
         if (preset.contains("AttributeOverrides", Tag.TAG_COMPOUND)) {
             restoreAttributeOverrides(preset.getCompound("AttributeOverrides"));
         }
 
+//? if >=1.21 {
+/*        if (preset.contains("CuriosInventory")) CuriosCompat.loadPreset(this, preset.get("CuriosInventory"));
+*///?} else {
         if (preset.contains("ForgeCaps")) {
             CompoundTag entityData = new CompoundTag();
             this.saveWithoutId(entityData);
@@ -191,6 +223,7 @@ public class DummyEntityTest extends Mob implements MenuProvider {
             this.setUUID(tempUuid);
             this.setPos(tempPos.x, tempPos.y, tempPos.z);
         }
+//?}
 
         updateEquipment();
     }
@@ -230,18 +263,39 @@ public class DummyEntityTest extends Mob implements MenuProvider {
 
     @Override
     public boolean canBeAffected(@NotNull MobEffectInstance effect) {
+//? if >=1.21 {
+/*        if (getCustomMobTypeId() == 1 && (effect.is(net.minecraft.world.effect.MobEffects.POISON) || effect.is(net.minecraft.world.effect.MobEffects.REGENERATION))) return false;
         return !isStandby() && super.canBeAffected(effect);
+*///?} else {
+        return !isStandby() && super.canBeAffected(effect);
+//?}
     }
 
+//? if >=1.21 {
+/*    @Override
+    public void onAddedToLevel() {
+        super.onAddedToLevel();
+*///?} else {
     @Override
     public void onAddedToWorld() {
         super.onAddedToWorld();
+//?}
         if (!this.level().isClientSide && !slotsInitialized) {
             CuriosCompat.initDummySlots(this);
             slotsInitialized = true;
         }
     }
 
+//? if >=1.21 {
+/*    @Override
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        super.defineSynchedData(builder);
+        builder.define(DATA_MOB_TYPE_ID, 0);
+        builder.define(DATA_IFRAMES, true);
+        builder.define(DATA_HEALTH_DROP, true);
+        builder.define(DATA_ENVIRONMENT_DAMAGE, false);
+    }
+*///?} else {
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
@@ -250,6 +304,7 @@ public class DummyEntityTest extends Mob implements MenuProvider {
         this.entityData.define(DATA_HEALTH_DROP, true);
         this.entityData.define(DATA_ENVIRONMENT_DAMAGE, false);
     }
+//?}
 
     public static AttributeSupplier.Builder createAttributes() {
         return Mob.createMobAttributes()
@@ -301,7 +356,11 @@ public class DummyEntityTest extends Mob implements MenuProvider {
         AttributeInstance instance = KineticEntityAttributes.ensureInstance(this, attribute);
         instance.setBaseValue(value);
         this.attributeOverrides.putDouble(id.toString(), value);
+//? if >=1.21 {
+/*        if (attribute == Attributes.MAX_HEALTH.value()) this.setHealth(this.getMaxHealth());
+*///?} else {
         if (attribute == Attributes.MAX_HEALTH) this.setHealth(this.getMaxHealth());
+//?}
     }
 
     private void restoreAttributeOverrides(CompoundTag saved) {
@@ -326,6 +385,10 @@ public class DummyEntityTest extends Mob implements MenuProvider {
     public void setEnvironmentDamage(boolean state) { this.entityData.set(DATA_ENVIRONMENT_DAMAGE, state); }
     public boolean isEnvironmentDamageEnabled() { return this.entityData.get(DATA_ENVIRONMENT_DAMAGE); }
 
+//? if >=1.21 {
+/*    @Override
+    public boolean isInvertedHealAndHarm() { return getCustomMobTypeId() == 1; }
+*///?} else {
     @Override
     public @NotNull MobType getMobType() {
         return switch (getCustomMobTypeId()) {
@@ -337,6 +400,7 @@ public class DummyEntityTest extends Mob implements MenuProvider {
         };
     }
 
+//?}
     @Override
     public @NotNull InteractionResult interactAt(@NotNull Player player, @NotNull Vec3 pos, @NotNull InteractionHand hand) {
         if (!this.level().isClientSide && hand == InteractionHand.MAIN_HAND && player.isCrouching() && player.getMainHandItem().isEmpty()) {
@@ -358,7 +422,11 @@ public class DummyEntityTest extends Mob implements MenuProvider {
             if (!stack.isEmpty()) {
                 CompoundTag itemTag = new CompoundTag();
                 itemTag.putByte("Slot", (byte) i);
-                stack.save(itemTag);
+                //? if >=1.21 {
+/*itemTag.merge((CompoundTag) stack.save(this.registryAccess()));
+*///?} else {
+stack.save(itemTag);
+//?}
                 list.add(itemTag);
             }
         }
@@ -386,7 +454,11 @@ public class DummyEntityTest extends Mob implements MenuProvider {
             for (int i = 0; i < list.size(); i++) {
                 CompoundTag itemTag = list.getCompound(i);
                 int slot = itemTag.getByte("Slot") & 255;
-                if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemStack.of(itemTag));
+                //? if >=1.21 {
+/*if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemStack.parseOptional(this.registryAccess(), itemTag));
+*///?} else {
+if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemStack.of(itemTag));
+//?}
             }
         }
         updateEquipment();
@@ -407,16 +479,26 @@ public class DummyEntityTest extends Mob implements MenuProvider {
     @Nullable @Override protected SoundEvent getAmbientSound() { return null; }
     @Override protected void playStepSound(@NotNull net.minecraft.core.BlockPos p, @NotNull net.minecraft.world.level.block.state.BlockState s) {}
 
+//? if >=1.21 {
+/*    @Override
+    protected void dropAllDeathLoot(net.minecraft.server.level.ServerLevel level, @NotNull DamageSource damageSource) {}
+*///?} else {
     @Override
     protected void dropAllDeathLoot(@NotNull DamageSource damageSource) {}
+//?}
 
     @Override
     protected void dropEquipment() {
         super.dropEquipment();
     }
 
+//? if >=1.21 {
+/*    @Override
+    protected void dropCustomDeathLoot(net.minecraft.server.level.ServerLevel level, @NotNull DamageSource damageSource, boolean recentlyHit) {}
+*///?} else {
     @Override
     protected void dropCustomDeathLoot(@NotNull DamageSource damageSource, int looting, boolean recentlyHit) {}
+//?}
 
     @Override
     public boolean shouldDropLoot() { return false; }
@@ -424,8 +506,13 @@ public class DummyEntityTest extends Mob implements MenuProvider {
     @Override
     public boolean shouldDropExperience() { return false; }
 
+//? if >=1.21 {
+/*    @Override
+    protected void dropExperience(net.minecraft.world.entity.Entity attacker) {}
+*///?} else {
     @Override
     protected void dropExperience() {}
+//?}
 
     @Nullable @Override
     public AbstractContainerMenu createMenu(int id, @NotNull Inventory inv, @NotNull Player p) {

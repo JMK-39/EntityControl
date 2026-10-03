@@ -465,7 +465,11 @@ public class DummyNetwork {
 
             stack = template.copy();
             stack.setCount(1);
-            stack.getOrCreateTag().putBoolean("KTDummyItem", true);
+            //? if >=1.21 {
+/*net.minecraft.world.item.component.CustomData.update(net.minecraft.core.component.DataComponents.CUSTOM_DATA, stack, tag -> tag.putBoolean("KTDummyItem", true));
+*///?} else {
+stack.getOrCreateTag().putBoolean("KTDummyItem", true);
+//?}
         }
 
         if (CuriosCompat.setCurioItem(dummy, slotIndex, stack)) {

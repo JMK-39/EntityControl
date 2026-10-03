@@ -1,10 +1,28 @@
 pluginManagement {
     repositories {
-        maven { url = 'https://maven.minecraftforge.net/' }
-        maven { url = 'https://repo.spongepowered.org/maven/' }
-        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
         gradlePluginPortal()
         mavenCentral()
+        maven { url = 'https://maven.neoforged.net/releases/' }
+        maven { url = 'https://maven.kikugie.dev/releases' }
+    }
+}
+
+plugins {
+    id 'dev.kikugie.stonecutter' version '0.9.8'
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
+// One source tree, one Gradle subproject per supported Minecraft version under versions/<node>/.
+// A node is named <minecraft>-<loader>; its loader-specific build logic lives in build.<loader>.gradle,
+// and its version numbers live in versions/<node>/gradle.properties.
+// Only enable a node once its code compiles: `gradlew build` builds every enabled node.
+stonecutter {
+    kotlinController = false
+    create(rootProject) {
+        version('1.20.1-forge', '1.20.1').buildscript('build.forge.gradle')
+        version('1.21.1-neoforge', '1.21.1').buildscript('build.neoforge.gradle')
+        // version('26.1.2-neoforge', '26.1.2').buildscript('build.neoforge.gradle')
+        vcsVersion = '1.20.1-forge'
     }
 }
 

@@ -151,8 +151,16 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
         Attribute attribute = KineticRegistries.attributes().get(id);
         if (attribute == null || !id.equals(KineticRegistries.attributes().id(attribute))) return;
 
+//? if >=1.21 {
+/*        double currentBaseValue = menu().entity.getAttribute(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attribute)) != null
+*///?} else {
         double currentBaseValue = menu().entity.getAttribute(attribute) != null
+//?}
+//? if >=1.21 {
+/*                ? menu().entity.getAttributeBaseValue(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attribute))
+*///?} else {
                 ? menu().entity.getAttributeBaseValue(attribute)
+//?}
                 : attribute.getDefaultValue();
         if (this.valueInput != null) {
             String newValue = String.format("%.1f", currentBaseValue);

@@ -1,0 +1,138 @@
+import groovy.json.JsonSlurper
+
+// Resolve only the core artifact for this node; never borrow another loader's JAR.
+def loader = project.property('loader').toString()
+def minecraft = project.property('minecraft_version').toString()
+def allowLegacy = loader == 'forge' && minecraft == '1.20.1'
+def versionParts = { String value ->
+    if (!(value ==~ /\d+(?:\.\d+){2,}/)) throw new GradleException("Invalid KineticCore version '${value}'.")
+    value.tokenize('.').collect { it.toBigInteger() }
+}
+def compareVersions = { String a, String b ->
+    def left = versionParts(a)
+    def right = versionParts(b)
+    for (int i = 0; i < Math.max(left.size(), right.size()); i++) {
+        int result = (i < left.size() ? left[i] : 0) <=> (i < right.size() ? right[i] : 0)
+        if (result) return result
+    }
+    0
+}
+def pools = []
+File parent = gradle.gradleUserHomeDir.canonicalFile.parentFile
+if (parent) pools.add(new File(parent, 'libs'))
+File coreRoot = rootProject.file('../KineticCore')
+File coreProperties = new File(coreRoot, 'gradle.properties')
+if (coreProperties.isFile()) {
+    Properties values = new Properties()
+    coreProperties.withInputStream { values.load(it) }
+    String output = values.getProperty('output_mods_dir')
+    if (output) {
+        File directory = new File(output)
+        if (!directory.isAbsolute()) directory = new File(coreRoot, output)
+        pools.add(directory)
+    }
+}
+pools.add(new File(coreRoot, 'build/libs'))
+pools = pools.findAll { it.isDirectory() }.unique { it.canonicalPath }
+
+def candidates = []
+pools.eachWithIndex { File directory, int rank ->
+    directory.eachFile { File jar ->
+        def match = jar.name =~ /^kineticcore-(?:(forge|neoforge)-([\d.]+)-)?(\d+(?:\.\d+){2,})\.jar$/
+        if (!jar.isFile() || !match.matches()) return
+        boolean legacy = match.group(1) == null
+        if (legacy ? !allowLegacy : (match.group(1) != loader || match.group(2) != minecraft)) return
+        candidates.add([version: match.group(3), file: jar, legacy: legacy, rank: rank])
+    }
+}
+candidates.sort { a, b ->
+    int versionOrder = compareVersions(b.version, a.version)
+    versionOrder ?: ((a.legacy <=> b.legacy) ?: (a.rank <=> b.rank))
+}
+String requested = project.findProperty('kineticcore_version')?.toString()
+String selected = requested ?: (candidates ? candidates.first().version : null)
+String assetPattern = "kineticcore-${loader}-${minecraft}-[revision].[ext]"
+if (!requested && !gradle.startParameter.offline) {
+    def connection = (HttpURLConnection) new URL('https://api.github.com/repos/JMK-39/KineticCore/releases/latest').openConnection()
+    connection.connectTimeout = 10000
+    connection.readTimeout = 10000
+    connection.setRequestProperty('Accept', 'application/vnd.github+json')
+    connection.setRequestProperty('User-Agent', 'KineticCore-Addon-Resolver')
+    try {
+        if (connection.responseCode != 200) throw new IOException("GitHub HTTP ${connection.responseCode}")
+        def release = connection.inputStream.withCloseable { new JsonSlurper().parse(it) }
+        String official = release.tag_name.toString().replaceFirst(/^v/, '')
+        versionParts(official)
+        String named = "kineticcore-${loader}-${minecraft}-${official}.jar"
+        boolean matching = release.assets.any { it.name == named }
+        boolean legacy = allowLegacy && release.assets.any { it.name == "kineticcore-${official}.jar" }
+        if ((!selected || compareVersions(official, selected) > 0) && (matching || legacy)) {
+            selected = official
+            if (!matching) assetPattern = 'kineticcore-[revision].[ext]'
+        } else if (!matching && !legacy) {
+            logger.warn("Latest KineticCore ${official} has no ${loader}/${minecraft} artifact; retaining the matching local version.")
+        }
+    } catch (Exception failure) {
+        if (!selected) throw new GradleException("No KineticCore for ${loader}/${minecraft}; restore a matching local JAR or set -Pkineticcore_version=<version>.", failure)
+        logger.warn("Using local KineticCore ${selected}: ${failure.message}")
+    } finally {
+        connection.disconnect()
+    }
+}
+if (!selected) throw new GradleException("No local KineticCore for ${loader}/${minecraft}. Other Minecraft/loader JARs cannot be used.")
+String minimum = project.property('kineticcore_min_version').toString()
+if (compareVersions(selected, minimum) < 0) throw new GradleException("KineticCore ${selected} is below required ${minimum}.")
+def local = candidates.find { it.version == selected }
+def override = project.findProperty('kineticcore_jar')?.toString()
+if (override) {
+    File jar = rootProject.file(override)
+    if (!jar.isFile()) throw new GradleException("Missing kineticcore_jar: ${jar}")
+    def match = jar.name =~ /^kineticcore-(?:(forge|neoforge)-([\d.]+)-)?(\d+(?:\.\d+){2,})\.jar$/
+    if (!match.matches() || match.group(3) != selected ||
+            (match.group(1) == null ? !allowLegacy : (match.group(1) != loader || match.group(2) != minecraft))) {
+        throw new GradleException("kineticcore_jar must be KineticCore ${selected} for ${loader}/${minecraft}: ${jar.name}")
+    }
+    local = [file: jar]
+}
+
+repositories {
+    if (parent) flatDir {
+        name = 'LocalModPool'
+        dirs new File(parent, 'libs')
+        // Core must only resolve through the loader/version-validated repositories below.
+        content { excludeModule 'dev.xyat.kineticcore', 'kineticcore' }
+    }
+    ivy {
+        name = "KineticCore-${loader}-${minecraft}"
+        url = 'https://github.com/JMK-39/KineticCore/releases/download'
+        patternLayout {
+            artifact "v[revision]/${assetPattern}"
+            if (allowLegacy) artifact 'v[revision]/kineticcore-[revision].[ext]'
+        }
+        metadataSources { artifact() }
+        content { includeModule 'dev.xyat.kineticcore', 'kineticcore' }
+    }
+}
+// Keep fixed third-party mod coordinates local-first too.
+if (parent) {
+    def localPool = repositories.findByName('LocalModPool')
+    repositories.remove(localPool)
+    repositories.addFirst(localPool)
+}
+if (local) {
+    repositories.exclusiveContent {
+        forRepository {
+            repositories.ivy {
+                name = "SelectedLocalCore-${loader}-${minecraft}"
+                url = local.file.parentFile.toURI()
+                patternLayout { artifact local.file.name.replace(selected, '[revision]') }
+                metadataSources { artifact() }
+            }
+        }
+        filter { includeModule 'dev.xyat.kineticcore', 'kineticcore' }
+    }
+}
+def dependency = "dev.xyat.kineticcore:kineticcore:${selected}"
+dependencies.add(loader == 'forge' ? 'modImplementation' : 'implementation', dependency)
+dependencies.add('kineticCoreReobf', dependency)
+logger.lifecycle("KineticCore ${selected} for ${loader}/${minecraft}: ${local ? local.file : 'GitHub release'}")

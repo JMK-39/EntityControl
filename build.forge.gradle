@@ -1,0 +1,72 @@
+// Build script for Forge nodes (Minecraft 1.20.1 and older): Forge's SRG names at runtime,
+// so the shipped JAR is the reobfuscated reobfJar output and Mixins need a refmap.
+
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'net.neoforged.moddev.legacyforge'
+}
+
+apply from: rootProject.file('gradle/kinetic-node.gradle')
+
+legacyForge {
+    version = "${project.property('minecraft_version')}-${project.property('forge_version')}"
+    // The regression checks under src/test use Minecraft classes.
+    addModdingDependenciesTo sourceSets.test
+
+    runs {
+        configureEach {
+            gameDirectory = rootProject.file('run')
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            systemProperty 'forge.logging.console.level', 'debug'
+        }
+
+        client {
+            client()
+            systemProperty 'forge.enabledGameTestNamespaces', kineticModId
+            // -Pkinetic_quick_play=<save folder> joins that world straight away, for checking that a player can join.
+            if (project.findProperty('kinetic_quick_play')) {
+                programArguments.addAll('--quickPlaySingleplayer', project.property('kinetic_quick_play').toString())
+            }
+        }
+
+        server {
+            server()
+            systemProperty 'forge.enabledGameTestNamespaces', kineticModId
+            programArgument '--nogui'
+        }
+    }
+
+    mods {
+        "${kineticModId}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+mixin {
+    add sourceSets.main, "${kineticModId}.mixins.refmap.json"
+    kineticMixinConfigs.each { configName ->
+        config configName
+    }
+}
+
+dependencies {
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+    compileOnly annotationProcessor('io.github.llamalad7:mixinextras-common:0.3.5')
+    modImplementation 'io.github.llamalad7:mixinextras-forge:0.3.5'
+    modImplementation 'curse.maven:jade-324717:6855440'
+    modImplementation 'maven.modrinth:curios:IPQlZkz1'
+
+    constraints {
+        // terminalconsoleappender requires log4j-core 2.8.1 while Minecraft only prefers 2.19.0,
+        // so without this the code would compile against 2.8.1. Minecraft 1.20.1 ships 2.19.0.
+        implementation 'org.apache.logging.log4j:log4j-core:2.19.0'
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs.addAll(['-Amixin.target.allowUnresolvedTarget=true', '-Amixin.suppressTargetWarnings=true'])
+}
+
+kineticConfigureReleaseJar(tasks.named('reobfJar', Jar))

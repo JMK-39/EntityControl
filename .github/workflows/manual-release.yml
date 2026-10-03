@@ -18,16 +18,16 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
-      - name: Set up Gradle 8.8
+      - name: Set up Gradle 9.8.0
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.8'
+          gradle-version: '9.8.0'
 
       - name: Validate version and reject duplicate release
         env:
@@ -57,7 +57,7 @@ jobs:
         env:
           VERSION: ${{ inputs.mod_version }}
         run: >-
-          gradle build --no-daemon --stacktrace
+          gradle buildAll --no-daemon --stacktrace
           -Puse_auto_version=false
           -Pmod_version="$VERSION"
           -Poutput_mods_dir=build/release
@@ -65,7 +65,7 @@ jobs:
       - name: Check release artifact
         env:
           VERSION: ${{ inputs.mod_version }}
-        run: test -s "build/release/entitycontrol-$VERSION.jar"
+        run: test -s "build/release/entitycontrol-forge-1.20.1-$VERSION.jar" && test -s "build/release/entitycontrol-neoforge-1.21.1-$VERSION.jar"
 
       - name: Publish GitHub Release
         env:
@@ -73,7 +73,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >-
           gh release create "v$VERSION"
-          "build/release/entitycontrol-$VERSION.jar"
+          build/release/entitycontrol-*-"$VERSION".jar
           --repo "$GITHUB_REPOSITORY"
           --title "EntityControl $VERSION"
           --generate-notes
