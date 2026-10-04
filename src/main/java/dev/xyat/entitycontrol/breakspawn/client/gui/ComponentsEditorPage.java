@@ -11,6 +11,7 @@ import net.minecraft.network.chat.Component;
 import java.util.function.Consumer;
 
 public final class ComponentsEditorPage extends KineticPage {
+    private static final int TEXT_MARGIN = 15;
     private final String itemId;
     private final Consumer<String> onSave;
     private String data;
@@ -62,10 +63,10 @@ public final class ComponentsEditorPage extends KineticPage {
 
     @Override
     protected void renderBackground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.centeredText(title(), width() / 2, 8, 0xFFFFFF, true);
-        graphics.centeredText(KineticI18n.translatable("gui.entitycontrol.components.hint"), width() / 2, 27, 0xAAAAAA, false);
-        if (!valid) graphics.centeredText(KineticI18n.translatable("gui.entitycontrol.components.invalid"),
-                width() / 2, height() - 53, 0xFF5555, false);
+        graphics.scrollingTextCentered(title(), width() / 2, 8, width() - 2 * TEXT_MARGIN, 0xFFFFFF, true);
+        graphics.scrollingTextCentered(KineticI18n.translatable("gui.entitycontrol.components.hint"), width() / 2, 27, width() - 2 * TEXT_MARGIN, 0xAAAAAA, false);
+        if (!valid) graphics.scrollingTextCentered(KineticI18n.translatable("gui.entitycontrol.components.invalid"),
+                width() / 2, height() - 53, width() - 2 * TEXT_MARGIN, 0xFF5555, false);
     }
 }
 *///?}

@@ -1,3 +1,21 @@
+## 26.10.4 — 2026-10-04
+
+### English
+
+- Long attribute/effect names, namespace labels and summaries scroll inside their own columns. The attribute editing footer and shared editor header keep controls within the available space, including long translations.
+- Bound dummy labels before adjacent controls, keep the Curios title clear of Back, and limit component editor headings, hints and errors to the screen width.
+- Hide duplicate vanilla container labels again after initialization so the dummy inventory caption is drawn only once.
+- Require matching KineticCore 26.10.4+ to use the current screen-fitting tooltip implementation. Existing item-component/NBT version rules remain unchanged.
+
+### 简体中文
+
+- 属性与效果名称、命名空间及说明在各自列内滚动；属性编辑栏和通用编辑器顶栏按可用空间限制控件，适配超长翻译。
+- 假人标签避开相邻控件，饰品标题避开返回按钮，组件编辑页的标题、说明与错误文字限制在屏幕范围内。
+- 初始化后重新隐藏原版容器标签，避免假人物品栏标题重复绘制。
+- 要求匹配的 KineticCore 26.10.4+，使用当前屏幕适配悬浮提示；保留既有组件/NBT 分版本规则。
+
+---
+
 2026年10月04日 — Language key validation / 语言键一致性检查
 
 - Require identical authored English/Chinese keys and string values in source, version overrides and packaged resources; generated formatting keys are rejected during builds.

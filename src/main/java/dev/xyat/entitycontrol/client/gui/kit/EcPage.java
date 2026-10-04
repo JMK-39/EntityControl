@@ -194,7 +194,7 @@ public abstract class EcPage extends KineticPage {
         body = new KineticLayout.Rect(frame.x() + PAD, bodyTop, frame.width() - PAD * 2, Math.max(0, bottom - bodyTop));
 
         Component backText = KineticI18n.translatable("gui.entitycontrol.common.back");
-        int backWidth = buttonWidth(backText, 56);
+        int backWidth = Math.min(buttonWidth(backText, 56), Math.min(CONTROL_WIDTH, header.width() / 4));
         ui.button(header.x(), header.y(), backWidth)
                 .text(backText)
                 .tooltip(KineticI18n.translatable("tip.entitycontrol.common.back"))
@@ -203,11 +203,28 @@ public abstract class EcPage extends KineticPage {
 
         int right = header.right();
         List<HeaderAction> actions = headerActions();
+        List<Component> actionTexts = new ArrayList<>(actions.size());
+        int[] preferredWidths = new int[actions.size()];
+        long preferredTotal = 0;
+        for (int index = 0; index < actions.size(); index++) {
+            HeaderAction action = actions.get(index);
+            Component text = action.menu() == null ? action.text() : action.text().copy().append(" ▾");
+            actionTexts.add(text);
+            preferredWidths[index] = action.width() > 0 ? action.width() : buttonWidth(text, 56);
+            preferredTotal += preferredWidths[index];
+        }
+        // All actions share one budget after reserving Back, a title viewport and its two gaps.
+        int titleReserve = Math.min(CONTROL_WIDTH, header.width() / 4);
+        int titleGap = Math.min(GAP * 2, Math.max(0, (header.width() - backWidth - titleReserve) / 2));
+        int actionSpace = Math.max(0, header.width() - backWidth - titleReserve - titleGap * 2);
+        int actionGap = actions.size() > 1 ? Math.min(GAP, actionSpace / (actions.size() - 1)) : 0;
+        int actionBudget = actionSpace - actionGap * Math.max(0, actions.size() - 1);
+        int actionCap = actions.isEmpty() ? 0 : actionBudget / actions.size();
         for (int index = actions.size() - 1; index >= 0; index--) {
             HeaderAction action = actions.get(index);
-            Component text = action.menu() == null ? action.text()
-                    : action.text().copy().append(" ▾");
-            int width = action.width() > 0 ? action.width() : buttonWidth(text, 56);
+            Component text = actionTexts.get(index);
+            int width = preferredTotal <= actionBudget ? preferredWidths[index]
+                    : Math.min(preferredWidths[index], actionCap);
             int x = right - width;
             KineticButton button = ui.button(x, header.y(), width)
                     .text(text)
@@ -220,13 +237,15 @@ public abstract class EcPage extends KineticPage {
             if (action.id() != null) {
                 headerButtons.put(action.id(), button);
             }
-            right = x - GAP;
+            right = x - actionGap;
         }
-        int titleLeft = header.x() + backWidth + GAP * 2;
-        int titleRight = right - GAP;
+        int titleLeft = header.x() + backWidth + titleGap;
+        int titleRight = right + (actions.isEmpty() ? 0 : actionGap) - titleGap;
         int side = Math.max(titleLeft - header.x(), header.right() - titleRight);
-        titleRect = new KineticLayout.Rect(header.x() + side, header.y(),
-                Math.max(0, header.width() - side * 2), H);
+        int centeredWidth = header.width() - side * 2;
+        titleRect = centeredWidth > 0
+                ? new KineticLayout.Rect(header.x() + side, header.y(), centeredWidth, H)
+                : new KineticLayout.Rect(titleLeft, header.y(), Math.max(0, titleRight - titleLeft), H);
 
         buildContent(ui, body);
     }

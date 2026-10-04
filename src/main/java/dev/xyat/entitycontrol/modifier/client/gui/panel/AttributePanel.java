@@ -47,6 +47,9 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
     private String selectedAttribute;
     private String selectedMode;
     private static final int VALUE_WIDTH = 64;
+    // Row columns reserve room for the numeric value and a readable attribute name.
+    private static final int ROW_VALUE_RESERVE = 86;
+    private static final int NAMESPACE_COLUMN_WIDTH = 96;
     private boolean loadingValue;
     private int valueLabelX;
 
@@ -210,7 +213,7 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
         updateControls();
     }
 
-    /** 底部一行：[模式 ▾] 数值 [输入框] [删除规则]，按钮宽度按文字计算。 */
+    /** 底部一行：[模式 ▾] 数值 [输入框] [删除规则]，文字宽度受面板空间限制。 */
     @Override
     protected void initExtra(KineticUi ui) {
         int rowY = y + h - EcPage.H;
@@ -219,7 +222,8 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
         for (String mode : MODES) {
             modeLabels.add(KineticI18n.translatable("gui.entitycontrol.modifier.global.mode." + mode.toLowerCase(Locale.ROOT)));
         }
-        int modeWidth = EcPage.fitWidth(modeLabels);
+        int textColumnWidth = Math.max(0, (w - VALUE_WIDTH - EcPage.GAP * 4) / 3);
+        int modeWidth = Math.min(textColumnWidth, EcPage.fitWidth(modeLabels));
         modeButton = ui.button(x, rowY, modeWidth)
                 .text(modeLabel())
                 .tooltip(KineticI18n.translatable("gui.entitycontrol.modifier.global.mode.tooltip"))
@@ -228,9 +232,10 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
 
         Component label = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.edit_val");
         valueLabelX = x + modeWidth + EcPage.GAP * 2;
-        int valueX = valueLabelX + KineticText.width(label) + EcPage.GAP;
+        int valueX = valueLabelX + Math.min(textColumnWidth, KineticText.width(label)) + EcPage.GAP;
         Component deleteText = KineticI18n.translatable("gui.entitycontrol.modifier.global.delete_rule");
-        deleteButton = ui.button(valueX + VALUE_WIDTH + EcPage.GAP, rowY, EcPage.fitWidth(List.of(deleteText)))
+        deleteButton = ui.button(valueX + VALUE_WIDTH + EcPage.GAP, rowY,
+                        Math.min(textColumnWidth, EcPage.fitWidth(List.of(deleteText))))
                 .text(deleteText)
                 .tooltip(KineticI18n.translatable("gui.entitycontrol.modifier.global.delete_rule.tooltip"))
                 .onClick(this::removeSelectedRule)
@@ -384,18 +389,22 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
                 namespace
         );
         int textX = rowX + 6;
+        int nameRight = rowX + rowWidth - ROW_VALUE_RESERVE;
+        int namespaceWidth = Math.min(NAMESPACE_COLUMN_WIDTH,
+                Math.max(0, (nameRight - textX - EcPage.GAP) / 2));
         // Parse legacy language-file colors continuously across translation placeholders.
-        graphics.text(namespaceText.getString(), textX, rowY + 6, KineticTheme.current().text());
+        graphics.scrollingText(Component.literal(namespaceText.getString()), textX, rowY + 6,
+                namespaceWidth, KineticTheme.current().text(), false);
 
         String attrName = getReadableName(attr, id);
-        int valueReserve = 86;
-        int nameX = textX + KineticText.width(namespaceText) + 4;
-        int maxNameWidth = Math.max(20, rowWidth - valueReserve - (nameX - rowX));
+        int nameX = textX + Math.min(namespaceWidth, KineticText.width(namespaceText)) + EcPage.GAP;
+        int maxNameWidth = Math.max(0, nameRight - nameX - EcPage.GAP);
         Component nameText = KineticI18n.translatable(
                 "gui.entitycontrol.modifier.modifier.name",
-                KineticText.ellipsize(attrName, maxNameWidth)
+                attrName
         );
-        graphics.text(nameText.getString(), nameX, rowY + 6, KineticTheme.current().text());
+        graphics.scrollingText(Component.literal(nameText.getString()), nameX, rowY + 6,
+                maxNameWidth, KineticTheme.current().text(), false);
 
 //? if >=1.21 {
 /*        double displayValue = previewEntity != null && previewEntity.getAttributes().hasAttribute(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attr))
@@ -454,7 +463,9 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
     @Override
     protected void renderExtra(KineticGraphics graphics, int mouseX, int mouseY) {
         Component label = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.edit_val");
-        graphics.text(label, valueLabelX, y + h - EcPage.H + 4, KineticTheme.current().text());
+        graphics.scrollingText(label, valueLabelX, y + h - EcPage.H + 4,
+                Math.max(0, attrValueBox.controlX() - valueLabelX - EcPage.GAP),
+                KineticTheme.current().text(), false);
     }
 
     @Override

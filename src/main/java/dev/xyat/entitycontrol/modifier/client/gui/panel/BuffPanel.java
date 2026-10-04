@@ -1,5 +1,6 @@
 package dev.xyat.entitycontrol.modifier.client.gui.panel;
 
+import dev.xyat.entitycontrol.client.gui.kit.EcPage;
 import dev.xyat.entitycontrol.modifier.client.gui.BuffEditScreen;
 import dev.xyat.entitycontrol.modifier.config.EntityModifierConfig;
 import dev.xyat.kineticcore.api.client.gui.input.MouseInput;
@@ -17,6 +18,10 @@ import java.util.Objects;
 
 public final class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
     private static final int REMOVE_BUTTON_WIDTH = 18;
+    // Keep namespace/name text out of the right-side buff summary and action column.
+    private static final int MODIFIED_RIGHT_RESERVE = 150;
+    private static final int UNMODIFIED_RIGHT_RESERVE = 28;
+    private static final int NAMESPACE_COLUMN_WIDTH = 96;
 
     private boolean isBuffModified(String buffId) {
         return selectedEntityId != null
@@ -84,17 +89,22 @@ public final class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
                         : "gui.entitycontrol.modifier.modifier.namespace.mod",
                 namespace
         );
-        graphics.text(namespaceText, textX, rowY + 6, KineticTheme.current().text());
+        boolean hasBuff = isBuffModified(effectId);
+        int rightReserve = hasBuff ? MODIFIED_RIGHT_RESERVE : UNMODIFIED_RIGHT_RESERVE;
+        int nameRight = rowX + rowWidth - rightReserve;
+        int namespaceWidth = Math.min(NAMESPACE_COLUMN_WIDTH,
+                Math.max(0, (nameRight - textX - EcPage.GAP) / 2));
+        graphics.scrollingText(namespaceText, textX, rowY + 6,
+                namespaceWidth, KineticTheme.current().text(), false);
 
-        int nameX = textX + KineticText.width(namespaceText) + 4;
-        int rightReserve = isBuffModified(effectId) ? 150 : 28;
+        int nameX = textX + Math.min(namespaceWidth, KineticText.width(namespaceText)) + EcPage.GAP;
         Component nameText = KineticI18n.translatable(
                 "gui.entitycontrol.modifier.modifier.name",
-                KineticText.ellipsize(getReadableName(effect, id), Math.max(20, rowWidth - (nameX - rowX) - rightReserve))
+                getReadableName(effect, id)
         );
-        graphics.text(nameText, nameX, rowY + 6, KineticTheme.current().text());
+        graphics.scrollingText(nameText, nameX, rowY + 6,
+                Math.max(0, nameRight - nameX - EcPage.GAP), KineticTheme.current().text(), false);
 
-        boolean hasBuff = isBuffModified(effectId);
         if (hasBuff) {
             EntityModifierConfig.PotionBuff data = parent.getLocalData().get(selectedEntityId).buffs.get(effectId);
             Component info = KineticI18n.translatable(
@@ -105,7 +115,8 @@ public final class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
             );
             int removeX = rowX + rowWidth - REMOVE_BUTTON_WIDTH - 4;
             int infoRight = removeX - 5;
-            graphics.text(info, infoRight - KineticText.width(info), rowY + 6, KineticTheme.current().text());
+            graphics.scrollingTextRight(info, infoRight, rowY + 6,
+                    Math.max(0, infoRight - nameRight), KineticTheme.current().text(), false);
 
             boolean removeHovered = mouseX >= removeX && mouseX < removeX + REMOVE_BUTTON_WIDTH
                     && mouseY >= rowY + 2 && mouseY < rowY + rowHeight - 2;
@@ -122,7 +133,9 @@ public final class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
             );
         } else {
             Component add = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.add_mark");
-            graphics.text(add, rowX + rowWidth - 9 - KineticText.width(add), rowY + 6, KineticTheme.current().text());
+            int addRight = rowX + rowWidth - 9;
+            graphics.scrollingTextRight(add, addRight, rowY + 6,
+                    Math.max(0, addRight - nameRight), KineticTheme.current().text(), false);
         }
     }
 

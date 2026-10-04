@@ -18,6 +18,7 @@ public final class RuntimeValidation {
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(this::started);
     }
     private void started(net.neoforged.neoforge.event.server.ServerStartedEvent event) {
+        if (Boolean.getBoolean("entitycontrol.guiValidation")) { GuiLongTextValidation.install(); return; }
         var level = event.getServer().overworld();
         run("component-equipment", () -> {
             String json = new com.google.gson.Gson().toJson(new BreakSpawnConfig.EquipmentSpec());

@@ -41,6 +41,12 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
     private static final KineticTexture EMPTY_SWORD = KineticTexture.of("minecraft", "textures/item/empty_slot_sword.png", 16, 16);
     private static final KineticTexture EMPTY_SHIELD = KineticTexture.of("minecraft", "textures/item/empty_armor_slot_shield.png", 16, 16);
 
+    // Labels stop before controls in the same row, with a four-pixel gap.
+    private static final int LABEL_X = 25;
+    private static final int RIGHT_CONTROL_X = 133;
+    private static final int ENVIRONMENT_CONTROL_X = RIGHT_CONTROL_X - 52;
+    private static final int TEXT_GAP = 4;
+
     private static int lastEntityId = -1;
     private static String tempAttribute = "";
     private static String tempValue = "0.0";
@@ -61,6 +67,9 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
 
     @Override
     protected void build(KineticUi ui) {
+        // Vanilla init resets the inventory label position after the page constructor.
+        setInventoryLabelPosition(8, Integer.MIN_VALUE);
+        setTitleLabelPosition(8, Integer.MIN_VALUE);
         currentIFrames = menu().entity.hasIFrames();
         currentHealthDrop = menu().entity.isHealthDropEnabled();
         currentEnvironmentDamage = menu().entity.isEnvironmentDamageEnabled();
@@ -92,7 +101,7 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
                 .build();
         this.valueInput.setTextValue(tempValue);
 
-        int rightX = leftPos() + 133;
+        int rightX = leftPos() + RIGHT_CONTROL_X;
         ui.button(rightX, topPos() + 8, 50)
                 .text(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.apply"))
                 .onClick(this::applyAttribute)
@@ -292,8 +301,8 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
     @Override
     protected void renderForeground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
         int textColor = KineticTheme.current().text();
-        graphics.text(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.attribute"), leftPos() + 25, topPos() + 27, textColor, false);
-        graphics.text(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.value"), leftPos() + 25, topPos() + 65, textColor, false);
-        graphics.text(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.inventory"), leftPos() + 25, topPos() + 99, textColor, false);
+        graphics.scrollingText(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.attribute"), leftPos() + LABEL_X, topPos() + 27, RIGHT_CONTROL_X - LABEL_X - TEXT_GAP, textColor, false);
+        graphics.scrollingText(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.value"), leftPos() + LABEL_X, topPos() + 65, RIGHT_CONTROL_X - LABEL_X - TEXT_GAP, textColor, false);
+        graphics.scrollingText(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.inventory"), leftPos() + LABEL_X, topPos() + 99, ENVIRONMENT_CONTROL_X - LABEL_X - TEXT_GAP, textColor, false);
     }
 }

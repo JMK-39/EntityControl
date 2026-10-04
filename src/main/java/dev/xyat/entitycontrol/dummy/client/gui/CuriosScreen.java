@@ -33,6 +33,9 @@ import java.util.List;
 
 public class CuriosScreen extends KineticPage {
     private static final int COLUMNS = 9;
+    private static final int BACK_WIDTH = 40;
+    private static final int PANEL_MARGIN = 5;
+    private static final int TEXT_GAP = 4;
     private static final int MAX_VISIBLE_ROWS = 4;
     private static final int SLOT_SIZE = 18;
     private static final int SCROLL_W = 6;
@@ -91,7 +94,7 @@ public class CuriosScreen extends KineticPage {
         this.playerInvX = cx - 88;
         this.playerInvY = gridStartY + gridViewH + 10;
 
-        ui.button(startX + panelW - 45, startY + 7, 40)
+        ui.button(startX + panelW - PANEL_MARGIN - BACK_WIDTH, startY + 7, BACK_WIDTH)
                 .text(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.back"))
                 .onClick(this::navigateBack)
                 .build();
@@ -125,13 +128,15 @@ public class CuriosScreen extends KineticPage {
     protected void renderBackground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
         int cx = width() / 2;
         KineticTheme.panelAlt(graphics, startX, startY, panelW, panelH);
-        graphics.centeredText(title(), cx, startY + 13, KineticTheme.current().text(), false);
+        int titleWidth = 2 * (startX + panelW - PANEL_MARGIN - BACK_WIDTH - TEXT_GAP - cx);
+        graphics.scrollingTextCentered(title(), cx, startY + 13, titleWidth, KineticTheme.current().text(), false);
 
         if (this.totalSlots <= 0) {
-            graphics.centeredText(
+            graphics.scrollingTextCentered(
                     KineticI18n.translatable("gui.entitycontrol.dummy.dummy.curios_ext.no_slots"),
                     gridStartX + gridViewW / 2,
                     gridStartY + gridViewH / 2 - 4,
+                    gridViewW - 2 * TEXT_GAP,
                     KineticTheme.indicatorColor(KineticTheme.Indicator.DANGER),
                     false
             );
