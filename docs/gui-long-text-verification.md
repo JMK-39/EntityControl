@@ -25,3 +25,9 @@ Local evidence: .gradle/gui-long-text-20261004/build-final.log, client-second.lo
 - 世界/HUD文字、数值保持原样。饰品无槽位提示分支已检查源码，本机测试提供了槽位；按用户要求不启动Forge游戏。核心过高提示问题见ContentStudio/docs/tooltip-height-follow-up.md。
 
 本机证据位于 .gradle/gui-long-text-20261004；正式JAR不含验证类。
+
+## Color follow-up / 颜色复查
+
+Effect namespaces, names and summaries previously rendered split translated Components whose legacy formatting stopped at placeholders. They now use the same flattened legacy-color path as attribute rows, while retaining the bounded scrolling viewports. The 18-capture follow-up covered global attributes and effects (normal/modified), English/Chinese, both window sizes and extended strings; zero runtime failures. Screenshots show green namespace contents, orange names and continuous green summary numbers. BuildAll passed again.
+
+效果行原先直接绘制分段翻译组件，旧颜色在占位符处中断。现与属性行统一为连续解析旧颜色的路径，同时保留滚动边界。18张复查截图覆盖全局属性、未修改/已修改效果、中英文、两种窗口及超长文字；运行零失败。命名空间内容为绿色、名称为橘黄色、说明及数字连续为绿色；再次通过buildAll。

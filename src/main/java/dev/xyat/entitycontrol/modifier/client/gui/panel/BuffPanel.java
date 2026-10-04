@@ -94,7 +94,7 @@ public final class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
         int nameRight = rowX + rowWidth - rightReserve;
         int namespaceWidth = Math.min(NAMESPACE_COLUMN_WIDTH,
                 Math.max(0, (nameRight - textX - EcPage.GAP) / 2));
-        graphics.scrollingText(namespaceText, textX, rowY + 6,
+        graphics.scrollingText(Component.literal(namespaceText.getString()), textX, rowY + 6,
                 namespaceWidth, KineticTheme.current().text(), false);
 
         int nameX = textX + Math.min(namespaceWidth, KineticText.width(namespaceText)) + EcPage.GAP;
@@ -102,7 +102,7 @@ public final class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
                 "gui.entitycontrol.modifier.modifier.name",
                 getReadableName(effect, id)
         );
-        graphics.scrollingText(nameText, nameX, rowY + 6,
+        graphics.scrollingText(Component.literal(nameText.getString()), nameX, rowY + 6,
                 Math.max(0, nameRight - nameX - EcPage.GAP), KineticTheme.current().text(), false);
 
         if (hasBuff) {
@@ -115,7 +115,7 @@ public final class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
             );
             int removeX = rowX + rowWidth - REMOVE_BUTTON_WIDTH - 4;
             int infoRight = removeX - 5;
-            graphics.scrollingTextRight(info, infoRight, rowY + 6,
+            graphics.scrollingTextRight(Component.literal(info.getString()), infoRight, rowY + 6,
                     Math.max(0, infoRight - nameRight), KineticTheme.current().text(), false);
 
             boolean removeHovered = mouseX >= removeX && mouseX < removeX + REMOVE_BUTTON_WIDTH

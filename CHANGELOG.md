@@ -2,12 +2,16 @@
 
 ### English
 
+- Preserve continuous language-file colors across namespace/name and buff-summary placeholders, including the text inside brackets.
+
 - Long attribute/effect names, namespace labels and summaries scroll inside their own columns. The attribute editing footer and shared editor header keep controls within the available space, including long translations.
 - Bound dummy labels before adjacent controls, keep the Curios title clear of Back, and limit component editor headings, hints and errors to the screen width.
 - Hide duplicate vanilla container labels again after initialization so the dummy inventory caption is drawn only once.
 - Require matching KineticCore 26.10.4+ to use the current screen-fitting tooltip implementation. Existing item-component/NBT version rules remain unchanged.
 
 ### 简体中文
+
+- 连续解析命名空间、名称与效果说明占位符前后的语言颜色，保留括号内文字及数字样式。
 
 - 属性与效果名称、命名空间及说明在各自列内滚动；属性编辑栏和通用编辑器顶栏按可用空间限制控件，适配超长翻译。
 - 假人标签避开相邻控件，饰品标题避开返回按钮，组件编辑页的标题、说明与错误文字限制在屏幕范围内。
