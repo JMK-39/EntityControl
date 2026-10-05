@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 public final class GuiLongTextValidation {
     private static final Logger LOG=LoggerFactory.getLogger(GuiLongTextValidation.class);
     private static final String ROOT=System.getProperty("entitycontrol.guiValidation.output","D:/IDEAWork/EntityControl/.gradle/gui-long-text-20261004/");
-    private static final String[] NAMES={"attributes-global","attributes-zombie","buffs-zombie","buffs-modified","dummy","curios","components","components-invalid"};
+    private static final String[] NAMES={"attributes-global","attributes-zombie","buffs-zombie","buffs-modified","dummy","curios","components","components-invalid","core-lists"};
     private static boolean installed,started,screenshot,finished,originalFullscreen;
     private static String originalLanguage;
     private static int originalScale,originalWidth,originalHeight,phase=-1,page=-1,captures,failures;
@@ -109,6 +109,7 @@ public final class GuiLongTextValidation {
             var menu=new dev.xyat.entitycontrol.dummy.DummyMenu(0,mc.player.getInventory(),dummy);
             if(index==4)mc.setScreen((net.minecraft.client.gui.screens.Screen)construct("dev.xyat.kineticcore.internal.client.gui.page.PageContainerScreen",new dev.xyat.entitycontrol.dummy.client.gui.DummyScreen(menu,Component.literal("GUI validation")),mc.player.getInventory(),Component.literal("GUI validation")));
             else KineticGui.open(new dev.xyat.entitycontrol.dummy.client.gui.CuriosScreen(menu));
+        }else if(index==8){KineticGui.open(new CoreListsPage());
         }else dev.xyat.kineticcore.api.client.gui.selector.KineticSelectors.openNbtEditor(index==6?"[damage=1]":"[invalid=]",text->{try{dev.xyat.entitycontrol.breakspawn.data.EquipmentData.compile("minecraft:diamond_sword",text);return null;}catch(RuntimeException invalid){return String.valueOf(invalid.getMessage());}},value->{});
     }
     private static Object field(Object target,String name)throws Exception {
@@ -150,6 +151,23 @@ public final class GuiLongTextValidation {
         if(originalFullscreen && !mc.getWindow().isFullscreen())mc.getWindow().toggleFullScreen();
         LOG.info("ENTITY_GUI_{} pages={} captures={} failures={} userSettingsRestored=true",failures==0?"PASS":"FAIL",NAMES.length,captures,failures);
         dev.xyat.kineticcore.api.runtime.KineticClientRuntime.stopClient();
+    }
+    /^** Core list styles: text rows (single-select yellow, multi-select green), button rows with green picks, and an open autocomplete popup. *^/
+    private static final class CoreListsPage extends KineticPage {
+        CoreListsPage(){super(Component.literal("Core list styles"));}
+        @Override protected void build(dev.xyat.kineticcore.api.client.gui.ui.KineticUi ui) {
+            int col=(width()-40)/3;
+            var ids=List.of("minecraft:plains","minecraft:forest","minecraft:desert","minecraft:a_deliberately_long_biome_identifier_to_check_scrolling","minecraft:taiga","minecraft:swamp","minecraft:jungle","minecraft:badlands");
+            var single=new ArrayList<dev.xyat.kineticcore.api.client.gui.widget.list.SelectionItem>();
+            for(String id:ids)single.add(new dev.xyat.kineticcore.api.client.gui.widget.list.SelectionItem(Component.literal(id),null,null,true,false));
+            ui.selectionList(10,30,col,110,single).selected(1).textRows().build();
+            var multi=new ArrayList<dev.xyat.kineticcore.api.client.gui.widget.list.ToggleItem>();
+            for(int i=0;i<ids.size();i++)multi.add(new dev.xyat.kineticcore.api.client.gui.widget.list.ToggleItem(Component.literal(ids.get(i)),null,i%3==0,true));
+            ui.toggleList(20+col,30,col,110,multi).textRows().build();
+            ui.toggleList(30+2*col,30,col,110,multi).build();
+            var field=ui.autoComplete(10,160,col,()->ids.stream().map(dev.xyat.kineticcore.api.client.search.KineticSuggestion::of).toList()).value("minecraft:").build();
+            focus(field);
+        }
     }
     private static final class StressLanguage extends Language {
         private final Language delegate;
