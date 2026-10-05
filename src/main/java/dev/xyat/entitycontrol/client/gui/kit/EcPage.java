@@ -583,7 +583,7 @@ public abstract class EcPage extends KineticPage {
                         List<KineticOverlays.MenuItem> items = new ArrayList<>(options.size());
                         for (KineticDropdown.Option option : options) {
                             Component text = display(option);
-                            items.add(KineticOverlays.MenuItem.toggle(text,
+                            items.add(KineticOverlays.MenuItem.choice(text,
                                     option.tooltip().getString().isBlank() ? text : option.tooltip(),
                                     option.value().equals(current[0]), () -> {
                                         current[0] = option.value();

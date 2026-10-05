@@ -80,7 +80,8 @@ public final class PickListPage extends EcPage {
 
     @Override
     protected void renderContent(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        list.render(graphics, mouseX, mouseY, picked::contains);
+        // Multi-select: picked rows are green; yellow stays the current choice.
+        list.render(graphics, mouseX, mouseY, key -> false, picked::contains, key -> false);
     }
 
     @Override

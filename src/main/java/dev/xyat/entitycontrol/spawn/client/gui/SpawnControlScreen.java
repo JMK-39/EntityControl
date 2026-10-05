@@ -253,7 +253,7 @@ public final class SpawnControlScreen extends EcPage {
                     List<KineticOverlays.MenuItem> items = new ArrayList<>();
                     for (Tab value : Tab.values()) {
                         String key = "tab." + value.name().toLowerCase(Locale.ROOT);
-                        items.add(KineticOverlays.MenuItem.toggle(tr(key), tr(key + ".tooltip"), value == tab, () -> {
+                        items.add(KineticOverlays.MenuItem.choice(tr(key), tr(key + ".tooltip"), value == tab, () -> {
                             tab = value;
                             rebuild();
                         }));
@@ -284,7 +284,7 @@ public final class SpawnControlScreen extends EcPage {
         List<KineticOverlays.MenuItem> items = new ArrayList<>();
         for (int index = 1; index <= globals.config_amount; index++) {
             int target = index;
-            items.add(KineticOverlays.MenuItem.toggle(old("profile_btn_numbered", index), oldTip("profile"), index == currentEditIndex, () -> {
+            items.add(KineticOverlays.MenuItem.choice(old("profile_btn_numbered", index), oldTip("profile"), index == currentEditIndex, () -> {
                 if (target == currentEditIndex) return;
                 if (dirty()) {
                     openDialog(tr("unsaved.title"), tr("unsaved.switch"), tr("unsaved.discard"),
@@ -333,7 +333,7 @@ public final class SpawnControlScreen extends EcPage {
             cards.preview().setClockwise(clockwise);
         }));
         for (int speed : new int[]{0, 50, 100, 200}) {
-            items.add(KineticOverlays.MenuItem.toggle(tr("preview.speed", speed), oldTip("rotation_speed"), rotationSpeed == speed, () -> {
+            items.add(KineticOverlays.MenuItem.choice(tr("preview.speed", speed), oldTip("rotation_speed"), rotationSpeed == speed, () -> {
                 rotationSpeed = speed;
                 cards.preview().setRotationSpeedPercent(speed);
             }));

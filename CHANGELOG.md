@@ -2,6 +2,9 @@
 
 ### English
 
+- Lists (biomes, spawn rules, reset rules, picker lists) are plain striped rows packed without gaps instead of a stack of boxed rows, and the attribute list no longer draws a box around every row. Only the hovered row, the current choice (yellow), chosen or changed rows (green) and rows with errors (red) are outlined.
+- In the "Add" pickers (for example adding several biomes), chosen entries are green, because they are a multi-selection; yellow marks only the current choice. Tab, scope, mode, profile and speed menus mark their current option yellow; filters and switches mark enabled options green.
+- Saving or removing a reset rule answers only the player who edited; the rules are no longer sent to every online player.
 - Restore the dummy editor's original vanilla inventory background below its equipment panel, preserving slot positions, buttons and interactions on every enabled Minecraft version.
 - Align the vanilla inventory texture with its existing item slots and hotbar.
 - Enabled Minecraft 26.1.2 / NeoForge 26.1.2.112 (Java 25); releases now cover Forge 1.20.1, NeoForge 1.21.1 and NeoForge 26.1.2. Optional Jade 26.1 and Curios 15 on 26.1.2.
@@ -12,6 +15,9 @@
 
 ### 简体中文
 
+- 列表（群系、生成规则、重置规则、选择列表）改为无间隙的条纹纯文字行，不再是一排带边框的方块；属性列表不再给每一行画边框。只有光标所在行、当前选择（黄色）、已选或已修改的行（绿色）以及有错误的行（红色）带边框。
+- "添加"选择列表（例如一次添加多个群系）中已选的项为绿色，因为这是多选；黄色只表示当前选择。标签页、范围、模式、配置档与速度菜单用黄色标出当前选项；筛选与开关菜单中开启的项为绿色。
+- 保存或删除重置规则只回复编辑的玩家，不再把规则发送给所有在线玩家。
 - 恢复假人编辑器装备面板下方的原版背包背景；所有已启用版本保留原有槽位、按钮位置和操作方式。
 - 对齐原版背包贴图与现有物品槽、快捷栏的位置。
 - 启用 Minecraft 26.1.2 / NeoForge 26.1.2.112（Java 25）；发布版本覆盖 Forge 1.20.1、NeoForge 1.21.1 与 NeoForge 26.1.2。26.1.2 可选 Jade 26.1 与 Curios 15。

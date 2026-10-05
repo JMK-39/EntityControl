@@ -115,7 +115,7 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
             Component help = KineticI18n.translatable(
                     "gui.entitycontrol.modifier.global.mode." + mode.toLowerCase(Locale.ROOT) + ".tooltip"
             );
-            entries.add(KineticOverlays.MenuItem.toggle(
+            entries.add(KineticOverlays.MenuItem.choice(
                     label, help, mode.equals(selectedMode), () -> selectMode(mode)
             ));
         }
@@ -379,8 +379,12 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
         String attrId = id == null ? "" : id.toString();
         String namespace = id == null ? "minecraft" : id.getNamespace();
         boolean modified = isAttrModified(attrId, attr);
-        EcPage.stateBorder(graphics, rowX, rowY + 1, rowWidth, rowHeight - 2,
-                selected, hovered, false, modified);
+        // Plain list row like the effect list: no box, only the hovered, current (yellow) or modified (green) row is outlined.
+        if (selected || hovered) {
+            KineticTheme.stateOutline(graphics, rowX, rowY + 1, rowWidth, rowHeight - 2, selected, hovered, false);
+        } else if (modified) {
+            KineticTheme.indicatorOutline(graphics, rowX, rowY + 1, rowWidth, rowHeight - 2, KineticTheme.Indicator.SUCCESS);
+        }
 
         Component namespaceText = KineticI18n.translatable(
                 "minecraft".equals(namespace)

@@ -10,12 +10,13 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /**
- * 文字行列表（纯绘制）：行间距 2，状态用边框颜色表示；悬停详情由页面的 {@code contentTooltips} 显示，
+ * 文字行列表（纯绘制）：无间隙条纹行，只有状态行带边框；悬停详情由页面的 {@code contentTooltips} 显示，
  * 滚动条由 {@link EcPage#scrollArea} 处理。只渲染可见行。
  */
 public final class TextRowList {
     public static final int ROW = 14;
-    public static final int GAP = 2;
+    // Plain text rows are packed without gaps, like Core's text-row lists.
+    public static final int GAP = 0;
     private static final int SCROLLBAR_SPACE = 8;
 
     public record Row(String key, Component text) {
@@ -67,7 +68,10 @@ public final class TextRowList {
         render(graphics, mouseX, mouseY, selected, key -> false, key -> false);
     }
 
-    /** 选中 = 橘黄，悬停 = 蓝色，数据有问题 = 红色，修改过 / 已启用 = 绿色（见 {@link EcPage#stateBorder}）。 */
+    /**
+     * Plain striped rows: only the hovered row, the current choice (yellow), chosen or modified rows (green) and rows
+     * with errors (red) are outlined, and their text takes the same color.
+     */
     public void render(KineticGraphics graphics, int mouseX, int mouseY, Predicate<String> selected,
                        Predicate<String> modified, Predicate<String> error) {
         if (area == null) return;
@@ -78,11 +82,17 @@ public final class TextRowList {
                 if (rect.bottom() < area.y() || rect.y() > area.bottom()) continue;
                 Row row = rows.get(index);
                 boolean hovered = area.contains(mouseX, mouseY) && rect.contains(mouseX, mouseY);
-                KineticTheme.stateSurface(graphics, rect.x(), rect.y(), rect.width(), rect.height(),
-                        KineticTheme.Surface.FIELD, false, false, false);
-                EcPage.stateBorder(graphics, rect.x(), rect.y(), rect.width(), rect.height(),
-                        selected.test(row.key()), hovered, error.test(row.key()), modified.test(row.key()));
-                graphics.scrollingText(row.text(), rect.x() + 5, rect.y() + 3, rect.width() - 10, palette.text(), false);
+                boolean isSelected = selected.test(row.key());
+                boolean isError = error.test(row.key());
+                boolean isModified = modified.test(row.key());
+                graphics.fill(rect.x(), rect.y(), rect.right(), rect.bottom(), (index & 1) == 0 ? palette.panel() : palette.panelAlt());
+                if (isSelected || hovered || isError) {
+                    KineticTheme.stateOutline(graphics, rect.x(), rect.y(), rect.width(), rect.height(), isSelected, hovered, isError);
+                } else if (isModified) {
+                    KineticTheme.indicatorOutline(graphics, rect.x(), rect.y(), rect.width(), rect.height(), KineticTheme.Indicator.SUCCESS);
+                }
+                int textColor = isError ? 0xFFFF5555 : isSelected ? 0xFFFFAA00 : isModified ? 0xFF55DD88 : palette.text();
+                graphics.scrollingText(row.text(), rect.x() + 5, rect.y() + 3, rect.width() - 10, textColor, false);
             }
         });
     }

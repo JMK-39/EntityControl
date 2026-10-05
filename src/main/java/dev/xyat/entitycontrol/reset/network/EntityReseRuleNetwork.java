@@ -121,10 +121,6 @@ public final class EntityReseRuleNetwork {
         CHANNEL.sendToPlayer(player, new RulesSnapshotPacket(EntityReseConfig.snapshotRules()));
     }
 
-    private static void broadcastSnapshot() {
-        CHANNEL.broadcast(new RulesSnapshotPacket(EntityReseConfig.snapshotRules()));
-    }
-
     private static void sendResult(ServerPlayer player, byte result) {
         CHANNEL.sendToPlayer(player, new OperationResultPacket(result, EntityReseConfig.snapshotRules()));
     }
@@ -277,7 +273,7 @@ public final class EntityReseRuleNetwork {
                 message.countCancelledDeath
         );
         if (saved) {
-            broadcastSnapshot();
+            sendSnapshot(player);
             sendResult(player, RESULT_SAVE_SUCCESS);
         } else {
             sendResult(player, RESULT_SAVE_FAILED);
@@ -297,7 +293,7 @@ public final class EntityReseRuleNetwork {
 
         boolean saved = EntityReseConfig.removeRuleAuthoritative(message.entityId);
         if (saved) {
-            broadcastSnapshot();
+            sendSnapshot(player);
             sendResult(player, RESULT_REMOVE_SUCCESS);
         } else {
             sendResult(player, RESULT_SAVE_FAILED);

@@ -253,15 +253,15 @@ public final class EntityModifierScreen extends EcPage {
     protected List<HeaderAction> headerActions() {
         return List.of(
                 HeaderAction.menu(tr(currentPanel == attributePanel ? "tab.attributes" : "tab.effects"), tr("tab.tooltip"), () -> List.of(
-                        KineticOverlays.MenuItem.toggle(KineticI18n.translatable("gui.entitycontrol.modifier.modifier.tab.attributes"),
+                        KineticOverlays.MenuItem.choice(KineticI18n.translatable("gui.entitycontrol.modifier.modifier.tab.attributes"),
                                 KineticI18n.translatable("gui.entitycontrol.modifier.modifier.tab.attributes.tooltip"),
                                 currentPanel == attributePanel, () -> switchPanel(attributePanel)),
-                        KineticOverlays.MenuItem.toggle(KineticI18n.translatable("gui.entitycontrol.modifier.modifier.tab.buffs"),
+                        KineticOverlays.MenuItem.choice(KineticI18n.translatable("gui.entitycontrol.modifier.modifier.tab.buffs"),
                                 KineticI18n.translatable("gui.entitycontrol.modifier.modifier.tab.buffs.tooltip"),
                                 currentPanel == buffPanel, () -> switchPanel(buffPanel)))),
                 HeaderAction.menu(tr(globalMode ? "scope.global" : "scope.entity"), tr("scope.tooltip"), () -> List.of(
-                        KineticOverlays.MenuItem.toggle(tr("scope.entity"), tr("scope.entity.tooltip"), !globalMode, () -> setGlobal(false)),
-                        KineticOverlays.MenuItem.toggle(tr("scope.global"), KineticI18n.translatable("gui.entitycontrol.modifier.global.expand_tooltip"),
+                        KineticOverlays.MenuItem.choice(tr("scope.entity"), tr("scope.entity.tooltip"), !globalMode, () -> setGlobal(false)),
+                        KineticOverlays.MenuItem.choice(tr("scope.global"), KineticI18n.translatable("gui.entitycontrol.modifier.global.expand_tooltip"),
                                 globalMode, () -> setGlobal(true)))),
                 HeaderAction.button("save", KineticI18n.translatable("gui.entitycontrol.modifier.modifier.save"),
                         KineticI18n.translatable("gui.entitycontrol.modifier.modifier.save.tooltip"),
