@@ -25,13 +25,17 @@ import java.util.concurrent.CompletableFuture;
 @Mod("entitycontrol_preservation_validation")
 public final class GuiPreservationValidation {
     private static final Logger LOG = LoggerFactory.getLogger(GuiPreservationValidation.class);
-    private static final String[] CASES = {"entity-models", "effect-icons", "dummy-vanilla-inventory", "armor-effect-icons", "armor-piece-effect-icons", "crafting-vanilla", "furnace-vanilla", "smithing-vanilla", "stonecutter-vanilla", "combat-entity-models", "combat-filtered-model", "mob-effect-icons", "mob-effect-picker", "tacz-vanilla-slots", "recipe-browser-vanilla-slots"};
+    private static final String[] CASES = {"entity-models", "effect-icons", "dummy-vanilla-inventory", "armor-effect-icons", "armor-piece-effect-icons", "crafting-vanilla", "furnace-vanilla", "smithing-vanilla", "stonecutter-vanilla", "combat-entity-models", "combat-filtered-model", "mob-effect-icons", "mob-effect-picker", "tacz-vanilla-slots", "recipe-browser-vanilla-slots", "tacz-material-tooltip", "tacz-workbench-tooltip", "tacz-result-tooltip", "tacz-recipe-tooltip", "tacz-data-tooltip", "tacz-header-tooltip", "tacz-field-tooltip", "tacz-attachment-tooltip"};
     private static boolean started, finished, captured, fullscreen;
     private static int phase = -1, page = -1, failures, captures, scale, width, height;
     private static String language;
     private static long due;
     private static CompletableFuture<Void> reload;
     private static boolean waitingCaptured;
+    private static java.lang.reflect.Field cachedMouseX, cachedMouseY;
+    private static double originalMouseX, originalMouseY;
+    private static KineticPage tooltipPage;
+    private static int tooltipX, tooltipY;
 
     public GuiPreservationValidation() {
         LOG.info("GUI_PRESERVATION_INSTALLED enabled={}", Boolean.getBoolean("entitycontrol.preservationValidation"));
@@ -43,6 +47,7 @@ public final class GuiPreservationValidation {
         if (finished) return;
         try {
             var mc = Minecraft.getInstance();
+            if (tooltipPage != null && KineticGui.currentPage() == tooltipPage) updateTooltipMouse();
             if (!started) {
                 if (mc.player == null || mc.level == null || mc.getSingleplayerServer() == null) {
                     if (!waitingCaptured && mc.screen != null && mc.getOverlay() == null) {
@@ -89,6 +94,7 @@ public final class GuiPreservationValidation {
         while (page < CASES.length && !selected.isBlank() && !List.of(selected.split(",")).contains(String.valueOf(page))) page++;
         if (page >= CASES.length) { nextPhase(); return; }
         var mc = Minecraft.getInstance();
+        tooltipPage = null;
         if (page <= 1) {
             var p = new EntityModifierScreen("{}"); KineticGui.open(p);
             var entities = (List<EntityModifierScreen.EntityGuiInfo>) field(p, "allEntities");
@@ -154,7 +160,7 @@ public final class GuiPreservationValidation {
             ((com.google.gson.JsonObject) invoke(record, "result")).getAsJsonObject("item").addProperty("item", "minecraft:netherite_sword");
             var p = (KineticPage) construct("dev.xyat.taczworkshop.client.gui.TaczRecipeEditorPage", null, record);
             setField(p, "selectedMaterial", 0); KineticGui.open(p);
-        } else {
+        } else if (page == 14) {
             var p = (KineticPage) construct("dev.xyat.contentstudio.recipe.client.gui.RecipePreviewPage");
             KineticGui.open(p);
             var records = (List<Object>) field(p, "displayRecords"); records.clear();
@@ -163,6 +169,8 @@ public final class GuiPreservationValidation {
                 setField(record, "output", new net.minecraft.world.item.ItemStack(item));
                 setField(record, "editorType", "CRAFTING"); records.add(record);
             }
+        } else {
+            openTaczTooltip();
         }
         captured = false; due = System.currentTimeMillis() + 1800;
         LOG.info("GUI_PRESERVATION_OPEN phase={} case={}", phase, CASES[page]);
@@ -171,6 +179,85 @@ public final class GuiPreservationValidation {
     private static void addEffect(Object config, String type, String list, String id) throws Exception {
         Object effect = construct("dev.xyat.kineticarmory.armorsets.data.ArmorDataConfig$" + type);
         setField(effect, "effectId", id); ((List<Object>) field(config, list)).add(effect);
+    }
+
+    private static Object tooltipRecipe() throws Exception {
+        var record = Class.forName("dev.xyat.taczworkshop.data.TaczRecipeRecord").getMethod("blank", String.class).invoke(null, "custom");
+        invoke(record, "setId", "validation:" + "long_unbroken_recipe_identifier_".repeat(4));
+        var item = ((com.google.gson.JsonObject) invoke(record, "result")).getAsJsonObject("item");
+        item.addProperty("item", "minecraft:diamond_sword");
+        String nbt = "{display:{Name:'{\"text\":\"LongStyledName_" + "abcdef".repeat(12) + "\",\"color\":\"aqua\"}'}}";
+        item.addProperty("nbt", nbt);
+        for (int i = 0; i < 10; i++) {
+            var ingredient = new com.google.gson.JsonObject(); ingredient.addProperty("item", "minecraft:diamond_sword"); ingredient.addProperty("nbt", nbt);
+            ((List<Object>) invoke(record, "materials")).add(construct("dev.xyat.taczworkshop.data.TaczMaterial", ingredient, 32));
+        }
+        return record;
+    }
+
+    private static void openTaczTooltip() throws Exception {
+        if (page <= 17) {
+            tooltipPage = (KineticPage) construct("dev.xyat.taczworkshop.client.gui.TaczRecipeEditorPage", null, tooltipRecipe());
+            setField(tooltipPage, "selectedMaterial", 0); KineticGui.open(tooltipPage);
+            tooltipX = page == 15 ? 200 : page == 16 ? 270 : 426;
+            tooltipY = page == 16 ? 51 : 109;
+        } else if (page <= 19) {
+            tooltipPage = (KineticPage) construct("dev.xyat.taczworkshop.client.gui." + (page == 18 ? "TaczRecipeListPage" : "TaczDataManagerPage"));
+            KineticGui.open(tooltipPage);
+            var source = (List<Object>) field(tooltipPage, "source"); source.clear();
+            if (page == 18) for (int i = 0; i < 15; i++) source.add(tooltipRecipe());
+            else {
+                var kind = Enum.valueOf((Class) Class.forName("dev.xyat.taczworkshop.data.TaczDataKind"), "GUN");
+                for (int i = 0; i < 15; i++) source.add(construct("dev.xyat.taczworkshop.client.TaczDataListEntry", kind,
+                        "tacz:ak47", "validation:" + "unbroken_data_identifier_".repeat(5), "item.minecraft.diamond_sword", "gun", false, false, new com.google.gson.JsonObject()));
+            }
+            invoke(tooltipPage, "rebuildFiltered"); tooltipX = 14 + 14 * 19 + 8; tooltipY = 68;
+        } else {
+            var detail = new com.google.gson.JsonObject(); detail.addProperty("kind", "gun"); detail.addProperty("id", "tacz:ak47");
+            detail.addProperty("data_id", "validation:" + "unbroken_data_identifier_".repeat(5));
+            var index = new com.google.gson.JsonObject(); index.addProperty("name", "item.minecraft.diamond_sword"); detail.add("index", index);
+            var data = new com.google.gson.JsonObject(); data.addProperty("a_normal", 12); data.addProperty("z_" + "unbroken_field_path_".repeat(5), 32); detail.add("data", data);
+            tooltipPage = (KineticPage) construct("dev.xyat.taczworkshop.client.gui.TaczDataDetailPage", detail); KineticGui.open(tooltipPage);
+            tooltipX = page == 20 ? 28 : page == 21 ? 325 : 205;
+            tooltipY = page == 20 ? 22 : page == 21 ? 124 : 90;
+        }
+        updateTooltipMouse();
+    }
+
+    private static void updateTooltipMouse() throws Exception {
+        var mc = Minecraft.getInstance();
+        if (cachedMouseX == null) {
+            cachedMouseX = mouseField("xpos", "f_91507_"); cachedMouseY = mouseField("ypos", "f_91508_");
+            originalMouseX = cachedMouseX.getDouble(mc.mouseHandler); originalMouseY = cachedMouseY.getDouble(mc.mouseHandler);
+        }
+        double x = ((Number) invoke(mc.screen, "canvasX")).doubleValue();
+        double y = ((Number) invoke(mc.screen, "canvasY")).doubleValue();
+        double scale = ((Number) invoke(mc.screen, "canvasScale")).doubleValue();
+        cachedMouseX.setDouble(mc.mouseHandler, (x + tooltipX * scale) * mc.getWindow().getWidth() / mc.getWindow().getGuiScaledWidth());
+        cachedMouseY.setDouble(mc.mouseHandler, (y + tooltipY * scale) * mc.getWindow().getHeight() / mc.getWindow().getGuiScaledHeight());
+    }
+
+    private static java.lang.reflect.Field mouseField(String official, String srg) throws Exception {
+        for (String name : List.of(official, srg)) try {
+            var coordinate = Minecraft.getInstance().mouseHandler.getClass().getDeclaredField(name); coordinate.setAccessible(true); return coordinate;
+        } catch (NoSuchFieldException ignored) { }
+        throw new NoSuchFieldException(official);
+    }
+
+    private static void verifyTooltip() throws Exception {
+        var mc = Minecraft.getInstance();
+        var overlays = invoke(invoke(mc.screen, "kineticRuntime"), "overlays");
+        var request = field(overlays, "tooltip");
+        if (request == null || !request.getClass().getSimpleName().equals("WrappedTextTooltip"))
+            throw new AssertionError("Expected screen-fitted tooltip for " + CASES[page] + ", got " + request);
+        var lines = (List<Component>) field(request, "lines");
+        int preferred = ((Number) field(request, "maxWidth")).intValue();
+        int mx = (int) (cachedMouseX.getDouble(mc.mouseHandler) * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getWidth());
+        int budget = Math.max(48, Math.max(mc.getWindow().getGuiScaledWidth() - mx - 28, mx - 28));
+        int widest = 0;
+        for (Component line : lines) for (var part : mc.font.split(line, Math.min(preferred, budget))) widest = Math.max(widest, mc.font.width(part));
+        if (widest > budget) throw new AssertionError("Tooltip exceeds cursor-side budget");
+        LOG.info("GUI_PRESERVATION_TOOLTIP case={} logicalLines={} preferred={} budget={} widest={}", CASES[page], lines.size(), preferred, budget, widest);
     }
 
     private static Object field(Object target, String name) throws Exception {
@@ -203,10 +290,15 @@ public final class GuiPreservationValidation {
         Files.createDirectories(path.getParent());
         try (var image = Screenshot.takeScreenshot(mc.getMainRenderTarget())) { image.writeToFile(path); }
         captures++; LOG.info("GUI_PRESERVATION_CAPTURE {}", path.getFileName());
+        if (page >= 15) verifyTooltip();
     }
 
     private static void finish() {
         finished = true; var mc = Minecraft.getInstance();
+        tooltipPage = null;
+        if (cachedMouseX != null) try {
+            cachedMouseX.setDouble(mc.mouseHandler, originalMouseX); cachedMouseY.setDouble(mc.mouseHandler, originalMouseY);
+        } catch (IllegalAccessException error) { failures++; LOG.error("GUI_PRESERVATION_MOUSE_RESTORE_FAIL", error); }
         if (started) {
             mc.options.guiScale().set(scale); mc.getLanguageManager().setSelected(language); mc.options.languageCode = language;
             mc.setScreen(null); mc.getWindow().setWindowed(width, height);

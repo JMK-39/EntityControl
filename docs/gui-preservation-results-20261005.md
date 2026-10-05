@@ -22,6 +22,7 @@ Evidence in this worktree's ignored `build/gui-preservation-check`:
 - `fullpack/client4.out.log`: initial 36 captures (3D cards, dummy and armor effects), zero fixture failures.
 - `fullpack/final-addons/client2.out.log`: 36 captures (recipes, Combat, Mob and TACZ), zero fixture failures.
 - `fullpack/final-names/client2.out.log`: final 16 captures (filtered Combat, corrected Mob names/picker, recipe browser), zero fixture failures.
+- `fullpack/tooltip-final/client2.out.log`: final TACZ release, eight actual tooltip paths in both languages/window sizes, 32 captures and zero failures. Styled Components now reach Core screen fitting without fixed-width prewrapping; original page layout and actions are preserved. Minimum Core is 26.10.4. The production package is rebuilt into D:/NEWMODS and its installed hash matches.
 - `neoforge/client.out.log`: initial 36 captures; `neoforge/recipes.out.log`: final rebuilt recipe-only 16 captures; `neoforge/final-browser/client.out.log`: four browser captures. All reported zero fixture failures.
 - Captures cover English and Simplified Chinese, 854×480 and 1536×864, automatic GUI scale; actual images were inspected, not just the logs. Forge resource packs retain their overrides of vanilla texture paths.
 - `final-artifact-receipts.json` records the nine installed release SHA256 values. Production archives contain no temporary validation classes.
@@ -39,6 +40,8 @@ KineticArmory 详情/件数加成效果行及 MobAscension 效果列表/选择�
 实际发布包均在 `D:/NEWMODS`。完整 OTHERWORLD CLASH 安装六个 Forge 新包，现有 1.21.1 目录安装三个对应 NeoForge 新包；九个已安装包与输出文件 SHA256 全部一致。测试使用既有完整 mods、原有 8GiB 参数，未下载游戏；只使用存档副本与未保存页面草稿。
 
 已检查中英文、854×480 与 1536×864、自动 GUI 缩放的实际截图。Forge 原版纹理路径仍遵从整合包资源包覆盖。三轮 Forge 验证分别生成 36、36、16 张截图；NeoForge 分别生成 36、16、4 张截图；夹具均报告零失败，实际画面另行检查。日志、截图及九个安装包哈希保留在本工作区的 `build/gui-preservation-check`。
+
+随后复查并修复 TACZ 的八条提示框绕过：原带样式文本交由核心按屏幕宽度换行，保留页面布局、操作与 280/320 首选宽度，最低核心 26.10.4。最终包重新构建到 D:/NEWMODS 并安装；完整包中英文、两种窗口尺寸共 32 次真实悬停零失败，查看实际截图，长 ID 与带颜色文本均在屏幕内。完整记录见 TACZ 工作树的 docs/gui-tooltip-fitting-20261005.md；九个发布包安装哈希已重新核对。
 
 记录的测试客户端均已退出；两个目录的临时夹具已移除，原选项及临时修改的日志配置已恢复并核对哈希。一次核心/Mixin 启动死锁已单独记录，本次未修改核心源码或 JAR。
 

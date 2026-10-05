@@ -28,3 +28,11 @@ User requirements: keep the original layouts, entry points, interactions and 3D 
 - [x] Remove final temporary fixture; restore original options and log-cleaner configuration after the owned client exits. Restored files match backup SHA256. Startup retry temporarily disables log deduplication; diagnostic report: ../../core-log-filter-startup-deadlock-20261005.md.
 
 Same-version filenames proved insufficient to identify the first ContentStudio package: the initially installed Neo JAR still contained an old slot-overlay call. The final rebuilt JAR was checked by bytecode, deployment SHA256 and new screenshots. Do not infer a Gradle defect from this provenance mismatch.
+
+## Tooltip follow-up
+
+- [x] Audit addon tooltip submission: TACZ has eight fixed-width formatted requests bypassing Core screen fitting; other reviewed addon business requests use raw text/item tooltip APIs.
+- [x] Preserve styled logical lines, ordering and widths while switching these eight paths to Core's raw Component API. Renderer regression: RED 11 content branches, GREEN 19 cases; independent review found no blocking issues.
+- [x] Rebuild the final TACZ release into D:/NEWMODS; language keys, refmap/manifest, zero bundled fixture classes and release-Core references verified.
+- [x] Install and launch the complete pack with original 8GiB settings. Final fixture: 32 captures, zero failures; all eight paths in English/Chinese at both sizes; inspect screenshots and recorded actual wrap widths.
+- [x] Exit owned clients normally, remove fixture and restore original options/log configuration with exact hashes. Refresh nine installed release hashes. No Core changes, pushes or releases.
