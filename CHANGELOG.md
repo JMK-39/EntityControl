@@ -1,3 +1,15 @@
+## 26.10.5 — 2026-10-05
+
+### English
+
+- Restore the dummy editor's original vanilla inventory background below its equipment panel, preserving slot positions, buttons and interactions on both enabled Minecraft versions.
+- Align the vanilla inventory texture with its existing item slots and hotbar.
+
+### 简体中文
+
+- 恢复假人编辑器装备面板下方的原版背包背景；两个已启用版本保留原有槽位、按钮位置和操作方式。
+- 对齐原版背包贴图与现有物品槽、快捷栏的位置。
+
 ## 26.10.4 — 2026-10-04
 
 ### English

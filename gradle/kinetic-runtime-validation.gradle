@@ -1,3 +1,39 @@
+// Opt-in preservation fixture; never included in the shipped mod or the standard build.
+def preservationMetadata = layout.buildDirectory.dir('gui-preservation-validation')
+def writePreservationMetadata = tasks.register('writePreservationValidationMetadata') {
+    inputs.property 'packFormat', project.property('pack_format')
+    outputs.dir preservationMetadata
+    doLast {
+        def fileName = project.property('loader') == 'forge' ? 'mods.toml' : 'neoforge.mods.toml'
+        File target = new File(preservationMetadata.get().asFile, "META-INF/${fileName}")
+        target.parentFile.mkdirs()
+        target.setText('modLoader="javafml"\nloaderVersion="[1,)"\nlicense="LGPLv3"\n[[mods]]\nmodId="entitycontrol_preservation_validation"\nversion="1.0.0"\ndisplayName="GUI preservation validation"\n', 'UTF-8')
+        new File(preservationMetadata.get().asFile, 'pack.mcmeta').setText(
+                '{"pack":{"description":"Opt-in GUI preservation fixture","pack_format":' + project.property('pack_format') + '}}', 'UTF-8')
+    }
+}
+def preservationJar = tasks.register('guiPreservationValidationJar', Jar) {
+    dependsOn 'testClasses', writePreservationMetadata
+    from(sourceSets.test.output) { include 'dev/xyat/entitycontrolpreservationvalidation/*.class' }
+    from preservationMetadata
+    archiveFileName = 'entitycontrol-preservation-validation.jar'
+}
+if (project.property('loader') == 'forge') {
+    afterEvaluate {
+    def shipped = tasks.named('reobfJar').get()
+    tasks.register('reobfGuiPreservationValidationJar', shipped.getClass().superclass) {
+        dependsOn preservationJar
+        input.set(preservationJar.flatMap { it.archiveFile })
+        // Inherited Minecraft calls owned by addon entity classes also need their hierarchy.
+        libraries.from(shipped.libraries, sourceSets.main.output)
+        remapOperation.toolType.set(shipped.remapOperation.toolType)
+        remapOperation.toolClasspath.from(shipped.remapOperation.toolClasspath)
+        remapOperation.mappings.from(shipped.remapOperation.mappings)
+        archiveFileName = 'entitycontrol-preservation-validation-reobf.jar'
+    }
+    }
+}
+
 if (project.property('loader') == 'neoforge') {
     def metadata = layout.buildDirectory.dir('runtime-validation')
     def writeMetadata = tasks.register('writeRuntimeValidationMetadata') {

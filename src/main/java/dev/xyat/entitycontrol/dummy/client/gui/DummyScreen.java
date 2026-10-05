@@ -35,6 +35,7 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
             200
     );
     private static final KineticTexture EMPTY_HELMET = KineticTexture.of("minecraft", "textures/item/empty_armor_slot_helmet.png", 16, 16);
+    private static final KineticTexture INVENTORY_TEXTURE = KineticTexture.of("minecraft", "textures/gui/container/generic_54.png", 256, 256);
     private static final KineticTexture EMPTY_CHEST = KineticTexture.of("minecraft", "textures/item/empty_armor_slot_chestplate.png", 16, 16);
     private static final KineticTexture EMPTY_LEGS = KineticTexture.of("minecraft", "textures/item/empty_armor_slot_leggings.png", 16, 16);
     private static final KineticTexture EMPTY_BOOTS = KineticTexture.of("minecraft", "textures/item/empty_armor_slot_boots.png", 16, 16);
@@ -268,7 +269,10 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
 
     @Override
     protected void renderContainerBackground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.texture(TEXTURE, leftPos(), topPos(), 0, 0, 200, 200);
+        // Keep the original equipment panel above the vanilla player inventory background.
+        graphics.fill(leftPos(), topPos(), leftPos() + 200, topPos() + 200, 0xFFC6C6C6);
+        graphics.texture(TEXTURE, leftPos(), topPos(), 0, 0, 200, 101);
+        graphics.texture(INVENTORY_TEXTURE, leftPos() + 13, topPos() + 101, 0, 126, 176, 90);
 
         for (int i = 0; i < Math.min(6, menu().slots.size()); i++) {
             Slot slot = menu().slots.get(i);
