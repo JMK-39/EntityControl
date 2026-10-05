@@ -54,7 +54,7 @@ public final class GuiLongTextValidation {
                 nextPage();return;
             }
             long now=System.currentTimeMillis();
-            if(!screenshot && now>=due) { capture("start");screenshot=true;due=now+(phase==4?3400:550);return; }
+            if(!screenshot && now>=due) { capture("start");layout();screenshot=true;due=now+(phase==4?3400:550);return; }
             if(screenshot && now>=due) {
                 if(phase==4)capture("scroll");
                 nextPage();
@@ -139,6 +139,14 @@ public final class GuiLongTextValidation {
         var mc=Minecraft.getInstance();Path path=Path.of(ROOT,String.format("%d-%02d-%s-%s.png",phase,page,NAMES[page],frame));Files.createDirectories(path.getParent());
         try(var image=Screenshot.takeScreenshot(mc.getMainRenderTarget())){image.writeToFile(path);}
         captures++;LOG.info("ENTITY_GUI_CAPTURE phase={} case={} image={}x{}",phase,NAMES[page],mc.getWindow().getWidth(),mc.getWindow().getHeight());
+    }
+    /^** Logs controls of the open screen that overlap or sit closer than 2 px (Core layout check). *^/
+    private static void layout() {
+        try {
+            for(Object problem:(List<?>)Class.forName("dev.xyat.kineticcore.internal.client.gui.LayoutCheck").getMethod("currentScreenProblems").invoke(null))
+                LOG.warn("ENTITY_GUI_LAYOUT phase={} case={} {}",phase,NAMES[page],problem);
+            LOG.info("ENTITY_GUI_LAYOUT_CHECKED phase={} case={} controls={}",phase,NAMES[page],Class.forName("dev.xyat.kineticcore.internal.client.gui.LayoutCheck").getField("lastCheckedControls").get(null));
+        } catch(ReflectiveOperationException unavailable) { LOG.warn("ENTITY_GUI_LAYOUT unavailable",unavailable); }
     }
     private static void finish() {
         finished=true;
