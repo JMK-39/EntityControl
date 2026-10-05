@@ -42,7 +42,14 @@ import java.util.UUID;
 
 public class DummyEntityTest extends Mob implements MenuProvider {
 
-    private final SimpleContainer inventory = new SimpleContainer(6);
+    // Equipment follows the inventory whenever it changes (setChanged is what notified container listeners).
+    private final SimpleContainer inventory = new SimpleContainer(6) {
+        @Override
+        public void setChanged() {
+            super.setChanged();
+            updateEquipment();
+        }
+    };
     private CompoundTag attributeOverrides = new CompoundTag();
     private static final EntityDataAccessor<Integer> DATA_MOB_TYPE_ID = SynchedEntityData.defineId(DummyEntityTest.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> DATA_IFRAMES = SynchedEntityData.defineId(DummyEntityTest.class, EntityDataSerializers.BOOLEAN);
@@ -63,7 +70,6 @@ public class DummyEntityTest extends Mob implements MenuProvider {
         this.setNoAi(true);
         this.setPersistenceRequired();
         this.xpReward = 0;
-        this.inventory.addListener(container -> updateEquipment());
     }
 
     public void updateEquipment() {
@@ -97,8 +103,13 @@ if (!stack.isEmpty() && !stack.getOrCreateTag().getBoolean("KTDummyItem")) {
     @Override
     public void die(@NotNull DamageSource cause) {}
 
+    //? if >=26.1 {
+    /*@Override
+    public void kill(net.minecraft.server.level.ServerLevel level) {}
+    *///?} else {
     @Override
     public void kill() {}
+    //?}
 
     @Override
     public void remove(@NotNull RemovalReason reason) {
@@ -112,7 +123,7 @@ if (!stack.isEmpty() && !stack.getOrCreateTag().getBoolean("KTDummyItem")) {
     }
 
     public void savePresetToOwner() {
-        if (this.level().isClientSide || this.ownerUUID == null) return;
+        if (this.level().isClientSide() || this.ownerUUID == null) return;
         Player player = this.level().getPlayerByUUID(this.ownerUUID);
         if (player != null) {
             CompoundTag preset = new CompoundTag();
@@ -124,7 +135,7 @@ if (!stack.isEmpty() && !stack.getOrCreateTag().getBoolean("KTDummyItem")) {
                     CompoundTag itemTag = new CompoundTag();
                     itemTag.putByte("Slot", (byte) i);
                     //? if >=1.21 {
-/*itemTag.merge((CompoundTag) stack.save(this.registryAccess()));
+/*itemTag.merge(dev.xyat.entitycontrol.util.Nbt.saveItem(stack, this.registryAccess()));
 *///?} else {
 stack.save(itemTag);
 //?}
@@ -168,43 +179,43 @@ stack.save(itemTag);
 
         if (preset.contains("Inventory")) {
             this.inventory.clearContent();
-            ListTag list = preset.getList("Inventory", 10);
+            ListTag list = dev.xyat.entitycontrol.util.Nbt.compoundList(preset, "Inventory");
             for (int i = 0; i < list.size(); i++) {
                 CompoundTag itemTag = list.getCompound(i);
-                int slot = itemTag.getByte("Slot") & 255;
+                int slot = dev.xyat.entitycontrol.util.Nbt.byteValue(itemTag, "Slot") & 255;
                 //? if >=1.21 {
-/*if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemStack.parseOptional(this.registryAccess(), itemTag));
+/*if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, dev.xyat.entitycontrol.util.Nbt.loadItem(itemTag, this.registryAccess()));
 *///?} else {
 if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemStack.of(itemTag));
 //?}
             }
         }
 
-        if (preset.contains("MobType")) this.setCustomMobType(preset.getInt("MobType"));
-        if (preset.contains("IFrames")) this.setIFrames(preset.getBoolean("IFrames"));
-        if (preset.contains("HealthDrop")) this.setHealthDrop(preset.getBoolean("HealthDrop"));
-        if (preset.contains("EnvironmentDamage")) this.setEnvironmentDamage(preset.getBoolean("EnvironmentDamage"));
+        if (preset.contains("MobType")) this.setCustomMobType(dev.xyat.entitycontrol.util.Nbt.intValue(preset, "MobType"));
+        if (preset.contains("IFrames")) this.setIFrames(dev.xyat.entitycontrol.util.Nbt.bool(preset, "IFrames"));
+        if (preset.contains("HealthDrop")) this.setHealthDrop(dev.xyat.entitycontrol.util.Nbt.bool(preset, "HealthDrop"));
+        if (preset.contains("EnvironmentDamage")) this.setEnvironmentDamage(dev.xyat.entitycontrol.util.Nbt.bool(preset, "EnvironmentDamage"));
 
         if (preset.contains("Attributes")) {
-            CompoundTag attrs = preset.getCompound("Attributes");
+            CompoundTag attrs = dev.xyat.entitycontrol.util.Nbt.compound(preset, "Attributes");
 //? if >=1.21 {
-/*            if (attrs.contains("MaxHealth")) this.setAttributeBaseValue(Attributes.MAX_HEALTH.value(), attrs.getDouble("MaxHealth"));
+/*            if (attrs.contains("MaxHealth")) this.setAttributeBaseValue(Attributes.MAX_HEALTH.value(), dev.xyat.entitycontrol.util.Nbt.doubleValue(attrs, "MaxHealth"));
 *///?} else {
-            if (attrs.contains("MaxHealth")) this.setAttributeBaseValue(Attributes.MAX_HEALTH, attrs.getDouble("MaxHealth"));
+            if (attrs.contains("MaxHealth")) this.setAttributeBaseValue(Attributes.MAX_HEALTH, dev.xyat.entitycontrol.util.Nbt.doubleValue(attrs, "MaxHealth"));
 //?}
 //? if >=1.21 {
-/*            if (attrs.contains("Armor")) this.setAttributeBaseValue(Attributes.ARMOR.value(), attrs.getDouble("Armor"));
+/*            if (attrs.contains("Armor")) this.setAttributeBaseValue(Attributes.ARMOR.value(), dev.xyat.entitycontrol.util.Nbt.doubleValue(attrs, "Armor"));
 *///?} else {
-            if (attrs.contains("Armor")) this.setAttributeBaseValue(Attributes.ARMOR, attrs.getDouble("Armor"));
+            if (attrs.contains("Armor")) this.setAttributeBaseValue(Attributes.ARMOR, dev.xyat.entitycontrol.util.Nbt.doubleValue(attrs, "Armor"));
 //?}
 //? if >=1.21 {
-/*            if (attrs.contains("ArmorToughness")) this.setAttributeBaseValue(Attributes.ARMOR_TOUGHNESS.value(), attrs.getDouble("ArmorToughness"));
+/*            if (attrs.contains("ArmorToughness")) this.setAttributeBaseValue(Attributes.ARMOR_TOUGHNESS.value(), dev.xyat.entitycontrol.util.Nbt.doubleValue(attrs, "ArmorToughness"));
 *///?} else {
-            if (attrs.contains("ArmorToughness")) this.setAttributeBaseValue(Attributes.ARMOR_TOUGHNESS, attrs.getDouble("ArmorToughness"));
+            if (attrs.contains("ArmorToughness")) this.setAttributeBaseValue(Attributes.ARMOR_TOUGHNESS, dev.xyat.entitycontrol.util.Nbt.doubleValue(attrs, "ArmorToughness"));
 //?}
         }
         if (preset.contains("AttributeOverrides", Tag.TAG_COMPOUND)) {
-            restoreAttributeOverrides(preset.getCompound("AttributeOverrides"));
+            restoreAttributeOverrides(dev.xyat.entitycontrol.util.Nbt.compound(preset, "AttributeOverrides"));
         }
 
 //? if >=1.21 {
@@ -229,7 +240,7 @@ if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemS
     }
 
     private boolean isStandby() {
-        if (this.level().isClientSide) return false;
+        if (this.level().isClientSide()) return false;
 
         double standbyRange = DummyConfig.dummyStandbyRange.get();
         if (standbyRange <= 0) {
@@ -280,7 +291,7 @@ if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemS
     public void onAddedToWorld() {
         super.onAddedToWorld();
 //?}
-        if (!this.level().isClientSide && !slotsInitialized) {
+        if (!this.level().isClientSide() && !slotsInitialized) {
             CuriosCompat.initDummySlots(this);
             slotsInitialized = true;
         }
@@ -318,7 +329,7 @@ if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemS
     @Override
     public void tick() {
         super.tick();
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             long now = this.level().getGameTime();
 
             // 环境方块伤害检测开关。
@@ -334,9 +345,19 @@ if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemS
         }
     }
 
+    // 26.1 damages entities on the server through hurtServer.
+    //? if >=26.1 {
+    /*@Override
+    public boolean hurtServer(net.minecraft.server.level.ServerLevel level, @NotNull DamageSource source, float amount) {
+        Entity attacker = source.getEntity();
+        if (!(attacker instanceof Player) && isStandby()) return false;
+        if (!this.hasIFrames()) this.invulnerableTime = 0;
+        return super.hurtServer(level, source, amount);
+    }
+    *///?} else {
     @Override
     public boolean hurt(@NotNull DamageSource source, float amount) {
-        if (this.level().isClientSide) return false;
+        if (this.level().isClientSide()) return false;
 
         Entity attacker = source.getEntity();
         boolean isPlayerAttack = attacker instanceof Player;
@@ -348,6 +369,7 @@ if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemS
         if (!this.hasIFrames()) this.invulnerableTime = 0;
         return super.hurt(source, amount);
     }
+    //?}
 
     public void setAttributeBaseValue(Attribute attribute, double value) {
         if (attribute == null || !Double.isFinite(value) || value != attribute.sanitizeValue(value)) return;
@@ -364,14 +386,14 @@ if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemS
     }
 
     private void restoreAttributeOverrides(CompoundTag saved) {
-        if (saved == null || saved.getAllKeys().size() > 512) return;
-        for (String name : saved.getAllKeys()) {
-            if (!saved.contains(name, Tag.TAG_ANY_NUMERIC)) continue;
+        if (saved == null || dev.xyat.entitycontrol.util.Nbt.keys(saved).size() > 512) return;
+        for (String name : dev.xyat.entitycontrol.util.Nbt.keys(saved)) {
+            if (!dev.xyat.entitycontrol.util.Nbt.isNumeric(saved, name)) continue;
             ResourceLocation id = KineticResourceIds.tryParse(name);
             if (id == null || !name.equals(id.toString())) continue;
             Attribute attribute = KineticRegistries.attributes().get(id);
             if (attribute != null && id.equals(KineticRegistries.attributes().id(attribute))) {
-                setAttributeBaseValue(attribute, saved.getDouble(name));
+                setAttributeBaseValue(attribute, dev.xyat.entitycontrol.util.Nbt.doubleValue(saved, name));
             }
         }
     }
@@ -402,16 +424,63 @@ if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemS
 
 //?}
     @Override
+    //? if >=26.1 {
+    /*public @NotNull InteractionResult interact(@NotNull Player player, @NotNull InteractionHand hand, @NotNull Vec3 pos) {
+    *///?} else {
     public @NotNull InteractionResult interactAt(@NotNull Player player, @NotNull Vec3 pos, @NotNull InteractionHand hand) {
-        if (!this.level().isClientSide && hand == InteractionHand.MAIN_HAND && player.isCrouching() && player.getMainHandItem().isEmpty()) {
+    //?}
+        if (!this.level().isClientSide() && hand == InteractionHand.MAIN_HAND && player.isCrouching() && player.getMainHandItem().isEmpty()) {
             KineticMenus.open((ServerPlayer) player, getDisplayName(), (containerId, inventory, owner) -> new DummyMenu(containerId, inventory, this), data -> data.writeInt(getId()));
             return InteractionResult.SUCCESS;
         }
+        //? if >=26.1 {
+        /*return super.interact(player, hand, pos);
+        *///?} else {
         return super.interactAt(player, pos, hand);
+        //?}
     }
 
     public void refreshSlotAttributes() { this.updateEquipment(); }
 
+    // 26.1 entities save through value outputs; the stored keys and item layout stay the same.
+    //? if >=26.1 {
+    /*@Override
+    protected void addAdditionalSaveData(@NotNull net.minecraft.world.level.storage.ValueOutput output) {
+        super.addAdditionalSaveData(output);
+        output.store("DummyAttributeOverrides", CompoundTag.CODEC, this.attributeOverrides.copy());
+        var items = output.list("DummyInventory", net.minecraft.world.ItemStackWithSlot.CODEC);
+        for (int i = 0; i < this.inventory.getContainerSize(); i++) {
+            ItemStack stack = this.inventory.getItem(i);
+            if (!stack.isEmpty()) items.add(new net.minecraft.world.ItemStackWithSlot(i, stack));
+        }
+        output.putInt("DummyMobType", this.getCustomMobTypeId());
+        output.putBoolean("DummyIFrames", this.hasIFrames());
+        output.putBoolean("DummyHealthDrop", this.isHealthDropEnabled());
+        output.putBoolean("DummyEnvironmentDamage", this.isEnvironmentDamageEnabled());
+        output.putBoolean("SlotsInitialized", this.slotsInitialized);
+        output.storeNullable("OwnerUUID", net.minecraft.core.UUIDUtil.CODEC, this.ownerUUID);
+    }
+
+    @Override
+    protected void readAdditionalSaveData(@NotNull net.minecraft.world.level.storage.ValueInput input) {
+        super.readAdditionalSaveData(input);
+        this.attributeOverrides = new CompoundTag();
+        input.read("DummyAttributeOverrides", CompoundTag.CODEC).ifPresent(this::restoreAttributeOverrides);
+        this.inventory.clearContent();
+        for (net.minecraft.world.ItemStackWithSlot item : input.listOrEmpty("DummyInventory", net.minecraft.world.ItemStackWithSlot.CODEC)) {
+            if (item.isValidInContainer(this.inventory.getContainerSize())) this.inventory.setItem(item.slot(), item.stack());
+        }
+        updateEquipment();
+        this.nextStandbyCheckTick = 0L;
+        this.cachedStandby = false;
+        this.setCustomMobType(input.getIntOr("DummyMobType", 0));
+        this.setIFrames(input.getBooleanOr("DummyIFrames", false));
+        this.setHealthDrop(input.getBooleanOr("DummyHealthDrop", false));
+        this.setEnvironmentDamage(input.getBooleanOr("DummyEnvironmentDamage", false));
+        this.slotsInitialized = input.getBooleanOr("SlotsInitialized", false);
+        this.ownerUUID = input.read("OwnerUUID", net.minecraft.core.UUIDUtil.CODEC).orElse(null);
+    }
+    *///?} else {
     @Override
     public void addAdditionalSaveData(@NotNull CompoundTag tag) {
         super.addAdditionalSaveData(tag);
@@ -423,7 +492,7 @@ if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemS
                 CompoundTag itemTag = new CompoundTag();
                 itemTag.putByte("Slot", (byte) i);
                 //? if >=1.21 {
-/*itemTag.merge((CompoundTag) stack.save(this.registryAccess()));
+/*itemTag.merge(dev.xyat.entitycontrol.util.Nbt.saveItem(stack, this.registryAccess()));
 *///?} else {
 stack.save(itemTag);
 //?}
@@ -455,7 +524,7 @@ stack.save(itemTag);
                 CompoundTag itemTag = list.getCompound(i);
                 int slot = itemTag.getByte("Slot") & 255;
                 //? if >=1.21 {
-/*if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemStack.parseOptional(this.registryAccess(), itemTag));
+/*if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, dev.xyat.entitycontrol.util.Nbt.loadItem(itemTag, this.registryAccess()));
 *///?} else {
 if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemStack.of(itemTag));
 //?}
@@ -473,6 +542,7 @@ if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemS
             this.ownerUUID = tag.getUUID("OwnerUUID");
         }
     }
+    //?}
 
     @Nullable @Override protected SoundEvent getHurtSound(@NotNull DamageSource s) { return null; }
     @Nullable @Override protected SoundEvent getDeathSound() { return null; }
@@ -487,10 +557,12 @@ if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemS
     protected void dropAllDeathLoot(@NotNull DamageSource damageSource) {}
 //?}
 
+    //? if <26.1 {
     @Override
     protected void dropEquipment() {
         super.dropEquipment();
     }
+    //?}
 
 //? if >=1.21 {
 /*    @Override
@@ -500,13 +572,21 @@ if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemS
     protected void dropCustomDeathLoot(@NotNull DamageSource damageSource, int looting, boolean recentlyHit) {}
 //?}
 
+    //? if >=26.1 {
+    /*@Override
+    protected boolean shouldDropLoot(net.minecraft.server.level.ServerLevel level) { return false; }
+    *///?} else {
     @Override
     public boolean shouldDropLoot() { return false; }
+    //?}
 
     @Override
     public boolean shouldDropExperience() { return false; }
 
-//? if >=1.21 {
+//? if >=26.1 {
+/*    @Override
+    protected void dropExperience(net.minecraft.server.level.ServerLevel level, net.minecraft.world.entity.Entity attacker) {}
+*///?} else if >=1.21 {
 /*    @Override
     protected void dropExperience(net.minecraft.world.entity.Entity attacker) {}
 *///?} else {

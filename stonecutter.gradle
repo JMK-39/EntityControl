@@ -44,6 +44,137 @@ stonecutter.parameters {
         spec.replace 'AttributeModifier.Operation.MULTIPLY_BASE', 'AttributeModifier.Operation.ADD_MULTIPLIED_BASE'
         spec.replace 'AttributeModifier.Operation.MULTIPLY_TOTAL', 'AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL'
     }
+
+        // Classes and methods that Minecraft or NeoForge only renamed or moved between 1.21.2 and 26.1, the same
+    // rules KineticCore uses. Whole words or exact calls only, because they also run backwards on older nodes.
+    // Classes whose API changed as well are handled in code with `//? if >=26.1 {` blocks.
+    replacements.regex(loader == 'neoforge' && eval(current.version, '>=26.1')) { spec ->
+        def rename = { String from, String to ->
+            spec.replace "\\b${from.replace('.', '\\.')}\\b", to, "\\b${to.replace('.', '\\.')}\\b", from
+        }
+        rename 'ResourceLocation', 'Identifier'
+        rename 'GuiGraphics', 'GuiGraphicsExtractor'
+        rename 'MobSpawnType', 'EntitySpawnReason'
+        rename 'DimensionTransition', 'TeleportTransition'
+        rename 'net.minecraft.Util', 'net.minecraft.util.Util'
+        rename 'net.minecraft.client.GuiMessage', 'net.minecraft.client.multiplayer.chat.GuiMessage'
+        rename 'net.minecraft.client.GuiMessageTag', 'net.minecraft.client.multiplayer.chat.GuiMessageTag'
+        rename 'net.minecraft.client.renderer.RenderType', 'net.minecraft.client.renderer.rendertype.RenderType'
+        rename 'net.minecraft.world.level.GameRules', 'net.minecraft.world.level.gamerules.GameRules'
+        rename 'net.neoforged.neoforge.common.util.TriState', 'net.minecraft.util.TriState'
+        rename 'ClickType', 'ContainerInput'
+        rename 'RegisterClientReloadListenersEvent', 'AddClientReloadListenersEvent'
+        rename 'AddReloadListenerEvent', 'AddServerReloadListenersEvent'
+
+        def call = { String from, String to ->
+            spec.replace java.util.regex.Pattern.quote(from), to, java.util.regex.Pattern.quote(to), from
+        }
+        // Registry keys: location() became identifier(); TagKey keeps location().
+        call 'dimension().location()', 'dimension().identifier()'
+        call 'getKey().location()', 'getKey().identifier()'
+        call 'key.location()', 'key.identifier()'
+        call 'OVERWORLD.location()', 'OVERWORLD.identifier()'
+        call 'ResourceKey::location', 'ResourceKey::identifier'
+        call '.getMinBuildHeight()', '.getMinY()'
+        call 'level.getMaxBuildHeight()', '(level.getMaxY() + 1)'
+        call '.registryOrThrow(', '.lookupOrThrow('
+        call 'registryAccess().registry(', 'registryAccess().lookup('
+        call 'TagParser.parseTag(', 'TagParser.parseCompoundFully('
+        call 'writeResourceLocation(', 'writeIdentifier('
+        call 'readResourceLocation(', 'readIdentifier('
+        call 'FMLEnvironment.dist', 'FMLEnvironment.getDist()'
+        call 'PacketDistributor.sendToServer(', 'net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer('
+        // Click and hover events are one record per action on 26.1.
+        call 'new ClickEvent(ClickEvent.Action.RUN_COMMAND, ', 'new ClickEvent.RunCommand('
+        call 'new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, ', 'new ClickEvent.SuggestCommand('
+        call 'new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, ', 'new ClickEvent.CopyToClipboard('
+        call 'new HoverEvent(HoverEvent.Action.SHOW_TEXT, ', 'new HoverEvent.ShowText('
+        // Widget methods.
+        rename 'renderWidget', 'extractWidgetRenderState'
+        rename 'getScrollbarPosition', 'scrollBarX'
+        rename 'getScrollAmount', 'scrollAmount'
+        rename 'getMaxScroll', 'maxScrollAmount'
+
+        // CompoundTag and ListTag getters return Optional since 1.21.5; the ...Or forms keep the old defaults.
+        def nbt = '\\b(tag|entityTag|stackTag|forgeData|persistentData|root|nbt|compound|data|list|getPersistentData\\(\\))'
+        def getter = { String from, String to, String defaultArgument ->
+            spec.replace "${nbt}\\.${from}\\(([^()]*)\\)", "\$1.${to}(\$2${defaultArgument})",
+                    "${nbt}\\.${to}\\(([^()]*?)${java.util.regex.Pattern.quote(defaultArgument)}\\)", "\$1.${from}(\$2)"
+        }
+        getter 'getInt', 'getIntOr', ', 0'
+        getter 'getLong', 'getLongOr', ', 0L'
+        getter 'getBoolean', 'getBooleanOr', ', false'
+        getter 'getString', 'getStringOr', ', ""'
+        getter 'getDouble', 'getDoubleOr', ', 0D'
+        getter 'getFloat', 'getFloatOr', ', 0F'
+        getter 'getCompound', 'getCompoundOrEmpty', ''
+        ['COMPOUND': 'CompoundTag', 'STRING': 'StringTag', 'LIST': 'ListTag'].each { type, tagClass ->
+            spec.replace "\\b([A-Za-z_]\\w*(?:\\(\\))?)\\.contains\\(([^(),]*), Tag\\.TAG_${type}\\)",
+                    "(\$1.get(\$2) instanceof net.minecraft.nbt.${tagClass})",
+                    "\\(([A-Za-z_]\\w*(?:\\(\\))?)\\.get\\(([^(),]*)\\) instanceof net\\.minecraft\\.nbt\\.${tagClass}\\)",
+                    "\$1.contains(\$2, Tag.TAG_${type})"
+        }
+        spec.replace '\\.getList\\(([^(),]*), Tag\\.(TAG_[A-Z]+)\\)', '.getListOrEmpty($1)/*$2*/',
+                '\\.getListOrEmpty\\(([^(),]*)\\)/\\*(TAG_[A-Z]+)\\*/', '.getList($1, Tag.$2)'
+        // Inventory slots, GameProfile records and permission sets.
+        call 'getInventory().items', 'getInventory().getNonEquipmentItems()'
+        call 'getGameProfile().getName()', 'getGameProfile().name()'
+        call 'profile.getName()', 'profile.name()'
+        call 'profile.getId()', 'profile.id()'
+        call 'getProfile().getName()', 'getProfile().name()'
+        call 'getProfile().getId()', 'getProfile().id()'
+        // Entity.getServer() is gone; the level knows its server.
+        call 'player.getServer()', 'player.level().getServer()'
+        call '.withPermission(2)', '.withPermission(net.minecraft.server.permissions.LevelBasedPermissionSet.GAMEMASTER)'
+        call '.withPermission(4)', '.withPermission(net.minecraft.server.permissions.LevelBasedPermissionSet.OWNER)'
+        call '.hasPermission(2)', '.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER)'
+        call '.hasPermissions(2)', '.permissions().hasPermission(new net.minecraft.server.permissions.Permission.HasCommandLevel(net.minecraft.server.permissions.PermissionLevel.GAMEMASTERS))'
+        call '.hasPermission(3)', '.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_ADMIN)'
+        // EntityControl: predicates moved to advancements.criterion; players reach their level through level(); entities are
+        // created for a spawn reason and snapped into place; block effects apply through applyEffectsFromBlocks.
+        rename 'net.minecraft.advancements.critereon', 'net.minecraft.advancements.criterion'
+        call 'player.serverLevel()', '((net.minecraft.server.level.ServerLevel) player.level())'
+        call 'living.moveTo(', 'living.snapTo('
+        call 'this.checkInsideBlocks()', 'this.applyEffectsFromBlocks()'
+        call 'Entity entity = type.create(level);', 'Entity entity = type.create(level, net.minecraft.world.entity.EntitySpawnReason.LOAD);'
+        call 'created = type.create(level);', 'created = type.create(level, net.minecraft.world.entity.EntitySpawnReason.TRIGGERED);'
+        call 'type.create(server.overworld())', 'type.create(server.overworld(), net.minecraft.world.entity.EntitySpawnReason.LOAD)'
+        call 'type.create(validationLevel)', 'type.create(validationLevel, net.minecraft.world.entity.EntitySpawnReason.LOAD)'
+        call 'player.displayClientMessage(message, true)', 'player.sendOverlayMessage(message)'
+        call 'event.camera().getPosition()', 'event.camera().position()'
+        // Item stacks no longer list their tags; the item holder does.
+        call 'stack.getTags()', 'stack.typeHolder().tags()'
+        call 'template.getTags()', 'template.typeHolder().tags()'
+        // Spawn lists are weighted lists of spawner data records; the weight sits beside each entry.
+        rename 'WeightedRandomList', 'WeightedList'
+        rename 'SPAWN_EGG', 'SPAWN_ITEM_USE'
+        call 'data.minCount;', 'data.minCount();'
+        call 'data.maxCount;', 'data.maxCount();'
+        call 'spawnerData.type', 'spawnerData.type()'
+        // Entity types are built with their registry key; custom data getters return defaults.
+        call '.build("dummy")', '.build(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.ENTITY_TYPE, dev.xyat.kineticcore.api.resource.KineticResourceIds.of("entitycontrol", "dummy")))'
+        call '.copyTag().getBoolean("KTDummyItem")', '.copyTag().getBooleanOr("KTDummyItem", false)'
+        // Mixin targets: entity type predicates test a type holder; totem protection runs inside hurtServer.
+        call 'Lnet/minecraft/advancements/critereon/EntityTypePredicate;matches(Lnet/minecraft/world/entity/EntityType;)Z', 'Lnet/minecraft/advancements/criterion/EntityTypePredicate;matches(Lnet/minecraft/core/Holder;)Z'
+        call 'EntityTypePredicate predicate, EntityType<?> type, Operation<Boolean> original', 'EntityTypePredicate predicate, net.minecraft.core.Holder<EntityType<?>> type, Operation<Boolean> original'
+        call 'method = "hurt",', 'method = "hurtServer",'
+        // Empty equipment slot icons are GUI sprites.
+        call 'textures/item/empty_armor_slot_helmet.png', 'textures/gui/sprites/container/slot/helmet.png'
+        call 'textures/item/empty_armor_slot_chestplate.png', 'textures/gui/sprites/container/slot/chestplate.png'
+        call 'textures/item/empty_armor_slot_leggings.png', 'textures/gui/sprites/container/slot/leggings.png'
+        call 'textures/item/empty_armor_slot_boots.png', 'textures/gui/sprites/container/slot/boots.png'
+        call 'textures/item/empty_armor_slot_shield.png', 'textures/gui/sprites/container/slot/shield.png'
+        call 'textures/item/empty_slot_sword.png', 'textures/gui/sprites/container/slot/sword.png'
+        // Validation fixtures: entities are created for a spawn reason, enchantment levels are listed directly, entity
+        // predicates resolve tags through the registry, the window resizes the GUI and screenshots use a callback.
+        call '.DUMMY.get().create(level)', '.DUMMY.get().create(level, net.minecraft.world.entity.EntitySpawnReason.LOAD)'
+        call '.DUMMY.get().create(mc.level)', '.DUMMY.get().create(mc.level, net.minecraft.world.entity.EntitySpawnReason.LOAD)'
+        call 'enchantments={levels:{\\"minecraft:sharpness\\":2}}', 'enchantments={\\"minecraft:sharpness\\":2}'
+        call '.Builder.entity().of(EntityTypeTags.', '.Builder.entity().of(level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.ENTITY_TYPE), EntityTypeTags.'
+        call 'mc.resizeDisplay()', 'mc.resizeGui()'
+        call 'try(var image=Screenshot.takeScreenshot(mc.getMainRenderTarget())){image.writeToFile(path);}', 'Screenshot.takeScreenshot(mc.getMainRenderTarget(),image->{try(image){image.writeToFile(path);}catch(java.io.IOException error){throw new java.io.UncheckedIOException(error);}});'
+        call 'try (var image = Screenshot.takeScreenshot(mc.getMainRenderTarget())) { image.writeToFile(path); }', 'Screenshot.takeScreenshot(mc.getMainRenderTarget(), image -> { try (image) { image.writeToFile(path); } catch (java.io.IOException error) { throw new java.io.UncheckedIOException(error); } });'
+    }
 }
 
 tasks.register('buildAll') {

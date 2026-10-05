@@ -34,9 +34,9 @@ public final class RuntimeValidation {
             require(dummy != null, "dummy registered");
             dummy.getInventory().setItem(4, stack);
             dummy.setAttributeBaseValue(Attributes.ARMOR.value(), 12);
-            var saved = new CompoundTag(); dummy.addAdditionalSaveData(saved);
+            var saved = dev.xyat.entitycontrol.util.Nbt.saveEntity(dummy);
             DummyEntityTest restored = DummyInit.DUMMY.get().create(level);
-            restored.readAdditionalSaveData(saved);
+            dev.xyat.entitycontrol.util.Nbt.loadEntity(restored, saved);
             require(restored.getInventory().getItem(4).getComponentsPatch().equals(stack.getComponentsPatch()), "dummy inventory retains components and marker");
             require(restored.getAttributeBaseValue(Attributes.ARMOR) == 12, "dummy attribute persistence");
             require(restored.getInventory().getItem(4).getOrDefault(net.minecraft.core.component.DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.EMPTY).copyTag().getBoolean("KTDummyItem"), "dummy item marker");

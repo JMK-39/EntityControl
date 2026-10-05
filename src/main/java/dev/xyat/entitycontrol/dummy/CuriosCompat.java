@@ -42,7 +42,17 @@ public final class CuriosCompat {
         return LoadedCurios.setCurioItem(entity, index, stack);
     }
 
-//? if >=1.21 {
+//? if >=26.1 {
+/*    public static net.minecraft.nbt.Tag savePreset(LivingEntity entity) {
+        if (!isAvailable()) return null;
+        return CuriosApi.getCuriosInventory(entity).map(ICuriosItemHandler::writeTag).orElse(null);
+    }
+
+    // Curios 15 resets to an empty default inventory, which would drop the preset just read.
+    public static void loadPreset(LivingEntity entity, net.minecraft.nbt.Tag saved) {
+        if (isAvailable() && saved != null) CuriosApi.getCuriosInventory(entity).ifPresent(handler -> handler.readTag(saved));
+    }
+*///?} else if >=1.21 {
 /*    public static net.minecraft.nbt.Tag savePreset(LivingEntity entity) {
         if (!isAvailable()) return null;
         return CuriosApi.getCuriosInventory(entity).map(ICuriosItemHandler::writeTag).orElse(null);

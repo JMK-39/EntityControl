@@ -499,13 +499,13 @@ stack.getOrCreateTag().putBoolean("KTDummyItem", true);
         if (data == null || data.isEmpty()) {
             return List.of();
         }
-        if (data.getAllKeys().size() > 1) {
+        if (dev.xyat.entitycontrol.util.Nbt.keys(data).size() > 1) {
             return null;
         }
 
         List<AttributeWrite> writes = new ArrayList<>(1);
-        for (String key : data.getAllKeys()) {
-            if (key.length() > 128 || !data.contains(key, Tag.TAG_ANY_NUMERIC)) {
+        for (String key : dev.xyat.entitycontrol.util.Nbt.keys(data)) {
+            if (key.length() > 128 || !dev.xyat.entitycontrol.util.Nbt.isNumeric(data, key)) {
                 return null;
             }
             ResourceLocation id = KineticResourceIds.tryParse(key);

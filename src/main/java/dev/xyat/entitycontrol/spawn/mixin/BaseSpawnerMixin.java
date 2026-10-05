@@ -338,7 +338,7 @@ public abstract class BaseSpawnerMixin implements SpawnerRuntimeAccessor {
     private ResourceLocation entitycontrol_spawn$readEntityIdFromSpawnerTag(CompoundTag tag) {
         CompoundTag spawnDataTag = tag.getCompound(BaseSpawner.SPAWN_DATA_TAG);
         CompoundTag entityTag = spawnDataTag.contains("entity")
-                ? spawnDataTag.getCompound("entity")
+                ? dev.xyat.entitycontrol.util.Nbt.compound(spawnDataTag, "entity")
                 : spawnDataTag;
         return entitycontrol_spawn$parseEntityId(entityTag);
     }
@@ -448,7 +448,7 @@ public abstract class BaseSpawnerMixin implements SpawnerRuntimeAccessor {
         if (maximum == minimum) {
             return minimum;
         }
-        return minimum + level.random.nextInt(maximum - minimum + 1);
+        return minimum + level.getRandom().nextInt(maximum - minimum + 1);
     }
 
     @Unique

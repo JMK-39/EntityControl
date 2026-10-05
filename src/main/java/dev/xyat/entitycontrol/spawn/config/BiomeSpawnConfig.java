@@ -15,6 +15,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+//? if <26.1
 import net.minecraft.util.random.Weight;
 import net.minecraft.util.random.WeightedRandomList;
 import net.minecraft.world.entity.Entity;
@@ -764,8 +765,17 @@ public class BiomeSpawnConfig {
                     continue;
                 }
 
+                // 26.1 keeps each entry's weight beside its spawner data.
+                //? if >=26.1 {
+                /*for (net.minecraft.util.random.Weighted<MobSpawnSettings.SpawnerData> weighted : list.unwrap()) {
+                    MobSpawnSettings.SpawnerData data = weighted.value();
+                    int weight = weighted.weight();
+                    ResourceLocation id = KineticRegistries.entityTypes().id(data.type());
+                *///?} else {
                 for (MobSpawnSettings.SpawnerData data : list.unwrap()) {
+                    int weight = data.getWeight().asInt();
                     ResourceLocation id = KineticRegistries.entityTypes().id(data.type);
+                //?}
                     if (id == null) continue;
 
                     String entityId = id.toString();
@@ -779,7 +789,7 @@ public class BiomeSpawnConfig {
                     if (!node.biomes.containsKey(biomeId)
                             && !node.deleted_biomes.contains(biomeId)) {
                         SpawnerDataNode spawnData = new SpawnerDataNode();
-                        spawnData.weight = data.getWeight().asInt();
+                        spawnData.weight = weight;
                         spawnData.min = data.minCount;
                         spawnData.max = data.maxCount;
                         node.biomes.put(biomeId, spawnData);
@@ -869,7 +879,11 @@ public class BiomeSpawnConfig {
             return;
         }
 
+        //? if >=26.1 {
+        /*Map<String, Map<MobCategory, List<net.minecraft.util.random.Weighted<MobSpawnSettings.SpawnerData>>>> biomeTargetSpawns = new HashMap<>();
+        *///?} else {
         Map<String, Map<MobCategory, List<MobSpawnSettings.SpawnerData>>> biomeTargetSpawns = new HashMap<>();
+        //?}
         int processEntityCount = 0;
         int rulesAddedCount = 0;
 
@@ -899,7 +913,11 @@ public class BiomeSpawnConfig {
 
                 biomeTargetSpawns.computeIfAbsent(b.getKey(), k -> new EnumMap<>(MobCategory.class))
                         .computeIfAbsent(targetCat, k -> new ArrayList<>())
+                        //? if >=26.1 {
+                        /*.add(new net.minecraft.util.random.Weighted<>(new MobSpawnSettings.SpawnerData(entityType, data.min, data.max), effectiveWeight));
+                        *///?} else {
                         .add(new MobSpawnSettings.SpawnerData(entityType, Weight.of(effectiveWeight), data.min, data.max));
+                        //?}
                 rulesAddedCount++;
             }
         }
@@ -908,12 +926,19 @@ public class BiomeSpawnConfig {
 
         for (Map.Entry<ResourceKey<Biome>, Biome> entry : biomeRegistry.entrySet()) {
             String biomeId = entry.getKey().location().toString();
-            Map<MobCategory, List<MobSpawnSettings.SpawnerData>> targets = biomeTargetSpawns.getOrDefault(biomeId, Collections.emptyMap());
             Map<MobCategory, WeightedRandomList<MobSpawnSettings.SpawnerData>> newSpawnersMap = new EnumMap<>(MobCategory.class);
+            //? if >=26.1 {
+            /*Map<MobCategory, List<net.minecraft.util.random.Weighted<MobSpawnSettings.SpawnerData>>> targets = biomeTargetSpawns.getOrDefault(biomeId, Collections.emptyMap());
+            for (MobCategory category : MobCategory.values()) {
+                newSpawnersMap.put(category, WeightedRandomList.of(targets.getOrDefault(category, Collections.emptyList())));
+            }
+            *///?} else {
+            Map<MobCategory, List<MobSpawnSettings.SpawnerData>> targets = biomeTargetSpawns.getOrDefault(biomeId, Collections.emptyMap());
             for (MobCategory category : MobCategory.values()) {
                 List<MobSpawnSettings.SpawnerData> list = targets.getOrDefault(category, Collections.emptyList());
                 newSpawnersMap.put(category, WeightedRandomList.create(list));
             }
+            //?}
             if (entry.getValue().getMobSettings() instanceof IMobSpawnSettingsAccess access) {
                 access.entitycontrol_spawn$setSpawners(newSpawnersMap);
             }

@@ -21,7 +21,7 @@ stonecutter {
     create(rootProject) {
         version('1.20.1-forge', '1.20.1').buildscript('build.forge.gradle')
         version('1.21.1-neoforge', '1.21.1').buildscript('build.neoforge.gradle')
-        // version('26.1.2-neoforge', '26.1.2').buildscript('build.neoforge.gradle')
+        version('26.1.2-neoforge', '26.1.2').buildscript('build.neoforge.gradle')
         vcsVersion = '1.20.1-forge'
     }
 }

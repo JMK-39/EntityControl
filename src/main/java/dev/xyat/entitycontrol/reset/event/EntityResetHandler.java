@@ -56,7 +56,7 @@ public final class EntityResetHandler {
 
     public static void onLivingHurt(KineticLivingEvents.HurtContext event) {
         if (!EntityReseConfig.enableEntityReset) return;
-        if (event.entity().level().isClientSide) return;
+        if (event.entity().level().isClientSide()) return;
         if (event.amount() <= 0) return;
 
         LivingEntity target = event.entity();
@@ -73,7 +73,7 @@ public final class EntityResetHandler {
     public static void onPlayerDeathPre(KineticLivingEvents.DeathContext event) {
         if (!EntityReseConfig.enableEntityReset) return;
         if (!(event.entity() instanceof Player player)) return;
-        if (player.level().isClientSide) return;
+        if (player.level().isClientSide()) return;
 
         List<LivingEntity> trackedBosses = getNearbyTrackedBosses(player);
         if (!trackedBosses.isEmpty()) {
@@ -84,7 +84,7 @@ public final class EntityResetHandler {
     public static void onPlayerDeathPost(KineticLivingEvents.DeathContext event) {
         if (!EntityReseConfig.enableEntityReset) return;
         if (!(event.entity() instanceof Player player)) return;
-        if (player.level().isClientSide) return;
+        if (player.level().isClientSide()) return;
 
         List<LivingEntity> bosses = deathSnapshot.remove(player.getUUID());
         if (bosses == null || bosses.isEmpty()) return;
@@ -98,7 +98,7 @@ public final class EntityResetHandler {
 
     public static void onTotemProtectionTriggered(Player player) {
         if (!EntityReseConfig.enableEntityReset) return;
-        if (player.level().isClientSide) return;
+        if (player.level().isClientSide()) return;
 
         List<LivingEntity> trackedBosses = getNearbyTrackedBosses(player);
         if (trackedBosses.isEmpty()) return;
@@ -160,8 +160,7 @@ public final class EntityResetHandler {
     }
 
     private static void saveSnapshot(LivingEntity entity) {
-        CompoundTag snapshot = new CompoundTag();
-        entity.saveWithoutId(snapshot);
+        CompoundTag snapshot = dev.xyat.entitycontrol.util.Nbt.saveEntity(entity);
 
         CompoundTag data = entity.getPersistentData();
         data.put(NBT_SNAPSHOT, snapshot);
@@ -186,10 +185,15 @@ public final class EntityResetHandler {
         applyTag.put("Pos", currentPos);
         applyTag.put("Rotation", currentRot);
         applyTag.put("Motion", currentMotion);
+        // 26.1 stores the fall distance as a double under its own key.
+        //? if >=26.1 {
+        /*applyTag.putDouble("fall_distance", entity.fallDistance);
+        *///?} else {
         applyTag.putFloat("FallDistance", entity.fallDistance);
-        applyTag.putUUID("UUID", entity.getUUID());
+        //?}
+        dev.xyat.entitycontrol.util.Nbt.putUuid(applyTag, "UUID", entity.getUUID());
 
-        entity.load(applyTag);
+        dev.xyat.entitycontrol.util.Nbt.loadEntity(entity, applyTag);
         entity.setHealth(entity.getMaxHealth());
 
         if (entity.level() instanceof ServerLevel serverLevel) {

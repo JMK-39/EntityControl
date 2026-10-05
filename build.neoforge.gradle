@@ -31,6 +31,10 @@ neoForge {
             if (project.findProperty('kinetic_quick_play')) {
                 programArguments.addAll('--quickPlaySingleplayer', project.property('kinetic_quick_play').toString())
             }
+            // -Pkinetic_client_jvm_args="-Dkey=value ..." passes system properties, e.g. to switch on a validation fixture.
+            if (project.findProperty('kinetic_client_jvm_args')) {
+                jvmArguments.addAll(project.property('kinetic_client_jvm_args').toString().trim().split(/\s+/).toList())
+            }
         }
 
         server {
@@ -49,7 +53,12 @@ neoForge {
 
 kineticConfigureReleaseJar(tasks.named('jar', Jar))
 
+// Third-party mods differ per Minecraft version, so each node lists its own in mod_dependencies
+// (versions/<node>/gradle.properties, comma-separated coordinates). A "compileOnly:" prefix keeps a mod
+// off the dev runtime.
 dependencies {
-    implementation 'maven.modrinth:jade:eYz2YBGT'
-    implementation 'maven.modrinth:curios:yohfFbgD'
+    (project.findProperty('mod_dependencies')?.toString() ?: '').split(',')*.trim().findAll { it }.each {
+        if (it.startsWith('compileOnly:')) compileOnly it.substring('compileOnly:'.length())
+        else implementation it
+    }
 }

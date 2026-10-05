@@ -89,10 +89,15 @@ public final class EquipmentEditorScreen extends EcPage {
         items.add(KineticOverlays.MenuItem.action(tr("equipment.pick"), tip("equipment.pick"), () -> pickItem(slot)));
         items.add(hasItem
 //? if >=1.21 {
-/*                ? KineticOverlays.MenuItem.action(tr("equipment.nbt"), tip("equipment.nbt"), () -> openChild(new ComponentsEditorPage(spec.itemId, spec.nbt, value -> {
-                    spec(slot).nbt = value;
+/*                // Item component text is edited in Core's NBT editor, the same screen Forge uses for NBT; blank saves as [].
+                ? KineticOverlays.MenuItem.action(tr("equipment.nbt"), tip("equipment.nbt"), () -> KineticSelectors.openNbtEditor(
+                spec.nbt == null ? "" : spec.nbt, text -> {
+                    try { dev.xyat.entitycontrol.breakspawn.data.EquipmentData.compile(spec.itemId, text); return null; }
+                    catch (RuntimeException invalid) { return invalid.getMessage() == null ? invalid.toString() : invalid.getMessage(); }
+                }, value -> {
+                    spec(slot).nbt = value.isBlank() ? "[]" : value;
                     onChange.run();
-                })))
+                }))
 *///?} else {
                 ? KineticOverlays.MenuItem.action(tr("equipment.nbt"), tip("equipment.nbt"), () -> KineticSelectors.openNbtEditor(
                 spec.nbt == null ? "" : spec.nbt, value -> {

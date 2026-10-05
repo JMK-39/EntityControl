@@ -130,7 +130,7 @@ public final class BreakSpawnEventHandler {
 
         double chance = calculateChance(blockRule, chanceState.failures);
         chanceState.lastRollTick = gameTime;
-        if (chance <= 0.0D || level.random.nextDouble() >= chance) {
+        if (chance <= 0.0D || level.getRandom().nextDouble() >= chance) {
             registerFailure(blockRule, chanceState);
             return;
         }
@@ -223,7 +223,7 @@ public final class BreakSpawnEventHandler {
             BreakSpawnConfig.ConfigRoot config,
             BreakSpawnConfig.BlockRule blockRule
     ) {
-        RandomSource random = level.random;
+        RandomSource random = level.getRandom();
         int minCount = Math.max(0, blockRule.minSpawnCount);
         int maxCount = Math.max(minCount, blockRule.maxSpawnCount);
         int targetCount = minCount + (maxCount > minCount ? random.nextInt(maxCount - minCount + 1) : 0);
@@ -498,7 +498,7 @@ public final class BreakSpawnEventHandler {
             tag.remove("id");
             tag.remove("Passengers");
             tag.remove("Leash");
-            entity.load(tag);
+            dev.xyat.entitycontrol.util.Nbt.loadEntity(entity, tag);
         } catch (Exception ignored) {
         }
     }

@@ -1,6 +1,6 @@
 {
   "pack": {
     "description": "Entity Control resources",
-    "pack_format": ${pack_format}${pack_supported_formats}
+    ${pack_version_fields}
   }
 }

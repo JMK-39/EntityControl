@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
 /^** Uses the existing client and unsaved page drafts. Never clicks or saves editor changes. *^/
 public final class GuiLongTextValidation {
     private static final Logger LOG=LoggerFactory.getLogger(GuiLongTextValidation.class);
-    private static final String ROOT="D:/IDEAWork/EntityControl/.gradle/gui-long-text-20261004/";
+    private static final String ROOT=System.getProperty("entitycontrol.guiValidation.output","D:/IDEAWork/EntityControl/.gradle/gui-long-text-20261004/");
     private static final String[] NAMES={"attributes-global","attributes-zombie","buffs-zombie","buffs-modified","dummy","curios","components","components-invalid"};
     private static boolean installed,started,screenshot,finished,originalFullscreen;
     private static String originalLanguage;
@@ -85,7 +85,7 @@ public final class GuiLongTextValidation {
         if(page>=NAMES.length){nextPhase();return;}
         openPage(page);
         screenshot=false;due=System.currentTimeMillis()+1000;
-        LOG.info("ENTITY_GUI_OPEN phase={} case={} page={}",phase,NAMES[page],KineticGui.currentPage().getClass().getName());
+        LOG.info("ENTITY_GUI_OPEN phase={} case={} page={}",phase,NAMES[page],KineticGui.currentPage()!=null?KineticGui.currentPage().getClass().getName():String.valueOf(Minecraft.getInstance().screen));
     }
     private static void openPage(int index) throws Exception {
         var mc=Minecraft.getInstance();
@@ -109,7 +109,7 @@ public final class GuiLongTextValidation {
             var menu=new dev.xyat.entitycontrol.dummy.DummyMenu(0,mc.player.getInventory(),dummy);
             if(index==4)mc.setScreen((net.minecraft.client.gui.screens.Screen)construct("dev.xyat.kineticcore.internal.client.gui.page.PageContainerScreen",new dev.xyat.entitycontrol.dummy.client.gui.DummyScreen(menu,Component.literal("GUI validation")),mc.player.getInventory(),Component.literal("GUI validation")));
             else KineticGui.open(new dev.xyat.entitycontrol.dummy.client.gui.CuriosScreen(menu));
-        }else KineticGui.open(new dev.xyat.entitycontrol.breakspawn.client.gui.ComponentsEditorPage("minecraft:diamond_sword",index==6?"[damage=1]":"[invalid=]",value->{}));
+        }else dev.xyat.kineticcore.api.client.gui.selector.KineticSelectors.openNbtEditor(index==6?"[damage=1]":"[invalid=]",text->{try{dev.xyat.entitycontrol.breakspawn.data.EquipmentData.compile("minecraft:diamond_sword",text);return null;}catch(RuntimeException invalid){return String.valueOf(invalid.getMessage());}},value->{});
     }
     private static Object field(Object target,String name)throws Exception {
         for(Class<?> type=target.getClass();type!=null;type=type.getSuperclass())try {

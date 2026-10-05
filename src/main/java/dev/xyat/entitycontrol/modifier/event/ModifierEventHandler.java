@@ -149,10 +149,10 @@ public final class ModifierEventHandler {
 
     public static void restoreOriginal(LivingEntity living, Set<String> removed) {
         CompoundTag persistent = living.getPersistentData();
-        if (!persistent.contains(BACKUP_KEY, 10)) return;
-        CompoundTag originals = persistent.getCompound(BACKUP_KEY);
-        for (String id : originals.getAllKeys()) {
-            if (restoreOne(living, id, originals.getCompound(id))) removed.add(id);
+        if (!(persistent.get(BACKUP_KEY) instanceof CompoundTag)) return;
+        CompoundTag originals = dev.xyat.entitycontrol.util.Nbt.compound(persistent, BACKUP_KEY);
+        for (String id : dev.xyat.entitycontrol.util.Nbt.keys(originals)) {
+            if (restoreOne(living, id, dev.xyat.entitycontrol.util.Nbt.compound(originals, id))) removed.add(id);
         }
         persistent.remove(BACKUP_KEY);
     }
@@ -162,13 +162,13 @@ public final class ModifierEventHandler {
         if (attributeId == null) return false;
         Attribute attribute = KineticRegistries.attributes().get(attributeId);
         if (attribute == null) return false;
-        if (original.getBoolean("added")) return KineticEntityAttributes.removeRuntimeInstance(living, attribute);
+        if (dev.xyat.entitycontrol.util.Nbt.bool(original, "added")) return KineticEntityAttributes.removeRuntimeInstance(living, attribute);
 //? if >=1.21 {
 /*        AttributeInstance instance = living.getAttributes().getInstance(net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attribute));
 *///?} else {
         AttributeInstance instance = living.getAttributes().getInstance(attribute);
 //?}
-        if (instance != null) instance.setBaseValue(original.getDouble("base"));
+        if (instance != null) instance.setBaseValue(dev.xyat.entitycontrol.util.Nbt.doubleValue(original, "base"));
         // Maximum-health changes are reconciled once after all rules have been applied.
         return false;
     }
@@ -182,11 +182,11 @@ public final class ModifierEventHandler {
 
     private static void synchronizeRuntime(ServerPlayer player, LivingEntity living) {
         CompoundTag persistent = living.getPersistentData();
-        if (!persistent.contains(BACKUP_KEY, 10)) return;
-        CompoundTag originals = persistent.getCompound(BACKUP_KEY);
+        if (!(persistent.get(BACKUP_KEY) instanceof CompoundTag)) return;
+        CompoundTag originals = dev.xyat.entitycontrol.util.Nbt.compound(persistent, BACKUP_KEY);
         Map<String, Double> dynamic = new LinkedHashMap<>();
-        for (String id : originals.getAllKeys()) {
-            if (!originals.getCompound(id).getBoolean("added")) continue;
+        for (String id : dev.xyat.entitycontrol.util.Nbt.keys(originals)) {
+            if (!dev.xyat.entitycontrol.util.Nbt.bool(dev.xyat.entitycontrol.util.Nbt.compound(originals, id), "added")) continue;
             ResourceLocation key = KineticResourceIds.tryParse(id);
             if (key == null) continue;
             Attribute attr = KineticRegistries.attributes().get(key);
@@ -211,14 +211,14 @@ public final class ModifierEventHandler {
                 }
                 if (!matches) continue;
             }
-            if (buff.chance < 1.0D && living.level().random.nextDouble() > buff.chance) continue;
+            if (buff.chance < 1.0D && living.level().getRandom().nextDouble() > buff.chance) continue;
             ResourceLocation effectId = KineticResourceIds.tryParse(entry.getKey());
             if (effectId == null) continue;
             MobEffect effect = KineticRegistries.mobEffects().get(effectId);
             if (effect == null) continue;
             int min = Math.max(1, buff.minLevel);
             int max = Math.max(min, buff.maxLevel);
-            int level = min + (max > min ? living.level().random.nextInt(max - min + 1) : 0);
+            int level = min + (max > min ? living.level().getRandom().nextInt(max - min + 1) : 0);
 //? if >=1.21 {
 /*            living.addEffect(new MobEffectInstance(net.minecraft.core.registries.BuiltInRegistries.MOB_EFFECT.wrapAsHolder(effect), -1, level - 1, false, false, true));
 *///?} else {

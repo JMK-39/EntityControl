@@ -230,7 +230,7 @@ public class GlobalDamageHandler {
 
     public static void onLivingDamage(KineticLivingEvents.DamageContext event) {
         try {
-            if (event.entity().level().isClientSide) return;
+            if (event.entity().level().isClientSide()) return;
 
             LivingEntity target = event.entity();
             DamageSource source = event.source();
@@ -427,7 +427,7 @@ public class GlobalDamageHandler {
 
     public static void onLivingDeathSummary(KineticLivingEvents.DeathContext event) {
         try {
-            if (event.entity().level().isClientSide || event.cancelled()) return;
+            if (event.entity().level().isClientSide() || event.cancelled()) return;
 
             LivingEntity target = event.entity();
             long now = target.level().getGameTime();

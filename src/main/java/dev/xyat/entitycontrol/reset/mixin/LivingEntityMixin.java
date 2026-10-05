@@ -2,7 +2,6 @@ package dev.xyat.entitycontrol.reset.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import dev.xyat.entitycontrol.reset.event.EntityResetHandler;
-import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,10 +17,7 @@ public abstract class LivingEntityMixin {
                     target = "Lnet/minecraft/world/entity/LivingEntity;checkTotemDeathProtection(Lnet/minecraft/world/damagesource/DamageSource;)Z"
             )
     )
-    private boolean entitycontrol_entityrese$captureFinalTotemProtectionResult(
-            boolean original,
-            DamageSource source
-    ) {
+    private boolean entitycontrol_entityrese$captureFinalTotemProtectionResult(boolean original) {
         LivingEntity self = (LivingEntity) (Object) this;
 
         if (original && self instanceof Player player) {

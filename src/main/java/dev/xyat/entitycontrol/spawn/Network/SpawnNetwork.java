@@ -214,8 +214,8 @@ public final class SpawnNetwork {
         boolean changed = false;
         BiomeSpawnConfig.ConfigProfile backupProfile = BiomeSpawnConfig.getBackupProfileData();
         if (BiomeSpawnConfig.globals.auto_scan) {
-            changed = BiomeSpawnConfig.performAutoScan(player.server, profile);
-            backupProfile = BiomeSpawnConfig.refreshAutoScanBackup(player.server);
+            changed = BiomeSpawnConfig.performAutoScan(player.getServer(), profile);
+            backupProfile = BiomeSpawnConfig.refreshAutoScanBackup(player.getServer());
         }
         if (changed) {
             BiomeSpawnConfig.saveProfileData(editIndex, profile);
@@ -241,7 +241,7 @@ public final class SpawnNetwork {
 
     public static void sendSpawnerSyncToPlayer(ServerPlayer player) {
         SpawnerConfig.cleanupInvalidEntityRules();
-        SpawnerConfig.SpawnerEditorSnapshot snapshot = SpawnerConfig.createEditorSnapshot(player.server);
+        SpawnerConfig.SpawnerEditorSnapshot snapshot = SpawnerConfig.createEditorSnapshot(player.getServer());
         CHANNEL.sendToPlayer(player, new SpawnerSyncPacket(SpawnerConfig.GSON.toJson(snapshot)));
     }
 
@@ -299,7 +299,7 @@ public final class SpawnNetwork {
             }
 
             if (!BiomeSpawnConfig.saveEditorState(
-                    player.server,
+                    player.getServer(),
                     message.ruleOverride,
                     message.biomeOverride,
                     message.autoScan,
@@ -343,7 +343,7 @@ public final class SpawnNetwork {
             return;
         }
 
-        BiomeSpawnConfig.ConfigProfile backup = BiomeSpawnConfig.refreshAutoScanBackup(player.server);
+        BiomeSpawnConfig.ConfigProfile backup = BiomeSpawnConfig.refreshAutoScanBackup(player.getServer());
         CHANNEL.sendToPlayer(
                 player,
                 new SpawnBackupSyncPacket(message.editIndex, BiomeSpawnConfig.GSON.toJson(backup))

@@ -10,6 +10,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
+//? if <26.1
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
@@ -32,7 +33,13 @@ public class DummyMenu extends AbstractContainerMenu {
                     if (DummyUtils.isBlacklisted(stack)) return false;
                     if (slotIdx < 4) {
                         EquipmentSlot target = getEquipmentSlot(slotIdx);
+                        // 26.1 armor is any item whose equippable component targets the slot.
+                        //? if >=26.1 {
+                        /*net.minecraft.world.item.equipment.Equippable equippable = stack.get(net.minecraft.core.component.DataComponents.EQUIPPABLE);
+                        return target != null && equippable != null && equippable.slot() == target;
+                        *///?} else {
                         return target != null && stack.getItem() instanceof ArmorItem armor && armor.getEquipmentSlot() == target;
+                        //?}
                     }
                     return true;
                 }
@@ -60,7 +67,7 @@ public class DummyMenu extends AbstractContainerMenu {
         if (slotId >= 0 && slotId < 6) {
             ItemStack carried = getCarried();
             if (!carried.isEmpty() && DummyUtils.isBlacklisted(carried)) {
-                if (!player.level().isClientSide) {
+                if (!player.level().isClientSide()) {
                     DummyNetwork.sendToPlayer(new DummyNetwork.SyncNotify(KineticI18n.translatable("msg.entitycontrol.dummy.dummy.blacklisted")), (ServerPlayer) player);
                 }
                 return;
@@ -89,7 +96,7 @@ public class DummyMenu extends AbstractContainerMenu {
                 slot.set(ItemStack.EMPTY);
             } else {
                 if (DummyUtils.isBlacklisted(stack)) {
-                    if (!player.level().isClientSide) {
+                    if (!player.level().isClientSide()) {
                         DummyNetwork.sendToPlayer(new DummyNetwork.SyncNotify(KineticI18n.translatable("msg.entitycontrol.dummy.dummy.blacklisted")), (ServerPlayer) player);
                     }
                     return ItemStack.EMPTY;

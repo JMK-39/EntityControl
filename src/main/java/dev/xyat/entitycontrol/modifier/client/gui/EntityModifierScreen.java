@@ -200,7 +200,7 @@ public final class EntityModifierScreen extends EcPage {
             return CategoryFilter.AQUATIC;
         }
 //? if >=1.21 {
-/*        if (entity.getType().is(EntityTypeTags.UNDEAD)) return CategoryFilter.UNDEAD;
+/*        if (entity.getType().builtInRegistryHolder().is(EntityTypeTags.UNDEAD)) return CategoryFilter.UNDEAD;
 *///?} else {
         if (entity.getMobType() == MobType.UNDEAD) return CategoryFilter.UNDEAD;
 //?}

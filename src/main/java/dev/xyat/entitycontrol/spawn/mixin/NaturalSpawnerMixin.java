@@ -76,7 +76,7 @@ public abstract class NaturalSpawnerMixin {
         }
 
         double rate = BiomeSpawnConfig.getCategorySpawnRate(category);
-        if (rate < 1.0D && level.random.nextDouble() > rate) {
+        if (rate < 1.0D && level.getRandom().nextDouble() > rate) {
             ci.cancel();
         }
     }
@@ -124,7 +124,7 @@ public abstract class NaturalSpawnerMixin {
                 );
             }
 
-            if (level.random.nextDouble() < fractional) {
+            if (level.getRandom().nextDouble() < fractional) {
                 NaturalSpawner.spawnCategoryForChunk(
                         category,
                         level,

@@ -44,6 +44,8 @@ public class DummyTextManager {
     public static void register() {
         KineticClientEvents.onTick(KineticClientEvents.TickPhase.END, DummyTextManager::onClientTick);
         KineticClientEvents.onLevelRender(KineticClientEvents.LevelRenderStage.AFTER_PARTICLES, DummyTextManager::onRenderLevel);
+        //? if >=26.1
+        /*KineticClientEvents.onHudRender(KineticClientEvents.HudStage.HOTBAR, DummyTextManager::onRenderHud);*/
     }
 
     public static void handlePacket(int entityId, Component source, Component type, float total, float dps, float avgDps, int hits, float currentDmg, boolean isDummy, int minionOwnerId) {
@@ -152,17 +154,50 @@ public class DummyTextManager {
         activeHuds.entrySet().removeIf(entry -> now - entry.getValue().lastUpdate > 5000L);
     }
 
-    private static void onRenderLevel(KineticClientEvents.LevelRenderContext event) {
-        Vec3 camPos = event.camera().getPosition();
+    //? if >=26.1 {
+    /*// 26.1 draws GUI elements only in the HUD pass: the level pass keeps this frame's camera, and the HUD pass draws the
+    // labels at the projected positions, as the level-render overlay does on older versions.
+    private static org.joml.Matrix4f frameView;
+    private static org.joml.Matrix4f frameProjection;
+    private static Vec3 frameCamera;
+    private static float framePartialTick;
 
+    private static void onRenderLevel(KineticClientEvents.LevelRenderContext event) {
+        frameView = new org.joml.Matrix4f(event.poseStack().last().pose());
+        frameProjection = new org.joml.Matrix4f(event.projectionMatrix());
+        frameCamera = event.camera().getPosition();
+        framePartialTick = event.partialTick();
+    }
+
+    private static void onRenderHud(KineticGraphics g, float partialTick) {
+        if (frameView == null) return;
+        int width = KineticClientRuntime.guiScaledWidth();
+        int height = KineticClientRuntime.guiScaledHeight();
+        drawLabels(g, world -> {
+            org.joml.Vector4f position = new org.joml.Vector4f((float) (world.x - frameCamera.x), (float) (world.y - frameCamera.y),
+                    (float) (world.z - frameCamera.z), 1.0F);
+            frameView.transform(position);
+            frameProjection.transform(position);
+            if (position.w() <= 0.0F) return null;
+            return new Vec2((position.x() / position.w() + 1.0F) * 0.5F * width, (1.0F - position.y() / position.w()) * 0.5F * height);
+        }, frameCamera, framePartialTick);
+    }
+    *///?} else {
+    private static void onRenderLevel(KineticClientEvents.LevelRenderContext event) {
+        try (KineticWorldRender.ScreenOverlay overlay = KineticWorldRender.beginScreenOverlay(event)) {
+            drawLabels(overlay.graphics(), overlay::project, event.camera().getPosition(), event.partialTick());
+        }
+    }
+    //?}
+
+    private static void drawLabels(KineticGraphics g, java.util.function.Function<Vec3, Vec2> project, Vec3 camPos, float partialTick) {
         var level = KineticClientRuntime.currentLevel();
         Player player = KineticClientRuntime.localPlayer();
         if (level == null || player == null) return;
 
         boolean cumulativeMode = DummyClientConfig.accumulateDamage.get();
 
-        try (KineticWorldRender.ScreenOverlay overlay = KineticWorldRender.beginScreenOverlay(event)) {
-            KineticGraphics g = overlay.graphics();
+        {
 
             for (Map.Entry<Integer, HudInstance> entry : activeHuds.entrySet()) {
                 Entity entity = level.getEntity(entry.getKey());
@@ -176,7 +211,7 @@ public class DummyTextManager {
                         continue;
                     }
 
-                    Vec2 position = overlay.project(origin);
+                    Vec2 position = project.apply(origin);
                     if (position != null) {
                         entry.getValue().render2D(g, position.x, position.y);
                     }
@@ -192,8 +227,8 @@ public class DummyTextManager {
 
                     HudInstance hud = activeHuds.get(entry.getKey());
                     double worldOffset = hud == null ? 0.5D : DummyClientConfig.overheadOffset.get();
-                    Vec3 origin = entity.getPosition(event.partialTick()).add(0, entity.getBbHeight() + worldOffset, 0);
-                    Vec2 position = overlay.project(origin);
+                    Vec3 origin = entity.getPosition(partialTick).add(0, entity.getBbHeight() + worldOffset, 0);
+                    Vec2 position = project.apply(origin);
                     if (position == null) {
                         continue;
                     }
@@ -206,9 +241,9 @@ public class DummyTextManager {
                 }
             } else {
                 for (FloatingText particle : particles) {
-                    Vec2 position = overlay.project(particle.origin3d);
+                    Vec2 position = project.apply(particle.origin3d);
                     if (position != null) {
-                        particle.render2D(g, position.x, position.y, event.partialTick());
+                        particle.render2D(g, position.x, position.y, partialTick);
                     }
                 }
             }
