@@ -83,7 +83,7 @@ public final class GuiPreservationValidation {
         String lang = phase >= 2 ? "zh_cn" : "en_us";
         mc.getLanguageManager().setSelected(lang); mc.options.languageCode = lang;
         boolean large = phase % 2 == 1;
-        mc.getWindow().setWindowed(large ? 1536 : 854, large ? 864 : 480); mc.resizeDisplay();
+        mc.getWindow().setWindowed(large ? 1920 : 854, large ? 1080 : 480); mc.resizeDisplay();
         reload = mc.reloadResourcePacks();
         LOG.info("GUI_PRESERVATION_PHASE phase={} language={} large={}", phase, lang, large);
     }

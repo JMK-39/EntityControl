@@ -73,7 +73,7 @@ public final class GuiLongTextValidation {
         String lang=phase==2 || phase==3?"zh_cn":"en_us";
         mc.getLanguageManager().setSelected(lang);
         mc.options.languageCode=lang;
-        int width=phase==1 || phase==3?1536:854,height=phase==1 || phase==3?864:480;
+        int width=phase==1 || phase==3?1920:854,height=phase==1 || phase==3?1080:480;
         mc.getWindow().setWindowed(width,height);mc.resizeDisplay();
         reload=mc.reloadResourcePacks();
         LOG.info("ENTITY_GUI_PHASE phase={} language={} requested={}x{} autoScale=true",phase,lang,width,height);
