@@ -108,6 +108,8 @@ public final class GuiLongTextValidation {
             /*dummy.onAddedToLevel();
             *///?} else
             dummy.onAddedToWorld();
+            // A real dummy gets its extra Curios slots on the server; this client-side one gets them here, so the page shows the real 54.
+            dev.xyat.entitycontrol.dummy.CuriosCompat.initDummySlots(dummy);
             var menu=new dev.xyat.entitycontrol.dummy.DummyMenu(0,mc.player.getInventory(),dummy);
             if(index==4)mc.setScreen((net.minecraft.client.gui.screens.Screen)construct("dev.xyat.kineticcore.internal.client.gui.page.PageContainerScreen",new dev.xyat.entitycontrol.dummy.client.gui.DummyScreen(menu,Component.literal("GUI validation")),mc.player.getInventory(),Component.literal("GUI validation")));
             else KineticGui.open(new dev.xyat.entitycontrol.dummy.client.gui.CuriosScreen(menu));
@@ -170,7 +172,12 @@ public final class GuiLongTextValidation {
     }
     /*** Core list styles: text rows (single-select yellow, multi-select green), button rows with green picks, and an open autocomplete popup. */
     private static final class CoreListsPage extends KineticPage {
-        CoreListsPage(){super(Component.literal("Core list styles"));}
+        CoreListsPage(){super(Component.literal("GUI test only - Core list styles (not part of the mod)"));}
+        @Override protected void renderBackground(dev.xyat.kineticcore.api.client.gui.render.KineticGraphics g,int mx,int my,float pt){
+            dev.xyat.kineticcore.api.client.gui.theme.KineticTheme.shadow(g,width(),height());
+            dev.xyat.kineticcore.api.client.gui.theme.KineticTheme.panel(g,4,4,width()-8,height()-8);
+            g.scrollingTextCentered(title(),width()/2,14,width()-24,0xFFFFFF,false);
+        }
         @Override protected void build(dev.xyat.kineticcore.api.client.gui.ui.KineticUi ui) {
             int col=(width()-40)/3;
             var ids=List.of("minecraft:plains","minecraft:forest","minecraft:desert","minecraft:a_deliberately_long_biome_identifier_to_check_scrolling","minecraft:taiga","minecraft:swamp","minecraft:jungle","minecraft:badlands");

@@ -4,12 +4,14 @@
 
 - The dummy editor's panel keeps its own 176 px frame again: a gray fill had widened it past the frame, and the vanilla inventory below the equipment panel was cut off above its bottom border. The inventory is now drawn in full, including the hotbar's lower edge.
 - The dummy Curios page draws its player inventory down to the texture's bottom border, so the hotbar slots keep their lower edge.
+- In the potion buff list, the remove button (X) of a modified effect sits 2 px inside the row frame instead of touching its top and bottom lines.
 - Checked with screenshots of all nine screens on 1.21.1 and 26.1.2, in English and Chinese, at two window sizes and with extra-long text; both versions look the same.
 
 ### 简体中文
 
 - 假人编辑器的面板恢复为自身 176 像素的边框：之前的灰色底色把面板撑宽到边框之外，装备面板下方的原版背包也在底边框之前被截断。现在背包完整绘制，包括快捷栏的下边缘。
 - 假人饰品页面的玩家背包绘制到贴图底边框为止，快捷栏格子不再缺少下边缘。
+- 药水增益列表中，已修改效果的移除按钮（X）与行边框保持 2 像素，不再碰到上下边框线。
 - 已在 1.21.1 与 26.1.2 上对全部 9 个界面截图检查，涵盖英文和中文、两种窗口尺寸以及超长文本；两个版本外观一致。
 
 ## 26.10.5 — 2026-10-05

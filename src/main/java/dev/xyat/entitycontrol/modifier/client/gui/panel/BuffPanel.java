@@ -18,6 +18,8 @@ import java.util.Objects;
 
 public final class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
     private static final int REMOVE_BUTTON_WIDTH = 18;
+    // The row frame is drawn 1 px inside the row; 4 px keeps the button 2 px clear of its top and bottom lines.
+    private static final int REMOVE_BUTTON_INSET = 4;
     // Keep namespace/name text out of the right-side buff summary and action column.
     private static final int MODIFIED_RIGHT_RESERVE = 150;
     private static final int UNMODIFIED_RIGHT_RESERVE = 28;
@@ -119,13 +121,13 @@ public final class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
                     Math.max(0, infoRight - nameRight), KineticTheme.current().text(), false);
 
             boolean removeHovered = mouseX >= removeX && mouseX < removeX + REMOVE_BUTTON_WIDTH
-                    && mouseY >= rowY + 2 && mouseY < rowY + rowHeight - 2;
+                    && mouseY >= rowY + REMOVE_BUTTON_INSET && mouseY < rowY + rowHeight - REMOVE_BUTTON_INSET;
             KineticTheme.button(
                     graphics,
                     removeX,
-                    rowY + 2,
+                    rowY + REMOVE_BUTTON_INSET,
                     REMOVE_BUTTON_WIDTH,
-                    rowHeight - 4,
+                    rowHeight - REMOVE_BUTTON_INSET * 2,
                     KineticI18n.translatable("gui.entitycontrol.modifier.modifier.remove_mark"),
                     removeHovered,
                     true,
@@ -150,7 +152,7 @@ public final class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
         if (hasBuff && rowList != null) {
             int rowY = rowList.rowTop(index);
             int removeX = rowList.controlX() + rowList.rowsWidth() - REMOVE_BUTTON_WIDTH - 4;
-            if (input.inside(removeX, rowY + 2, REMOVE_BUTTON_WIDTH, rowList.rowHeight() - 4)) {
+            if (input.inside(removeX, rowY + REMOVE_BUTTON_INSET, REMOVE_BUTTON_WIDTH, rowList.rowHeight() - REMOVE_BUTTON_INSET * 2)) {
                 EntityModifierConfig.EntityEditData data = parent.getLocalData().get(selectedEntityId);
                 if (data != null) data.buffs.remove(effectId);
                 updateSearch(searchBox == null ? "" : searchBox.textValue());
