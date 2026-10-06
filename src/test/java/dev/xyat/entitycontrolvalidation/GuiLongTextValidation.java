@@ -1,5 +1,4 @@
-//? if >=1.21 {
-/*package dev.xyat.entitycontrolvalidation;
+package dev.xyat.entitycontrolvalidation;
 
 import dev.xyat.kineticcore.api.client.event.KineticClientEvents;
 import dev.xyat.kineticcore.api.client.gui.KineticGui;
@@ -18,7 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/^** Uses the existing client and unsaved page drafts. Never clicks or saves editor changes. *^/
+/*** Uses the existing client and unsaved page drafts. Never clicks or saves editor changes. */
 public final class GuiLongTextValidation {
     private static final Logger LOG=LoggerFactory.getLogger(GuiLongTextValidation.class);
     private static final String ROOT=System.getProperty("entitycontrol.guiValidation.output","D:/IDEAWork/EntityControl/.gradle/gui-long-text-20261004/");
@@ -105,12 +104,21 @@ public final class GuiLongTextValidation {
         }else if(index<=5){
             var dummy=dev.xyat.entitycontrol.dummy.DummyInit.DUMMY.get().create(mc.level);
             dummy.setPos(mc.player.position());
-            dummy.onAddedToLevel();
+            //? if >=1.21 {
+            /*dummy.onAddedToLevel();
+            *///?} else
+            dummy.onAddedToWorld();
             var menu=new dev.xyat.entitycontrol.dummy.DummyMenu(0,mc.player.getInventory(),dummy);
             if(index==4)mc.setScreen((net.minecraft.client.gui.screens.Screen)construct("dev.xyat.kineticcore.internal.client.gui.page.PageContainerScreen",new dev.xyat.entitycontrol.dummy.client.gui.DummyScreen(menu,Component.literal("GUI validation")),mc.player.getInventory(),Component.literal("GUI validation")));
             else KineticGui.open(new dev.xyat.entitycontrol.dummy.client.gui.CuriosScreen(menu));
         }else if(index==8){KineticGui.open(new CoreListsPage());
-        }else dev.xyat.kineticcore.api.client.gui.selector.KineticSelectors.openNbtEditor(index==6?"[damage=1]":"[invalid=]",text->{try{dev.xyat.entitycontrol.breakspawn.data.EquipmentData.compile("minecraft:diamond_sword",text);return null;}catch(RuntimeException invalid){return String.valueOf(invalid.getMessage());}},value->{});
+        }else{
+        //? if >=1.21 {
+        /*dev.xyat.kineticcore.api.client.gui.selector.KineticSelectors.openNbtEditor(index==6?"[damage=1]":"[invalid=]",text->{try{dev.xyat.entitycontrol.breakspawn.data.EquipmentData.compile("minecraft:diamond_sword",text);return null;}catch(RuntimeException invalid){return String.valueOf(invalid.getMessage());}},value->{});
+        *///?} else {
+        dev.xyat.kineticcore.api.client.gui.selector.KineticSelectors.openNbtEditor(index==6?"{Damage:1}":"{Damage:}",text->{try{net.minecraft.nbt.TagParser.parseTag(text);return null;}catch(Exception invalid){return String.valueOf(invalid.getMessage());}},value->{});
+        //?}
+        }
     }
     private static Object field(Object target,String name)throws Exception {
         for(Class<?> type=target.getClass();type!=null;type=type.getSuperclass())try {
@@ -140,7 +148,7 @@ public final class GuiLongTextValidation {
         try(var image=Screenshot.takeScreenshot(mc.getMainRenderTarget())){image.writeToFile(path);}
         captures++;LOG.info("ENTITY_GUI_CAPTURE phase={} case={} image={}x{}",phase,NAMES[page],mc.getWindow().getWidth(),mc.getWindow().getHeight());
     }
-    /^** Logs controls of the open screen that overlap or sit closer than 2 px (Core layout check). *^/
+    /*** Logs controls of the open screen that overlap or sit closer than 2 px (Core layout check). */
     private static void layout() {
         try {
             for(Object problem:(List<?>)Class.forName("dev.xyat.kineticcore.internal.client.gui.LayoutCheck").getMethod("currentScreenProblems").invoke(null))
@@ -160,7 +168,7 @@ public final class GuiLongTextValidation {
         LOG.info("ENTITY_GUI_{} pages={} captures={} failures={} userSettingsRestored=true",failures==0?"PASS":"FAIL",NAMES.length,captures,failures);
         dev.xyat.kineticcore.api.runtime.KineticClientRuntime.stopClient();
     }
-    /^** Core list styles: text rows (single-select yellow, multi-select green), button rows with green picks, and an open autocomplete popup. *^/
+    /*** Core list styles: text rows (single-select yellow, multi-select green), button rows with green picks, and an open autocomplete popup. */
     private static final class CoreListsPage extends KineticPage {
         CoreListsPage(){super(Component.literal("Core list styles"));}
         @Override protected void build(dev.xyat.kineticcore.api.client.gui.ui.KineticUi ui) {
@@ -189,4 +197,3 @@ public final class GuiLongTextValidation {
         @Override public net.minecraft.util.FormattedCharSequence getVisualOrder(net.minecraft.network.chat.FormattedText text){return delegate.getVisualOrder(text);}
     }
 }
-*///?}
