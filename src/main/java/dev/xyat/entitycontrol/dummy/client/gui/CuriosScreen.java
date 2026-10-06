@@ -249,7 +249,8 @@ public class CuriosScreen extends KineticPage {
                 curioScroll.render(graphics, mouseX, mouseY, scrollX, gridStartY, SCROLL_W, gridViewH, SCROLL_MIN_THUMB);
             }
 
-            graphics.texture(INVENTORY_TEX, playerInvX, playerInvY, 0, 125, 176, 90);
+            // Down to the texture's bottom border (v 222), so the hotbar slots keep their lower edge.
+            graphics.texture(INVENTORY_TEX, playerInvX, playerInvY, 0, 125, 176, 97);
 
             if (KineticClientRuntime.localPlayer() != null) {
                 Inventory inv = KineticClientRuntime.localPlayer().getInventory();

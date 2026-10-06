@@ -269,10 +269,10 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
 
     @Override
     protected void renderContainerBackground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        // Keep the original equipment panel above the vanilla player inventory background.
-        graphics.fill(leftPos(), topPos(), leftPos() + 200, topPos() + 200, 0xFFC6C6C6);
+        // Keep the original equipment panel above the vanilla player inventory background. The panel in the texture is
+        // 176 px wide at x 13, the same as the vanilla inventory, which is drawn down to its bottom border.
         graphics.texture(TEXTURE, leftPos(), topPos(), 0, 0, 200, 101);
-        graphics.texture(INVENTORY_TEXTURE, leftPos() + 13, topPos() + 101, 0, 126, 176, 90);
+        graphics.texture(INVENTORY_TEXTURE, leftPos() + 13, topPos() + 101, 0, 126, 176, 96);
 
         for (int i = 0; i < Math.min(6, menu().slots.size()); i++) {
             Slot slot = menu().slots.get(i);
