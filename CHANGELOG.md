@@ -1,3 +1,13 @@
+## 2026-10-08 — Attribute value text / 属性数值文字
+
+### English
+
+- Attribute values scroll within their original value column instead of covering the attribute names.
+
+### 简体中文
+
+- 属性数值在原有数值列内滚动显示，不再覆盖属性名称。
+
 ## 26.10.6 — 2026-10-06
 
 ### English
