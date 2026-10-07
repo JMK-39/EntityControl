@@ -37,3 +37,6 @@ versions/*/src/
 
 # Generated ModDev IDE launches
 .vscode/
+*.zip
+*.7z
+/wiki/

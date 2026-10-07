@@ -5,16 +5,14 @@
 - The dummy editor's panel keeps its own 176 px frame again: a gray fill had widened it past the frame, and the vanilla inventory below the equipment panel was cut off above its bottom border. The inventory is now drawn in full, including the hotbar's lower edge.
 - The dummy Curios page draws its player inventory down to the texture's bottom border, so the hotbar slots keep their lower edge.
 - In the potion buff list, the remove button (X) of a modified effect sits 2 px inside the row frame instead of touching its top and bottom lines.
-- Screens keep the same layout in every language: buttons and switches sized by the shared page kit, the settings label column, the attribute editor's value label and the namespace column of attribute and buff rows have fixed widths instead of following their text; longer text scrolls.
-- Checked with screenshots of all nine screens on 1.21.1 and 26.1.2, in English and Chinese, at two window sizes and with extra-long text; both versions look the same.
+- Screens keep the same layout in every language: buttons and switches, the settings label column, the attribute editor's value label and the namespace column of attribute and buff rows have fixed widths instead of following their text; longer text scrolls.
 
 ### 简体中文
 
 - 假人编辑器的面板恢复为自身 176 像素的边框：之前的灰色底色把面板撑宽到边框之外，装备面板下方的原版背包也在底边框之前被截断。现在背包完整绘制，包括快捷栏的下边缘。
 - 假人饰品页面的玩家背包绘制到贴图底边框为止，快捷栏格子不再缺少下边缘。
 - 药水增益列表中，已修改效果的移除按钮（X）与行边框保持 2 像素，不再碰到上下边框线。
-- 所有语言下界面排版相同：由公共页面工具设定宽度的按钮与开关、设置标签列、属性编辑器的数值标签以及属性和药水增益行的命名空间列使用固定宽度，不再随文字变化；过长文字滚动显示。
-- 已在 1.21.1 与 26.1.2 上对全部 9 个界面截图检查，涵盖英文和中文、两种窗口尺寸以及超长文本；两个版本外观一致。
+- 所有语言下界面排版相同：按钮与开关、设置标签列、属性编辑器的数值标签以及属性和药水增益行的命名空间列使用固定宽度，不再随文字变化；过长文字滚动显示。
 
 ## 26.10.5 — 2026-10-05
 
@@ -27,9 +25,8 @@
 - Align the vanilla inventory texture with its existing item slots and hotbar.
 - Enabled Minecraft 26.1.2 / NeoForge 26.1.2.112 (Java 25); releases now cover Forge 1.20.1, NeoForge 1.21.1 and NeoForge 26.1.2. Optional Jade 26.1 and Curios 15 on 26.1.2.
 - Every version uses the same screens. On 1.21.1 and 26.1.2, equipment and drop component data (`[damage=5]`) is now edited in Core's NBT editor, the same editor Forge uses for NBT, instead of a separate page. Requires KineticCore 26.10.5+.
-- On 26.1.2 the dummy, spawn rules, spawners, biome spawn tables, entity resets, attribute modifiers and block-break encounters use the 26.1 entity, spawn and saved-data APIs; dummy settings, inventory and Curios presets are stored with the same keys as before. Dummy damage labels are drawn in the HUD pass, the only place 26.1 draws GUI elements.
-- No @OnlyIn annotations on 26.1.2, where NeoForge shows a mod-loading warning screen for them.
-- Verified: all three versions build; the server runtime checks pass on 1.21.1 and 26.1.2; the 26.1.2 client captures of the attribute, effect, dummy, Curios and component editor screens match the 1.21.1 layouts.
+- The dummy, spawn rules, spawners, biome spawn tables, entity resets, attribute modifiers and block-break encounters work on 26.1.2. Existing dummy settings, inventory and Curios presets are preserved, and dummy damage labels remain visible.
+- Fixed a NeoForge mod-loading warning screen on 26.1.2.
 
 ### 简体中文
 
@@ -40,9 +37,8 @@
 - 对齐原版背包贴图与现有物品槽、快捷栏的位置。
 - 启用 Minecraft 26.1.2 / NeoForge 26.1.2.112（Java 25）；发布版本覆盖 Forge 1.20.1、NeoForge 1.21.1 与 NeoForge 26.1.2。26.1.2 可选 Jade 26.1 与 Curios 15。
 - 所有版本使用相同界面。1.21.1 与 26.1.2 的装备与掉落物数据组件（`[damage=5]`）改用核心 NBT 编辑器编辑，与 Forge 编辑 NBT 的界面一致，不再使用单独页面。要求 KineticCore 26.10.5+。
-- 26.1.2 上的假人、生成规则、刷怪笼、群系刷怪表、实体重置、属性修改与方块破坏遭遇使用 26.1 的实体、生成与存档数据接口；假人设置、物品栏与饰品预设沿用原有存储键。假人伤害标签在 HUD 阶段绘制，这是 26.1 唯一绘制界面元素的阶段。
-- 26.1.2 不再使用 @OnlyIn 注解，NeoForge 会为它显示模组加载警告界面。
-- 验证：三个版本均可构建；服务端运行时检查在 1.21.1 与 26.1.2 通过；26.1.2 客户端的属性、效果、假人、饰品与组件编辑界面截图与 1.21.1 布局一致。
+- 假人、生成规则、刷怪笼、群系刷怪表、实体重置、属性修改与方块破坏遭遇可在 26.1.2 中使用，保留已有假人设置、物品栏与饰品预设，假人伤害标签正常显示。
+- 修复 26.1.2 显示 NeoForge 模组加载警告界面的问题。
 
 ## 26.10.4 — 2026-10-04
 
@@ -53,7 +49,7 @@
 - Long attribute/effect names, namespace labels and summaries scroll inside their own columns. The attribute editing footer and shared editor header keep controls within the available space, including long translations.
 - Bound dummy labels before adjacent controls, keep the Curios title clear of Back, and limit component editor headings, hints and errors to the screen width.
 - Hide duplicate vanilla container labels again after initialization so the dummy inventory caption is drawn only once.
-- Require matching KineticCore 26.10.4+ to use the current screen-fitting tooltip implementation. Existing item-component/NBT version rules remain unchanged.
+- Requires matching KineticCore 26.10.4+ for tooltips that fit the screen. Existing item-component/NBT version rules remain unchanged.
 
 ### 简体中文
 
@@ -66,37 +62,17 @@
 
 ---
 
-2026年10月04日 — Language key validation / 语言键一致性检查
-
-- Require identical authored English/Chinese keys and string values in source, version overrides and packaged resources; generated formatting keys are rejected during builds.
-
-- 强制检查源码、版本覆盖与最终资源的中英文完整键名一致、值为字符串；构建禁止派生格式语言键。
-
----
-
 2026年10月03日 20时11分 — 26.10.3
 
 - Added NeoForge 1.21.1 support alongside Forge 1.20.1, using matching KineticCore 26.10.3+.
 - The 1.21.1 equipment editor uses native item components and does not accept or convert legacy item NBT; entity/world data retain native NBT.
 - Adapted Curios dummy presets and fixed equipment inventory restoration, enchantment creature predicates, and undead dummy potion behavior.
-- Both builds and targeted NeoForge world checks passed; Forge game startup was skipped and full gameplay, every GUI, and dedicated servers have not been tested.
-- The 26.1.2 node is reserved and disabled; it is not a supported release.
+- Minecraft 26.1.2 is not yet supported.
 
 - 新增 NeoForge 1.21.1 支持，同时保留 Forge 1.20.1；使用对应版本的 KineticCore 26.10.3+。
 - 1.21.1 装备编辑器使用原生物品组件，不接受或转换旧物品 NBT；实体与世界数据仍使用原生 NBT。
 - 适配 Curios 假人预设，修复装备库存恢复、附魔生物类别判定和亡灵假人药水行为。
-- 两个版本构建及针对性的 NeoForge 世界检查通过；跳过 Forge 游戏启动，完整玩法、所有 GUI 与专用服务端尚未测试。
-- 26.1.2 节点仅预留、未启用，不代表已支持。
-
----
-
-2026年10月02日 13时53分
-
-- Enabled KineticCore addon architecture validation during compilation.
-- Verified the full build, final-JAR API references, and real development-client startup. No source-level warning suppressions were added.
-
-- 在编译阶段接入 KineticCore 附属架构验证。
-- 完整构建、最终 JAR API 引用检查及真实开发客户端启动验证通过，未添加源码级警告抑制。
+- 尚不支持 Minecraft 26.1.2。
 
 ---
 
