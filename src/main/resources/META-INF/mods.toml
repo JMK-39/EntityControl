@@ -28,7 +28,7 @@ side="BOTH"
 [[dependencies.entitycontrol]]
 modId="kineticcore"
 mandatory=true
-versionRange="[26.10.3,)"
+versionRange="${kineticcore_version_range}"
 ordering="AFTER"
 side="BOTH"
 

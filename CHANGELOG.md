@@ -76,13 +76,13 @@
 
 2026年10月03日 20时11分 — 26.10.3
 
-- Added NeoForge 1.21.1 support alongside Forge 1.20.1, using Java 21 and matching KineticCore 26.10.3+.
+- Added NeoForge 1.21.1 support alongside Forge 1.20.1, using matching KineticCore 26.10.3+.
 - The 1.21.1 equipment editor uses native item components and does not accept or convert legacy item NBT; entity/world data retain native NBT.
 - Adapted Curios dummy presets and fixed equipment inventory restoration, enchantment creature predicates, and undead dummy potion behavior.
 - Both builds and targeted NeoForge world checks passed; Forge game startup was skipped and full gameplay, every GUI, and dedicated servers have not been tested.
 - The 26.1.2 node is reserved and disabled; it is not a supported release.
 
-- 新增 NeoForge 1.21.1 支持，同时保留 Forge 1.20.1；使用 Java 21 和对应版本的 KineticCore 26.10.3+。
+- 新增 NeoForge 1.21.1 支持，同时保留 Forge 1.20.1；使用对应版本的 KineticCore 26.10.3+。
 - 1.21.1 装备编辑器使用原生物品组件，不接受或转换旧物品 NBT；实体与世界数据仍使用原生 NBT。
 - 适配 Curios 假人预设，修复装备库存恢复、附魔生物类别判定和亡灵假人药水行为。
 - 两个版本构建及针对性的 NeoForge 世界检查通过；跳过 Forge 游戏启动，完整玩法、所有 GUI 与专用服务端尚未测试。
