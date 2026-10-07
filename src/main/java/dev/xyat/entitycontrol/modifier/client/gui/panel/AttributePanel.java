@@ -6,7 +6,6 @@ import dev.xyat.kineticcore.api.client.gui.input.MouseInput;
 import dev.xyat.kineticcore.api.client.gui.overlay.KineticOverlays;
 import dev.xyat.kineticcore.api.client.gui.render.KineticGraphics;
 import dev.xyat.kineticcore.api.client.gui.state.EditedEntryTracker;
-import dev.xyat.kineticcore.api.client.gui.text.KineticText;
 import dev.xyat.kineticcore.api.client.gui.theme.KineticTheme;
 import dev.xyat.kineticcore.api.client.gui.ui.KineticUi;
 import dev.xyat.kineticcore.api.client.gui.ui.NumberType;
@@ -447,11 +446,12 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
                         : "gui.entitycontrol.modifier.modifier.value.default",
                 operation + String.format(Locale.ROOT, "%.2f", displayValue)
         );
-        graphics.text(
-                valueText.getString(),
-                rowX + rowWidth - 7 - KineticText.width(valueText),
+        graphics.scrollingTextRight(
+                Component.literal(valueText.getString()),
+                rowX + rowWidth - 7,
                 rowY + 6,
-                KineticTheme.current().text()
+                Math.max(0, ROW_VALUE_RESERVE - 7),
+                KineticTheme.current().text(), false
         );
     }
 
