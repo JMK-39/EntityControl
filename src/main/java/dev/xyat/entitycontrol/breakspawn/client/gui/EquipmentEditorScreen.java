@@ -68,7 +68,7 @@ public final class EquipmentEditorScreen extends EcPage {
             BreakSpawnConfig.EquipmentSpec spec = rule.equipment.get(slot);
             ItemStack stack = stack(spec);
             KineticLayout.Rect row = form.row(KineticI18n.translatable("gui.entitycontrol.breakspawn.slot." + slot), tip("equipment.slot"));
-            icons.put(slot, new KineticLayout.Rect(row.x(), row.y(), 16, 16));
+            icons.put(slot, new KineticLayout.Rect(row.x(), row.y() + (H - 18) / 2, 18, 18));
             Component itemText = stack.isEmpty() ? KineticI18n.translatable("gui.entitycontrol.breakspawn.equipment.empty") : stack.getHoverName();
             KineticLayout.Rect itemRect = new KineticLayout.Rect(row.x() + 16 + GAP, row.y(), CONTROL_WIDTH, H);
             menuButton(ui, itemRect, itemText, tip("equipment.item"), true, () -> slotMenu(slot));
@@ -151,7 +151,8 @@ public final class EquipmentEditorScreen extends EcPage {
         for (Map.Entry<String, KineticLayout.Rect> entry : icons.entrySet()) {
             KineticLayout.Rect rect = entry.getValue();
             ItemStack stack = stack(rule.equipment.get(entry.getKey()));
-            if (!stack.isEmpty()) graphics.item(stack, rect.x(), rect.y());
+            KineticTheme.itemSlot(graphics, rect.x(), rect.y(), rect.width(), rect.contains(mouseX, mouseY));
+            if (!stack.isEmpty()) KineticTheme.item(graphics, stack, rect.x(), rect.y(), rect.width(), 0.75F, false);
         }
         if (helpRect != null) {
             graphics.wrappedText(tr("equipment.help"), helpRect.x(), helpRect.y(), helpRect.width(), KineticTheme.current().text());

@@ -239,10 +239,11 @@ public class CuriosScreen extends KineticPage {
                         ItemStack stack = CuriosCompat.getCurioItem(dummy, i);
                         boolean hovered = mouseX >= x && mouseX < x + SLOT_SIZE
                                 && mouseY >= y && mouseY < y + SLOT_SIZE;
-                        KineticTheme.itemSlot(graphics, x, y, SLOT_SIZE, 4, hovered);
+                        // Keep two pixels between the preview tiles without changing the inventory cell layout.
+                        int previewSize = SLOT_SIZE - 2;
+                        KineticTheme.itemSlot(graphics, x, y, previewSize, 4, hovered);
                         if (!stack.isEmpty()) {
-                            graphics.item(stack, x + 1, y + 1);
-                            graphics.itemDecorations(stack, x + 1, y + 1);
+                            KineticTheme.item(graphics, stack, x, y, previewSize, 0.625F, true);
                         }
                     }
                 });

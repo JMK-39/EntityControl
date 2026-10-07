@@ -1,3 +1,13 @@
+## 2026-10-08 — Item preview slots / 物品预览格
+
+### English
+
+- Spawn-equipment previews use the standard item-slot background. Dummy accessory previews have clear gaps between their slots, with each icon kept clear of its slot border.
+
+### 简体中文
+
+- 生成装备的物品预览使用统一的物品格背景。假人饰品预览格之间保留间距，图标与格子描边之间留出空隙。
+
 ## 2026-10-08 — Attribute value text / 属性数值文字
 
 ### English
