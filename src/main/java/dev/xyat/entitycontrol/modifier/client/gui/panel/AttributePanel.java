@@ -230,9 +230,9 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
                 .onClick(this::showModeMenu)
                 .build();
 
-        Component label = KineticI18n.translatable("gui.entitycontrol.modifier.modifier.edit_val");
         valueLabelX = x + modeWidth + EcPage.GAP * 2;
-        int valueX = valueLabelX + Math.min(textColumnWidth, KineticText.width(label)) + EcPage.GAP;
+        // The "Edit value" label has the same room in every language and scrolls when longer.
+        int valueX = valueLabelX + Math.min(textColumnWidth, 50) + EcPage.GAP;
         Component deleteText = KineticI18n.translatable("gui.entitycontrol.modifier.global.delete_rule");
         deleteButton = ui.button(valueX + VALUE_WIDTH + EcPage.GAP, rowY,
                         Math.min(textColumnWidth, EcPage.fitWidth(List.of(deleteText))))
@@ -401,7 +401,8 @@ public final class AttributePanel extends AbstractModifierScrollPanel<Attribute>
                 namespaceWidth, KineticTheme.current().text(), false);
 
         String attrName = getReadableName(attr, id);
-        int nameX = textX + Math.min(namespaceWidth, KineticText.width(namespaceText)) + EcPage.GAP;
+        // The name always starts after the full namespace column, whatever the namespace text's length.
+        int nameX = textX + namespaceWidth + EcPage.GAP;
         int maxNameWidth = Math.max(0, nameRight - nameX - EcPage.GAP);
         Component nameText = KineticI18n.translatable(
                 "gui.entitycontrol.modifier.modifier.name",

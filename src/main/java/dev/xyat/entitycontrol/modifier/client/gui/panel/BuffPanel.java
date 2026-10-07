@@ -5,7 +5,6 @@ import dev.xyat.entitycontrol.modifier.client.gui.BuffEditScreen;
 import dev.xyat.entitycontrol.modifier.config.EntityModifierConfig;
 import dev.xyat.kineticcore.api.client.gui.input.MouseInput;
 import dev.xyat.kineticcore.api.client.gui.render.KineticGraphics;
-import dev.xyat.kineticcore.api.client.gui.text.KineticText;
 import dev.xyat.kineticcore.api.client.gui.theme.KineticTheme;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.text.KineticI18n;
@@ -99,7 +98,8 @@ public final class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
         graphics.scrollingText(Component.literal(namespaceText.getString()), textX, rowY + 6,
                 namespaceWidth, KineticTheme.current().text(), false);
 
-        int nameX = textX + Math.min(namespaceWidth, KineticText.width(namespaceText)) + EcPage.GAP;
+        // The name always starts after the full namespace column, whatever the namespace text's length.
+        int nameX = textX + namespaceWidth + EcPage.GAP;
         Component nameText = KineticI18n.translatable(
                 "gui.entitycontrol.modifier.modifier.name",
                 getReadableName(effect, id)

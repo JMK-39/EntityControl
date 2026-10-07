@@ -8,7 +8,6 @@ import dev.xyat.kineticcore.api.client.gui.overlay.KineticOverlays;
 import dev.xyat.kineticcore.api.client.gui.page.KineticPage;
 import dev.xyat.kineticcore.api.client.gui.render.KineticGraphics;
 import dev.xyat.kineticcore.api.client.gui.scroll.KineticScrollController;
-import dev.xyat.kineticcore.api.client.gui.text.KineticText;
 import dev.xyat.kineticcore.api.client.gui.theme.KineticTheme;
 import dev.xyat.kineticcore.api.client.gui.ui.KineticUi;
 import dev.xyat.kineticcore.api.client.gui.ui.NumberType;
@@ -64,13 +63,12 @@ public abstract class EcPage extends KineticPage {
     /** 按钮的最小宽度。 */
     public static final int MIN_BUTTON = 40;
 
-    /** 放下这些文字所需的按钮宽度（取最长的一条，含内边距）。 */
+    /** 按钮、开关的标准宽度：所有语言相同，文字过长时在按钮内滚动。 */
+    // The same width in every language; never derived from the text, so translations cannot change the layout.
+    public static final int FIT_WIDTH = 72;
+
     public static int fitWidth(List<? extends Component> texts) {
-        int need = MIN_BUTTON;
-        for (Component text : texts) {
-            if (text != null) need = Math.max(need, KineticText.width(text) + 20);
-        }
-        return need;
+        return FIT_WIDTH;
     }
 
     /**
@@ -95,9 +93,8 @@ public abstract class EcPage extends KineticPage {
 
     /** 设置列表的标签列宽度：按最长的标签计算（含内边距），控件紧跟在标签后面。 */
     public static int labelColumn(List<? extends Component> labels, int max) {
-        int widest = 0;
-        for (Component label : labels) widest = Math.max(widest, KineticText.width(label));
-        return Math.max(80, Math.min(max, widest + PAD + GAP * 3));
+        // A fixed column in every language; longer labels scroll inside it.
+        return Math.max(80, Math.min(max, 120));
     }
 
     /** 截成标准控件宽度（左对齐）。 */
@@ -275,7 +272,8 @@ public abstract class EcPage extends KineticPage {
 
     /** 按文字宽度计算按钮宽度。 */
     public static int buttonWidth(Component text, int minimum) {
-        return Math.max(minimum, KineticText.width(text) + 16);
+        // The same width in every language; the label scrolls inside the button when longer.
+        return Math.max(minimum, 64);
     }
 
     /** 两列等分。 */
