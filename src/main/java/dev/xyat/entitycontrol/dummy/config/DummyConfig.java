@@ -40,9 +40,9 @@ public class DummyConfig {
         ).translation("cfg.entitycontrol.dummy.dummy.syncInterval").defineInt("syncIntervalTicks", 2, 1, 20);
 
         dummyCurioExtraSlots = builder.comment(
-                "假人额外 curio 槽位数量。原版逻辑为 53（总计约54格）。槽位越多，Curios 的 LivingTick 开销越高；不需要大量饰品时建议改小，例如 0/7/15。",
-                "Extra curio slots for dummies. Original behavior is 53. More slots means more Curios LivingTick cost; use 0/7/15 if you do not need many."
-        ).translation("cfg.entitycontrol.dummy.dummy.curioExtraSlots").defineInt("curioExtraSlots", 53, 0, 53);
+                "假人额外 Curios 槽位数量。默认额外 15 格，加上基础槽位共 16 格。槽位越多，Curios 的 LivingTick 开销越高。",
+                "Extra Curios slots for dummies. Defaults to 15 extra slots, for 16 including the base slot. More slots increase Curios LivingTick cost."
+        ).translation("cfg.entitycontrol.dummy.dummy.curioExtraSlots").defineInt("curioExtraSlots", 15, 0, 53);
         builder.pop();
 
         builder.push("DummyServerSettings");

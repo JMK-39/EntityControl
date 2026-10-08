@@ -22,7 +22,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.ai.attributes.Attribute;
-import net.minecraft.world.inventory.Slot;
 
 import java.util.Comparator;
 import java.util.List;
@@ -273,18 +272,6 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
         // 176 px wide at x 13, the same as the vanilla inventory, which is drawn down to its bottom border.
         graphics.texture(TEXTURE, leftPos(), topPos(), 0, 0, 200, 101);
         graphics.texture(INVENTORY_TEXTURE, leftPos() + 13, topPos() + 101, 0, 126, 176, 96);
-
-        for (int i = 0; i < Math.min(6, menu().slots.size()); i++) {
-            Slot slot = menu().slots.get(i);
-            if (slot.isActive()) {
-                KineticTheme.itemSlot(
-                        graphics,
-                        leftPos() + slot.x - 1,
-                        topPos() + slot.y - 1,
-                        slot == hoveredSlot()
-                );
-            }
-        }
 
         for (int i = 0; i < Math.min(6, menu().slots.size()); i++) {
             if (menu().slots.get(i).getItem().isEmpty()) {

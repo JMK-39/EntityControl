@@ -127,7 +127,7 @@
   "cfg.entitycontrol.dummy.dummy.colorSumTitle": "Title Color",
   "cfg.entitycontrol.dummy.dummy.colorSumTitle.tooltip": "Color of the combat-summary title.",
   "cfg.entitycontrol.dummy.dummy.curioExtraSlots": "Extra Curio Slots",
-  "cfg.entitycontrol.dummy.dummy.curioExtraSlots.tooltip": "Extra Curios slots available to a dummy. Lower values reduce tick cost.",
+  "cfg.entitycontrol.dummy.dummy.curioExtraSlots.tooltip": "Extra Curios slots available to a dummy. Default: 15 extra slots, 16 including the base slot. Lower values reduce tick cost.",
   "cfg.entitycontrol.dummy.dummy.overOffset": "Vertical Offset",
   "cfg.entitycontrol.dummy.dummy.overScale": "HUD Scale",
   "cfg.entitycontrol.dummy.dummy.particleScale": "Particle Scale",

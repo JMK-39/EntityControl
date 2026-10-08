@@ -127,7 +127,7 @@
   "cfg.entitycontrol.dummy.dummy.colorSumTitle": "标题文本颜色",
   "cfg.entitycontrol.dummy.dummy.colorSumTitle.tooltip": "战斗结算标题的颜色。",
   "cfg.entitycontrol.dummy.dummy.curioExtraSlots": "额外饰品槽位",
-  "cfg.entitycontrol.dummy.dummy.curioExtraSlots.tooltip": "假人可用的额外 Curios 槽位，调低可减少 Tick 开销。",
+  "cfg.entitycontrol.dummy.dummy.curioExtraSlots.tooltip": "假人可用的额外 Curios 槽位。默认额外 15 格，加上基础槽位共 16 格，调低可减少 Tick 开销。",
   "cfg.entitycontrol.dummy.dummy.overOffset": "HUD 垂直高度",
   "cfg.entitycontrol.dummy.dummy.overScale": "HUD 整体缩放",
   "cfg.entitycontrol.dummy.dummy.particleScale": "飘字大小缩放",

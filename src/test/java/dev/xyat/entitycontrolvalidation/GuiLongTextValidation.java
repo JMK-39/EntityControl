@@ -21,7 +21,8 @@ import org.slf4j.LoggerFactory;
 public final class GuiLongTextValidation {
     private static final Logger LOG=LoggerFactory.getLogger(GuiLongTextValidation.class);
     private static final String ROOT=System.getProperty("entitycontrol.guiValidation.output","D:/IDEAWork/EntityControl/.gradle/gui-long-text-20261004/");
-    private static final String[] NAMES={"attributes-global","attributes-zombie","buffs-zombie","buffs-modified","dummy","curios","components","components-invalid","core-lists"};
+    private static final String[] NAMES={"attributes-global","attributes-zombie","buffs-zombie","buffs-modified","dummy","curios","components","components-invalid","core-lists","spawn-equipment"};
+    private static final BitSet capturedPages = new BitSet();
     private static boolean installed,started,screenshot,finished,originalFullscreen;
     private static String originalLanguage;
     private static int originalScale,originalWidth,originalHeight,phase=-1,page=-1,captures,failures;
@@ -108,11 +109,26 @@ public final class GuiLongTextValidation {
             /*dummy.onAddedToLevel();
             *///?} else
             dummy.onAddedToWorld();
-            // A real dummy gets its extra Curios slots on the server; this client-side one gets them here, so the page shows the real 54.
+            // A real dummy gets its configured Curios slots on the server; initialize the client-only fixture here.
             dev.xyat.entitycontrol.dummy.CuriosCompat.initDummySlots(dummy);
+            if (Boolean.getBoolean("entitycontrol.guiValidation.defaultSlots") &&
+                    dev.xyat.entitycontrol.dummy.CuriosCompat.getSlotCount(dummy) != 16) {
+                throw new AssertionError("Fresh dummy configuration must provide exactly 16 Curios slots");
+            }
+            dummy.getInventory().setItem(4, new ItemStack(Items.EMERALD, 64));
+            for (int slot = 0; slot < dev.xyat.entitycontrol.dummy.CuriosCompat.getSlotCount(dummy); slot++) {
+                dev.xyat.entitycontrol.dummy.CuriosCompat.setCurioItem(dummy, slot,
+                        new ItemStack(slot % 2 == 0 ? Items.DIAMOND : Items.DIAMOND_SWORD, slot % 2 == 0 ? 64 : 1));
+            }
             var menu=new dev.xyat.entitycontrol.dummy.DummyMenu(0,mc.player.getInventory(),dummy);
             if(index==4)mc.setScreen((net.minecraft.client.gui.screens.Screen)construct("dev.xyat.kineticcore.internal.client.gui.page.PageContainerScreen",new dev.xyat.entitycontrol.dummy.client.gui.DummyScreen(menu,Component.literal("GUI validation")),mc.player.getInventory(),Component.literal("GUI validation")));
             else KineticGui.open(new dev.xyat.entitycontrol.dummy.client.gui.CuriosScreen(menu));
+        }else if(index==9){
+            var rule = new dev.xyat.entitycontrol.breakspawn.config.BreakSpawnConfig.EntityRule();
+            var equipment = new dev.xyat.entitycontrol.breakspawn.config.BreakSpawnConfig.EquipmentSpec();
+            equipment.itemId = "minecraft:diamond_sword";
+            rule.equipment.put("mainhand", equipment);
+            KineticGui.open(new dev.xyat.entitycontrol.breakspawn.client.gui.EquipmentEditorScreen("minecraft:zombie",rule,()->{}));
         }else if(index==8){KineticGui.open(new CoreListsPage());
         }else{
         //? if >=1.21 {
@@ -148,6 +164,7 @@ public final class GuiLongTextValidation {
     private static void capture(String frame)throws Exception {
         var mc=Minecraft.getInstance();Path path=Path.of(ROOT,String.format("%d-%02d-%s-%s.png",phase,page,NAMES[page],frame));Files.createDirectories(path.getParent());
         try(var image=Screenshot.takeScreenshot(mc.getMainRenderTarget())){image.writeToFile(path);}
+        capturedPages.set(page);
         captures++;LOG.info("ENTITY_GUI_CAPTURE phase={} case={} image={}x{}",phase,NAMES[page],mc.getWindow().getWidth(),mc.getWindow().getHeight());
     }
     /*** Logs controls of the open screen that overlap or sit closer than 2 px (Core layout check). */
@@ -167,7 +184,7 @@ public final class GuiLongTextValidation {
         mc.setScreen(null);
         mc.getWindow().setWindowed(originalWidth,originalHeight);
         if(originalFullscreen && !mc.getWindow().isFullscreen())mc.getWindow().toggleFullScreen();
-        LOG.info("ENTITY_GUI_{} pages={} captures={} failures={} userSettingsRestored=true",failures==0?"PASS":"FAIL",NAMES.length,captures,failures);
+        LOG.info("ENTITY_GUI_{} pages={} captures={} failures={} userSettingsRestored=true",failures==0?"PASS":"FAIL",capturedPages.cardinality(),captures,failures);
         dev.xyat.kineticcore.api.runtime.KineticClientRuntime.stopClient();
     }
     /*** Core list styles: text rows (single-select yellow, multi-select green), button rows with green picks, and an open autocomplete popup. */

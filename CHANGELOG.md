@@ -3,10 +3,14 @@
 ### English
 
 - Spawn-equipment previews use the standard item-slot background. Dummy accessory previews have clear gaps between their slots, with each icon kept clear of its slot border.
+- Keep the dummy's built-in equipment and player inventory slot textures. The separate accessory grid shows full-size item icons with two-pixel gaps, using fewer rows and columns within the existing panel.
+- Testing dummies have 16 Curios accessory slots by default; the extra slot count remains configurable.
 
 ### 简体中文
 
 - 生成装备的物品预览使用统一的物品格背景。假人饰品预览格之间保留间距，图标与格子描边之间留出空隙。
+- 假人内置装备栏和玩家背包保留原有槽位贴图；独立饰品网格在现有面板中减少行列，完整显示物品图标，并保留两像素间距。
+- 测试假人默认提供 16 个 Curios 饰品槽位，额外槽位数量仍可配置。
 
 ## 2026-10-08 — Attribute value text / 属性数值文字
 

@@ -32,12 +32,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CuriosScreen extends KineticPage {
-    private static final int COLUMNS = 9;
+    private static final int COLUMNS = 7;
     private static final int BACK_WIDTH = 40;
     private static final int PANEL_MARGIN = 5;
     private static final int TEXT_GAP = 4;
-    private static final int MAX_VISIBLE_ROWS = 4;
     private static final int SLOT_SIZE = 18;
+    private static final int CURIO_SLOT_SIZE = 22;
+    private static final int CURIO_GAP = 2;
+    private static final int CURIO_PITCH = CURIO_SLOT_SIZE + CURIO_GAP;
+    // Fit full-size icons in the original four-row, 72-pixel accessory area.
+    private static final int MAX_VISIBLE_ROWS = (4 * SLOT_SIZE + CURIO_GAP) / CURIO_PITCH;
     private static final int SCROLL_W = 6;
     private static final int SCROLL_MIN_THUMB = 15;
     private static final KineticTexture INVENTORY_TEX = KineticTexture.of(
@@ -82,8 +86,8 @@ public class CuriosScreen extends KineticPage {
         this.visibleRows = Math.min(MAX_VISIBLE_ROWS, maxRows);
         this.curioScroll.updateRange(Math.max(0, maxRows - this.visibleRows), maxRows, this.visibleRows);
 
-        this.gridViewW = COLUMNS * SLOT_SIZE;
-        this.gridViewH = visibleRows * SLOT_SIZE;
+        this.gridViewW = COLUMNS * CURIO_PITCH - CURIO_GAP;
+        this.gridViewH = visibleRows * CURIO_PITCH - CURIO_GAP;
         this.panelW = 194;
         this.panelH = 144 + gridViewH;
         this.startX = cx - panelW / 2;
@@ -234,16 +238,14 @@ public class CuriosScreen extends KineticPage {
                 graphics.clipped(gridStartX, gridStartY, gridStartX + gridViewW, gridStartY + gridViewH, () -> {
                     for (int i = startIdx; i < endIdx; i++) {
                         int displayIdx = i - startIdx;
-                        int x = gridStartX + (displayIdx % COLUMNS) * SLOT_SIZE;
-                        int y = gridStartY + (displayIdx / COLUMNS) * SLOT_SIZE;
+                        int x = gridStartX + (displayIdx % COLUMNS) * CURIO_PITCH;
+                        int y = gridStartY + (displayIdx / COLUMNS) * CURIO_PITCH;
                         ItemStack stack = CuriosCompat.getCurioItem(dummy, i);
-                        boolean hovered = mouseX >= x && mouseX < x + SLOT_SIZE
-                                && mouseY >= y && mouseY < y + SLOT_SIZE;
-                        // Keep two pixels between the preview tiles without changing the inventory cell layout.
-                        int previewSize = SLOT_SIZE - 2;
-                        KineticTheme.itemSlot(graphics, x, y, previewSize, 4, hovered);
+                        boolean hovered = mouseX >= x && mouseX < x + CURIO_SLOT_SIZE
+                                && mouseY >= y && mouseY < y + CURIO_SLOT_SIZE;
+                        KineticTheme.itemSlot(graphics, x, y, CURIO_SLOT_SIZE, hovered);
                         if (!stack.isEmpty()) {
-                            KineticTheme.item(graphics, stack, x, y, previewSize, 0.625F, true);
+                            KineticTheme.item(graphics, stack, x, y, CURIO_SLOT_SIZE, 1.0F, true);
                         }
                     }
                 });
@@ -274,9 +276,9 @@ public class CuriosScreen extends KineticPage {
                 int endIdx = Math.min(startIdx + visibleRows * COLUMNS, totalSlots);
                 for (int i = startIdx; i < endIdx; i++) {
                     int displayIdx = i - startIdx;
-                    int x = gridStartX + (displayIdx % COLUMNS) * SLOT_SIZE;
-                    int y = gridStartY + (displayIdx / COLUMNS) * SLOT_SIZE;
-                    if (inside(mouseX, mouseY, x, y)) {
+                    int x = gridStartX + (displayIdx % COLUMNS) * CURIO_PITCH;
+                    int y = gridStartY + (displayIdx / COLUMNS) * CURIO_PITCH;
+                    if (mouseX >= x && mouseX < x + CURIO_SLOT_SIZE && mouseY >= y && mouseY < y + CURIO_SLOT_SIZE) {
                         return new HoverInfo(CuriosCompat.getCurioItem(dummy, i), true);
                     }
                 }
@@ -316,9 +318,9 @@ public class CuriosScreen extends KineticPage {
 
                 for (int i = startIdx; i < endIdx; i++) {
                     int displayIdx = i - startIdx;
-                    int x = gridStartX + (displayIdx % COLUMNS) * SLOT_SIZE;
-                    int y = gridStartY + (displayIdx / COLUMNS) * SLOT_SIZE;
-                    if (!input.inside(x, y, SLOT_SIZE, SLOT_SIZE)) continue;
+                    int x = gridStartX + (displayIdx % COLUMNS) * CURIO_PITCH;
+                    int y = gridStartY + (displayIdx / COLUMNS) * CURIO_PITCH;
+                    if (!input.inside(x, y, CURIO_SLOT_SIZE, CURIO_SLOT_SIZE)) continue;
 
                     if (input.isLeft()) {
                         if (!cursorStack.isEmpty()) {
