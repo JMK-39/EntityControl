@@ -26,29 +26,7 @@ public class DummyMenu extends AbstractContainerMenu {
         this.entity = entity;
 
         for (int i = 0; i < 6; i++) {
-            final int slotIdx = i;
-            this.addSlot(new Slot(entity.getInventory(), i, 21 + i * 18, 8) {
-                @Override
-                public boolean mayPlace(@NotNull ItemStack stack) {
-                    if (DummyUtils.isBlacklisted(stack)) return false;
-                    if (slotIdx < 4) {
-                        EquipmentSlot target = getEquipmentSlot(slotIdx);
-                        // 26.1 armor is any item whose equippable component targets the slot.
-                        //? if >=26.1 {
-                        /*net.minecraft.world.item.equipment.Equippable equippable = stack.get(net.minecraft.core.component.DataComponents.EQUIPPABLE);
-                        return target != null && equippable != null && equippable.slot() == target;
-                        *///?} else {
-                        return target != null && stack.getItem() instanceof ArmorItem armor && armor.getEquipmentSlot() == target;
-                        //?}
-                    }
-                    return true;
-                }
-                @Override
-                public void setChanged() {
-                    super.setChanged();
-                    entity.refreshSlotAttributes();
-                }
-            });
+            this.addSlot(new DummyEquipmentSlot(i));
         }
 
         for (int row = 0; row < 3; row++) {
@@ -59,6 +37,37 @@ public class DummyMenu extends AbstractContainerMenu {
 
         for (int col = 0; col < 9; col++) {
             this.addSlot(new Slot(playerInv, col, 21 + col * 18, 173));
+        }
+    }
+
+    // Explicit parameters avoid javac 17 copying duplicate mapped constructor names into an anonymous class.
+    private final class DummyEquipmentSlot extends Slot {
+        private final int slotIdx;
+
+        private DummyEquipmentSlot(int slotIdx) {
+            super(entity.getInventory(), slotIdx, 21 + slotIdx * 18, 8);
+            this.slotIdx = slotIdx;
+        }
+
+        @Override
+        public boolean mayPlace(@NotNull ItemStack stack) {
+            if (DummyUtils.isBlacklisted(stack)) return false;
+            if (slotIdx < 4) {
+                EquipmentSlot target = getEquipmentSlot(slotIdx);
+                // 26.1 armor is any item whose equippable component targets the slot.
+                //? if >=26.1 {
+                /*net.minecraft.world.item.equipment.Equippable equippable = stack.get(net.minecraft.core.component.DataComponents.EQUIPPABLE);
+                return target != null && equippable != null && equippable.slot() == target;
+                *///?} else {
+                return target != null && stack.getItem() instanceof ArmorItem armor && armor.getEquipmentSlot() == target;
+                //?}
+            }
+            return true;
+        }
+        @Override
+        public void setChanged() {
+            super.setChanged();
+            entity.refreshSlotAttributes();
         }
     }
 
