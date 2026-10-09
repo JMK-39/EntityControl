@@ -33,6 +33,9 @@ public final class DummyConfigGui {
                 )
                 .pageDescription(KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.client.description"))
                 .applyTiming(KTConfigPage.ApplyTiming.IMMEDIATE)
+                .intValue("damage_render_distance", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.damageRenderDistance"),
+                        DummyClientConfig.damageRenderDistance::get, DummyClientConfig.damageRenderDistance::set,
+                        64, 1, 1024, KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.damageRenderDistance.tooltip"))
                 .divider()
                 .tickSecondsValue("summary_duration", KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.summaryDuration"),
                         DummyClientConfig.summaryDuration::get, DummyClientConfig.summaryDuration::set,
@@ -74,7 +77,7 @@ public final class DummyConfigGui {
     private static boolean includeAutomaticClientField(String path) {
         int separator = path.lastIndexOf('.');
         String leaf = separator < 0 ? path : path.substring(separator + 1);
-        return !leaf.startsWith("color") && !"DeathSummaryHUD.durationTicks".equals(path);
+        return !leaf.startsWith("color") && !"damageRenderDistance".equals(leaf) && !"DeathSummaryHUD.durationTicks".equals(path);
     }
 
     private static void saveClientConfig() {

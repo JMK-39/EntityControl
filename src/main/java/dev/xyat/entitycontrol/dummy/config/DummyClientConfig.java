@@ -9,6 +9,7 @@ public class DummyClientConfig {
     public static final KTClientConfigSpec.BooleanValue showDamageParticles;
     public static final KTClientConfigSpec.BooleanValue accumulateDamage;
     public static final KTClientConfigSpec.DoubleValue particleScale;
+    public static final KTClientConfigSpec.IntValue damageRenderDistance;
     public static final KTClientConfigSpec.DoubleValue damageTextScale;
     public static final KTClientConfigSpec.DoubleValue particleSpread;
     public static final KTClientConfigSpec.IntValue colorNormal;
@@ -49,6 +50,12 @@ public class DummyClientConfig {
                 "是否累计显示同一生物在连续攻击期间受到的伤害。停止受到伤害 3 秒后自动清空。",
                 "Whether to accumulate damage dealt to the same mob during continuous attacks. The value clears after 3 seconds without damage."
         ).translation("cfg.entitycontrol.dummy.dummy.accumulateDamage").defineBoolean("accumulateDamage", false);
+
+        damageRenderDistance = builder.comment(
+                "普通飘字与累计伤害数字的最大显示距离（格）。默认 64，上限 1024；保存后立即生效，不影响假人头顶面板。",
+                "Maximum display distance in blocks for floating and cumulative damage numbers. Default 64, maximum 1024; applies immediately without changing the dummy overhead panel."
+        ).translation("cfg.entitycontrol.dummy.dummy.damageRenderDistance")
+                .defineInt("damageRenderDistance",dev.xyat.entitycontrol.dummy.client.DamageNumberRange.DEFAULT_BLOCKS,1,1024);
 
         particleScale = builder.comment(
                 "伤害数字粒子的整体缩放比例。",

@@ -1,3 +1,17 @@
+## 2026-10-09 — Adjustable damage number distance / 可调伤害数字显示距离
+
+### English
+
+- Add an in-game Damage Number Distance setting, defaulting to 64 blocks with a 1–1024 block range. Saving applies immediately to floating and cumulative damage numbers.
+- Keep damage-number distance separate from the dummy overhead statistics panel and use the target position consistently at distance boundaries.
+- Add explanations to dummy attribute, equipment, creature-category and damage-behavior controls.
+
+### 简体中文
+
+- 游戏内新增“伤害数字显示距离”，默认 64 格，可调整范围 1–1024 格，保存后立即应用于普通飘字与累计伤害数字。
+- 伤害数字距离独立于假人头顶统计面板；距离边界按目标位置统一判断。
+- 为假人属性、饰品装备、生物类别与受伤行为控件补充操作说明。
+
 ## 2026-10-08 — Item preview slots / 物品预览格
 
 ### English

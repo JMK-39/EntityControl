@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
 public final class GuiLongTextValidation {
     private static final Logger LOG=LoggerFactory.getLogger(GuiLongTextValidation.class);
     private static final String ROOT=System.getProperty("entitycontrol.guiValidation.output","D:/IDEAWork/EntityControl/.gradle/gui-long-text-20261004/");
-    private static final String[] NAMES={"attributes-global","attributes-zombie","buffs-zombie","buffs-modified","dummy","curios","components","components-invalid","core-lists","spawn-equipment"};
+    private static final String[] NAMES={"attributes-global","attributes-zombie","buffs-zombie","buffs-modified","dummy","curios","components","components-invalid","core-lists","spawn-equipment","damage-distance"};
     private static final BitSet capturedPages = new BitSet();
     private static boolean installed,started,screenshot,finished,originalFullscreen;
     private static String originalLanguage;
@@ -67,13 +67,14 @@ public final class GuiLongTextValidation {
     private static void nextPhase() {
         if(stressOriginal!=null){Language.inject(stressOriginal);stressOriginal=null;}
         phase++;page=-1;
-        if(phase>=5){finish();return;}
+        boolean fullHdOnly=Boolean.getBoolean("entitycontrol.guiValidation.fullHdOnly");
+        if(phase>=(fullHdOnly?2:5)){finish();return;}
         var mc=Minecraft.getInstance();
         mc.setScreen(null);
-        String lang=phase==2 || phase==3?"zh_cn":"en_us";
+        String lang=(fullHdOnly?phase==1:phase==2 || phase==3)?"zh_cn":"en_us";
         mc.getLanguageManager().setSelected(lang);
         mc.options.languageCode=lang;
-        int width=phase==1 || phase==3?1920:854,height=phase==1 || phase==3?1080:480;
+        int width=fullHdOnly || phase==1 || phase==3?1920:854,height=fullHdOnly || phase==1 || phase==3?1080:480;
         mc.getWindow().setWindowed(width,height);mc.resizeDisplay();
         reload=mc.reloadResourcePacks();
         LOG.info("ENTITY_GUI_PHASE phase={} language={} requested={}x{} autoScale=true",phase,lang,width,height);
@@ -89,6 +90,7 @@ public final class GuiLongTextValidation {
     }
     private static void openPage(int index) throws Exception {
         var mc=Minecraft.getInstance();
+        if(index==10){KineticGui.open(new DamageDistanceProbePage());return;}
         if(index<=3) {
             var p=new dev.xyat.entitycontrol.modifier.client.gui.EntityModifierScreen("{}");
             KineticGui.open(p);
@@ -160,6 +162,45 @@ public final class GuiLongTextValidation {
         if(types.length!=args.length)return false;
         for(int i=0;i<types.length;i++)if(args[i]!=null && !(types[i].isInstance(args[i]) || types[i]==int.class && args[i] instanceof Integer || types[i]==boolean.class && args[i] instanceof Boolean))return false;
         return true;
+    }
+    private static final class DamageDistanceProbePage extends KineticPage {
+        private boolean checked;
+        DamageDistanceProbePage(){super(Component.literal("Damage distance runtime validation"));}
+        @Override protected void build(dev.xyat.kineticcore.api.client.gui.ui.KineticUi ui){}
+        @Override protected void renderForeground(dev.xyat.kineticcore.api.client.gui.render.KineticGraphics g,int mx,int my,float pt) {
+            if(checked)return;
+            checked=true;
+            try {
+                var method=dev.xyat.entitycontrol.dummy.config.DummyConfigGui.class.getDeclaredMethod("buildClientPage");method.setAccessible(true);
+                var config=(dev.xyat.kineticcore.api.config.client.KTConfigPage)method.invoke(null);
+                var entry=config.entries().stream().filter(e->e.id().equals("damage_render_distance")).findFirst().orElseThrow();
+                if(!entry.defaultValue().equals(64)||entry.minimum().intValue()!=1||entry.maximum().intValue()!=1024)throw new AssertionError("Distance config bounds");
+                for(var item:config.entries())if(item.isValueEntry()&&(item.tooltip()==null||item.tooltip().getString().isBlank()))throw new AssertionError("Missing config tooltip: "+item.id());
+                var manager=dev.xyat.entitycontrol.dummy.client.DummyTextManager.class;
+                var particlesField=manager.getDeclaredField("particles");particlesField.setAccessible(true);
+                @SuppressWarnings("unchecked") var particles=(List<Object>)particlesField.get(null);
+                var constructor=Class.forName(manager.getName()+"$FloatingText").getDeclaredConstructors()[0];constructor.setAccessible(true);
+                var draw=manager.getDeclaredMethod("drawLabels",dev.xyat.kineticcore.api.client.gui.render.KineticGraphics.class,java.util.function.Function.class,net.minecraft.world.phys.Vec3.class,float.class);draw.setAccessible(true);
+                var player=Minecraft.getInstance().player;var origin=player.position();
+                for(int distance:new int[]{1,64,1024,16,64}) {
+                    entry.writeSnapshot(distance);config.save();particles.clear();
+                    for(double blocks:new double[]{1,64,1024,1025}){
+                        var point=origin.add(blocks,0,0);particles.add(constructor.newInstance(point,point,"42",0xFFFFFF,false,0f,0f));
+                    }
+                    int[] projections={0};
+                    java.util.function.Function<net.minecraft.world.phys.Vec3,net.minecraft.world.phys.Vec2> project=world->{projections[0]++;return new net.minecraft.world.phys.Vec2(100+projections[0]*36,100);};
+                    draw.invoke(null,g,project,origin,0f);
+                    int expected=distance==1024?3:distance==64?2:1;
+                    if(projections[0]!=expected)throw new AssertionError("Live distance render: "+distance+" -> "+projections[0]);
+                    LOG.info("ENTITY_DAMAGE_RANGE_PASS configured={} visible={} immediate=true",distance,projections[0]);
+                }
+                particles.clear();
+                LOG.info("ENTITY_DAMAGE_CONFIG_PASS default=64 min=1 max=1024 allValueTooltips=true language={}",Minecraft.getInstance().getLanguageManager().getSelected());
+            }catch(Throwable error){throw new AssertionError("Damage distance runtime check",error);}
+            dev.xyat.entitycontrol.dummy.config.DummyConfigGui.open();
+            try{invoke(field(Minecraft.getInstance().screen,"searchBox"),"setValue","damage_render_distance");}
+            catch(Exception error){throw new AssertionError("Distance setting is not searchable",error);}
+        }
     }
     private static void capture(String frame)throws Exception {
         var mc=Minecraft.getInstance();Path path=Path.of(ROOT,String.format("%d-%02d-%s-%s.png",phase,page,NAMES[page],frame));Files.createDirectories(path.getParent());

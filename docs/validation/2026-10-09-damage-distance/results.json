@@ -1,0 +1,71 @@
+[
+    {
+        "node":  "forge",
+        "file":  "entitycontrol-forge-1.20.1-26.10.9.jar",
+        "major":  61,
+        "languageKeys":  1206,
+        "sha256":  "08ba922af4f3b47197b30c04532fe3fd4235333f71c80465db3fd0559fc46657",
+        "installedProfile":  "OTHERWORLD CLASH",
+        "runtime":  [
+                        "ENTITY_DAMAGE_RANGE_PASS configured=1 visible=1 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=64 visible=2 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=1024 visible=3 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=16 visible=1 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=64 visible=2 immediate=true",
+                        "ENTITY_DAMAGE_CONFIG_PASS default=64 min=1 max=1024 allValueTooltips=true language=en_us",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=1 visible=1 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=64 visible=2 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=1024 visible=3 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=16 visible=1 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=64 visible=2 immediate=true",
+                        "ENTITY_DAMAGE_CONFIG_PASS default=64 min=1 max=1024 allValueTooltips=true language=zh_cn",
+                        "ENTITY_GUI_PASS pages=1 captures=2 failures=0 userSettingsRestored=true"
+                    ]
+    },
+    {
+        "node":  "neo21",
+        "file":  "entitycontrol-neoforge-1.21.1-26.10.9.jar",
+        "major":  65,
+        "languageKeys":  1206,
+        "sha256":  "328406b6a7aa157fcad35ea121021003a6acdf7e24f8117005d5e320e00fb1c7",
+        "installedProfile":  "1.21.1-NeoForge_21.1.252",
+        "runtime":  [
+                        "ENTITY_DAMAGE_RANGE_PASS configured=1 visible=1 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=64 visible=2 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=1024 visible=3 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=16 visible=1 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=64 visible=2 immediate=true",
+                        "ENTITY_DAMAGE_CONFIG_PASS default=64 min=1 max=1024 allValueTooltips=true language=en_us",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=1 visible=1 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=64 visible=2 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=1024 visible=3 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=16 visible=1 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=64 visible=2 immediate=true",
+                        "ENTITY_DAMAGE_CONFIG_PASS default=64 min=1 max=1024 allValueTooltips=true language=zh_cn",
+                        "ENTITY_GUI_PASS pages=1 captures=2 failures=0 userSettingsRestored=true"
+                    ]
+    },
+    {
+        "node":  "neo26",
+        "file":  "entitycontrol-neoforge-26.1.2-26.10.9.jar",
+        "major":  69,
+        "languageKeys":  1206,
+        "sha256":  "703c740eed6ed992bc4dd03d4607a202460e84505724972a1cd275c96d65763c",
+        "installedProfile":  "26.1.2-NeoForge_26.1.2.112",
+        "runtime":  [
+                        "ENTITY_DAMAGE_RANGE_PASS configured=1 visible=1 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=64 visible=2 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=1024 visible=3 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=16 visible=1 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=64 visible=2 immediate=true",
+                        "ENTITY_DAMAGE_CONFIG_PASS default=64 min=1 max=1024 allValueTooltips=true language=en_us",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=1 visible=1 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=64 visible=2 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=1024 visible=3 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=16 visible=1 immediate=true",
+                        "ENTITY_DAMAGE_RANGE_PASS configured=64 visible=2 immediate=true",
+                        "ENTITY_DAMAGE_CONFIG_PASS default=64 min=1 max=1024 allValueTooltips=true language=zh_cn",
+                        "ENTITY_GUI_PASS pages=1 captures=2 failures=0 userSettingsRestored=true"
+                    ]
+    }
+]

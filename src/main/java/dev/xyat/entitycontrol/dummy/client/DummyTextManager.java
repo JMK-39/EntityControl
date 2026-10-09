@@ -37,7 +37,6 @@ public class DummyTextManager {
     private static final int PARTICLE_LIFESPAN = 60;
     private static final int PLAYER_DAMAGE_COLOR = 0xFF5555;
     private static final long CUMULATIVE_TIMEOUT_MILLIS = 3000L;
-    private static final double DAMAGE_RENDER_DISTANCE_SQR = 4096.0D;
 
     private static int arcCounter = 0;
 
@@ -103,7 +102,7 @@ public class DummyTextManager {
 
         arcCounter++;
 
-        particles.add(new FloatingText(origin, DECIMAL_FORMAT.format(amount), color, minion, vx, vy));
+        particles.add(new FloatingText(origin, entity.position(), DECIMAL_FORMAT.format(amount), color, minion, vx, vy));
     }
 
     private static void updateCumulativeNumber(int entityId, float amount, int color, boolean minion) {
@@ -196,6 +195,7 @@ public class DummyTextManager {
         if (level == null || player == null) return;
 
         boolean cumulativeMode = DummyClientConfig.accumulateDamage.get();
+        int damageDistance = DummyClientConfig.damageRenderDistance.get();
 
         {
 
@@ -221,7 +221,7 @@ public class DummyTextManager {
             if (cumulativeMode) {
                 for (Map.Entry<Integer, CumulativeDamageNumber> entry : cumulativeNumbers.entrySet()) {
                     Entity entity = level.getEntity(entry.getKey());
-                    if (entity == null || !entity.isAlive() || player.distanceToSqr(entity) > DAMAGE_RENDER_DISTANCE_SQR) {
+                    if (entity == null || !entity.isAlive() || !DamageNumberRange.contains(player.distanceToSqr(entity),damageDistance)) {
                         continue;
                     }
 
@@ -241,6 +241,7 @@ public class DummyTextManager {
                 }
             } else {
                 for (FloatingText particle : particles) {
+                    if(!DamageNumberRange.contains(player.position().distanceToSqr(particle.rangeOrigin),damageDistance))continue;
                     Vec2 position = project.apply(particle.origin3d);
                     if (position != null) {
                         particle.render2D(g, position.x, position.y, partialTick);
@@ -383,6 +384,7 @@ public class DummyTextManager {
 
     private static class FloatingText {
         private final Vec3 origin3d;
+        private final Vec3 rangeOrigin;
         private float offsetX;
         private float offsetY;
         private float vx;
@@ -392,8 +394,9 @@ public class DummyTextManager {
         private int age = 0;
         private final boolean minion;
 
-        FloatingText(Vec3 origin, String text, int color, boolean minion, float initVx, float initVy) {
+        FloatingText(Vec3 origin, Vec3 rangeOrigin, String text, int color, boolean minion, float initVx, float initVy) {
             this.origin3d = origin;
+            this.rangeOrigin = rangeOrigin;
             this.text = text;
             this.color = color;
             this.minion = minion;

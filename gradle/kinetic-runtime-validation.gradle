@@ -89,3 +89,11 @@ if (project.property('loader') == 'forge') {
         }
     }
 }
+
+// Pure distance boundaries complement the opt-in in-game config/render fixture.
+tasks.register('checkDamageNumberRange', JavaExec) {
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.xyat.entitycontrol.dummy.client.DamageNumberRangeCheck'
+}
+tasks.named('check').configure { dependsOn 'checkDamageNumberRange' }

@@ -87,6 +87,7 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
                         this::getDict
                 )
                 .label(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.attribute"))
+                .tooltip(KineticI18n.translatable("tip.entitycontrol.dummy.dummy.attribute"))
                 .value(tempAttribute)
                 .onChange(this::onAttributeChanged)
                 .firstShownTextAsDefault().build();
@@ -95,6 +96,7 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
 
         this.valueInput = ui.numberField(leftPos() + 21, topPos() + 76, 60, NumberType.DECIMAL)
                 .label(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.value"))
+                .tooltip(KineticI18n.translatable("tip.entitycontrol.dummy.dummy.value"))
                 .allowNegative(true)
                 .onChange(text -> tempValue = text)
                 .firstShownTextAsDefault()
@@ -104,17 +106,20 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
         int rightX = leftPos() + RIGHT_CONTROL_X;
         ui.button(rightX, topPos() + 8, 50)
                 .text(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.apply"))
+                .tooltip(KineticI18n.translatable("tip.entitycontrol.dummy.dummy.apply"))
                 .onClick(this::applyAttribute)
                 .build();
 
         KineticButton curiosButton = ui.button(rightX, topPos() + 26, 50)
                 .text(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.curios_ext"))
+                .tooltip(KineticI18n.translatable(CuriosCompat.isAvailable()?"tip.entitycontrol.dummy.dummy.curios_ext":"tip.entitycontrol.dummy.dummy.curios_required"))
                 .onClick(() -> openChild(new CuriosScreen(menu())))
                 .build();
         curiosButton.setEnabled(CuriosCompat.isAvailable());
 
         ui.button(rightX, topPos() + 59, 50)
                 .text(getMobTypeName(menu().entity.getCustomMobTypeId()))
+                .tooltip(KineticI18n.translatable("tip.entitycontrol.dummy.dummy.mob_type"))
                 .onClick(button -> {
                     int nextType = (menu().entity.getCustomMobTypeId() + 1) % 5;
                     menu().entity.setCustomMobType(nextType);
@@ -125,6 +130,7 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
 
         ui.button(rightX, topPos() + 77, 50)
                 .text(getIFramesText(currentIFrames))
+                .tooltip(KineticI18n.translatable("tip.entitycontrol.dummy.dummy.iframes"))
                 .onClick(button -> {
                     currentIFrames = !currentIFrames;
                     button.setText(getIFramesText(currentIFrames));
@@ -144,6 +150,7 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
 
         ui.button(rightX, topPos() + 95, 50)
                 .text(getHealthDropText(currentHealthDrop))
+                .tooltip(KineticI18n.translatable("tip.entitycontrol.dummy.dummy.health_drop"))
                 .onClick(button -> {
                     currentHealthDrop = !currentHealthDrop;
                     button.setText(getHealthDropText(currentHealthDrop));
