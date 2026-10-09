@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
 public final class GuiLongTextValidation {
     private static final Logger LOG=LoggerFactory.getLogger(GuiLongTextValidation.class);
     private static final String ROOT=System.getProperty("entitycontrol.guiValidation.output","D:/IDEAWork/EntityControl/.gradle/gui-long-text-20261004/");
-    private static final String[] NAMES={"attributes-global","attributes-zombie","buffs-zombie","buffs-modified","dummy","curios","components","components-invalid","core-lists","spawn-equipment","damage-distance"};
+    private static final String[] NAMES={"attributes-global","attributes-zombie","buffs-zombie","buffs-modified","dummy","curios","components","components-invalid","core-lists","spawn-equipment","damage-distance","config-tooltips","portable-dummy"};
     private static final BitSet capturedPages = new BitSet();
     private static boolean installed,started,screenshot,finished,originalFullscreen;
     private static String originalLanguage;
@@ -54,6 +54,9 @@ public final class GuiLongTextValidation {
                 nextPage();return;
             }
             long now=System.currentTimeMillis();
+            if(page==11 && mc.screen!=null)hoverConfigRow();
+            // Server editor-close packets arrive after the synchronous interaction checks.
+            if(page==12 && !(KineticGui.currentPage() instanceof DummyItemPreviewPage))KineticGui.open(new DummyItemPreviewPage());
             if(!screenshot && now>=due) { capture("start");layout();screenshot=true;due=now+(phase==4?3400:550);return; }
             if(screenshot && now>=due) {
                 if(phase==4)capture("scroll");
@@ -90,7 +93,34 @@ public final class GuiLongTextValidation {
     }
     private static void openPage(int index) throws Exception {
         var mc=Minecraft.getInstance();
+        if(index==12){
+            CompletableFuture.runAsync(()->DummyItemValidation.run(mc.getSingleplayerServer()),mc.getSingleplayerServer()).get();
+            KineticGui.open(new DummyItemPreviewPage());return;
+        }
         if(index==10){KineticGui.open(new DamageDistanceProbePage());return;}
+        if(index==11){
+            var registered=dev.xyat.kineticcore.api.config.client.KTConfigApi.find(
+                    dev.xyat.entitycontrol.dummy.config.DummyConfigGui.PAGE_ID).orElseThrow();
+            var missing=registered.entries().stream().filter(e->e.isValueEntry()
+                    && (e.tooltip()==null || e.tooltip().getString().isBlank())).map(e->e.id()).toList();
+            LOG.info("ENTITY_CONFIG_TOOLTIP_REGISTERED values={} missing={} language={}",
+                    registered.entries().stream().filter(e->e.isValueEntry()).count(),missing,
+                    mc.getLanguageManager().getSelected());
+            if(!missing.isEmpty())throw new AssertionError("Registered config rows lack hover help: "+missing);
+            for(var configPage:dev.xyat.kineticcore.api.config.client.KTConfigApi.pages()){
+                if(!configPage.id().startsWith("entitycontrol:"))continue;
+                for(var entry:configPage.entries()){
+                    if(!entry.isValueEntry() && entry.type()!=dev.xyat.kineticcore.api.config.client.KTConfigEntry.Type.ACTION)continue;
+                    if(entry.tooltip()==null || entry.tooltip().getString().isBlank())
+                        throw new AssertionError("Missing menu hover help: "+configPage.id()+"/"+entry.id());
+                }
+            }
+            LOG.info("ENTITY_CONFIG_TOOLTIP_ALL_PAGES_PASS language={}",mc.getLanguageManager().getSelected());
+            dev.xyat.kineticcore.api.config.client.KTConfigApi.openOwner("entitycontrol");
+            ((dev.xyat.kineticcore.api.client.gui.widget.KineticTextField)field(mc.screen,"searchBox")).setTextValue(
+                    dev.xyat.kineticcore.api.text.KineticI18n.translatable("cfg.entitycontrol.dummy.dummy.particleScale").getString());
+            return;
+        }
         if(index<=3) {
             var p=new dev.xyat.entitycontrol.modifier.client.gui.EntityModifierScreen("{}");
             KineticGui.open(p);
@@ -138,6 +168,15 @@ public final class GuiLongTextValidation {
         *///?} else {
         dev.xyat.kineticcore.api.client.gui.selector.KineticSelectors.openNbtEditor(index==6?"{Damage:1}":"{Damage:}",text->{try{net.minecraft.nbt.TagParser.parseTag(text);return null;}catch(Exception invalid){return String.valueOf(invalid.getMessage());}},value->{});
         //?}
+        }
+    }
+    private static final class DummyItemPreviewPage extends KineticPage {
+        DummyItemPreviewPage(){super(Component.literal("Portable testing dummy"));}
+        @Override protected void build(dev.xyat.kineticcore.api.client.gui.ui.KineticUi ui) { }
+        @Override protected void renderForeground(dev.xyat.kineticcore.api.client.gui.render.KineticGraphics g,int mx,int my,float pt) {
+            var stack=new ItemStack(dev.xyat.kineticcore.api.registry.KineticRegistries.items().get(
+                    dev.xyat.kineticcore.api.resource.KineticResourceIds.of("entitycontrol","dummy")));
+            g.item(stack,width()/2-8,height()/2-8);
         }
     }
     private static Object field(Object target,String name)throws Exception {
@@ -201,6 +240,26 @@ public final class GuiLongTextValidation {
             try{invoke(field(Minecraft.getInstance().screen,"searchBox"),"setValue","damage_render_distance");}
             catch(Exception error){throw new AssertionError("Distance setting is not searchable",error);}
         }
+    }
+    private static void hoverConfigRow()throws Exception {
+        var mc=Minecraft.getInstance();
+        var rows=(Map<?,Integer>)field(mc.screen,"visibleRows");
+        for(var row:rows.entrySet()){
+            if(!"ENTRY".equals(invoke(row.getKey(),"kind").toString()))continue;
+            double x=((Number)invoke(mc.screen,"canvasX")).doubleValue();
+            double y=((Number)invoke(mc.screen,"canvasY")).doubleValue();
+            double scale=((Number)invoke(mc.screen,"canvasScale")).doubleValue();
+            for(String name:List.of("xpos","f_91507_"))try{
+                var f=mc.mouseHandler.getClass().getDeclaredField(name);f.setAccessible(true);
+                f.setDouble(mc.mouseHandler,(x+45*scale)*mc.getWindow().getWidth()/mc.getWindow().getGuiScaledWidth());break;
+            }catch(NoSuchFieldException ignored){}
+            for(String name:List.of("ypos","f_91508_"))try{
+                var f=mc.mouseHandler.getClass().getDeclaredField(name);f.setAccessible(true);
+                f.setDouble(mc.mouseHandler,(y+(row.getValue()+5)*scale)*mc.getWindow().getHeight()/mc.getWindow().getGuiScaledHeight());break;
+            }catch(NoSuchFieldException ignored){}
+            return;
+        }
+        throw new AssertionError("Filtered config row is not visible");
     }
     private static void capture(String frame)throws Exception {
         var mc=Minecraft.getInstance();Path path=Path.of(ROOT,String.format("%d-%02d-%s-%s.png",phase,page,NAMES[page],frame));Files.createDirectories(path.getParent());

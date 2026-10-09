@@ -442,6 +442,21 @@ if (slot < this.inventory.getContainerSize()) this.inventory.setItem(slot, ItemS
 
     public void refreshSlotAttributes() { this.updateEquipment(); }
 
+    @Override
+    public boolean skipAttackInteraction(@NotNull Entity attacker) {
+        if (attacker instanceof Player player && player.isCrouching() && player.getMainHandItem().isEmpty()) {
+            if (isRemoved()) return true;
+            if (!level().isClientSide()) {
+                ItemStack recovered = dev.xyat.entitycontrol.dummy.item.DummyItem.capture(this);
+                allowKtRemoval = true;
+                discard();
+                player.setItemInHand(InteractionHand.MAIN_HAND, recovered);
+            }
+            return true;
+        }
+        return super.skipAttackInteraction(attacker);
+    }
+
     // 26.1 entities save through value outputs; the stored keys and item layout stay the same.
     //? if >=26.1 {
     /*@Override

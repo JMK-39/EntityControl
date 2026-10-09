@@ -61,18 +61,22 @@ if (project.property('loader') == 'forge') {
     def captureMetadata = layout.buildDirectory.dir('gui-capture-validation')
     def writeCaptureMetadata = tasks.register('writeGuiCaptureValidationMetadata') {
         inputs.property 'packFormat', project.property('pack_format')
+        inputs.property 'fixtureCurioTag', 'minecraft:diamond'
         outputs.dir captureMetadata
         doLast {
             File target = new File(captureMetadata.get().asFile, 'META-INF/mods.toml')
             target.parentFile.mkdirs()
             target.setText('modLoader="javafml"\nloaderVersion="[1,)"\nlicense="LGPLv3"\n[[mods]]\nmodId="entitycontrol_validation"\nversion="1.0.0"\ndisplayName="EntityControl GUI capture"\n', 'UTF-8')
+            File tag = new File(captureMetadata.get().asFile, 'data/curios/tags/items/curio.json')
+            tag.parentFile.mkdirs()
+            tag.setText('{"replace":false,"values":["minecraft:diamond"]}', 'UTF-8')
             new File(captureMetadata.get().asFile, 'pack.mcmeta').setText(
                     '{"pack":{"description":"Opt-in GUI capture fixture","pack_format":' + project.property('pack_format') + '}}', 'UTF-8')
         }
     }
     def captureJar = tasks.register('guiCaptureValidationJar', Jar) {
         dependsOn 'testClasses', writeCaptureMetadata
-        from(sourceSets.test.output) { include 'dev/xyat/entitycontrolvalidation/GuiLongTextValidation*.class', 'dev/xyat/entitycontrolvalidation/GuiCaptureForgeEntry.class' }
+        from(sourceSets.test.output) { include 'dev/xyat/entitycontrolvalidation/GuiLongTextValidation*.class', 'dev/xyat/entitycontrolvalidation/GuiCaptureForgeEntry.class', 'dev/xyat/entitycontrolvalidation/DummyItemValidation.class' }
         from captureMetadata
         archiveFileName = 'entitycontrol-gui-capture.jar'
     }

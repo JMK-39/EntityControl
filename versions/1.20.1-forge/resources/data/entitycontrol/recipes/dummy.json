@@ -1,0 +1,1 @@
+{"type":"minecraft:crafting_shaped","category":"misc","pattern":["H","A","H"],"key":{"H":{"item":"minecraft:hay_block"},"A":{"item":"minecraft:armor_stand"}},"result":{"item":"entitycontrol:dummy","count":1}}

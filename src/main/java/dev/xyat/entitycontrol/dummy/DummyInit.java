@@ -4,6 +4,8 @@ import dev.xyat.entitycontrol.dummy.entity.DummyEntityTest;
 import dev.xyat.kineticcore.api.registry.KineticEntityAttributes;
 import dev.xyat.kineticcore.api.registry.KineticEntityTypes;
 import dev.xyat.kineticcore.api.registry.KineticMenuTypes;
+import dev.xyat.kineticcore.api.registry.KineticItems;
+import dev.xyat.entitycontrol.dummy.item.DummyItem;
 import dev.xyat.kineticcore.api.registry.KineticRegistryHandle;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import net.minecraft.world.entity.EntityType;
@@ -11,6 +13,8 @@ import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.inventory.MenuType;
 
 public final class DummyInit {
+    public static final KineticRegistryHandle<DummyItem> DUMMY_ITEM = KineticItems.register(
+            KineticResourceIds.of(DummyModule.MODID, "dummy"), DummyItem::new);
     public static final KineticRegistryHandle<EntityType<DummyEntityTest>> DUMMY =
             KineticEntityTypes.register(
                     KineticResourceIds.of(DummyModule.MODID, "dummy"),

@@ -64,7 +64,17 @@ public final class CuriosCompat {
             handler.reset();
         });
     }
-*///?}
+    *///?} else {
+    public static net.minecraft.nbt.Tag savePreset(LivingEntity entity) {
+        if (!isAvailable()) return null;
+        return CuriosApi.getCuriosInventory(entity).map(ICuriosItemHandler::writeTag).orElse(null);
+    }
+
+    public static void loadPreset(LivingEntity entity, net.minecraft.nbt.Tag saved) {
+        // Curios 5 reset() clears both saved stacks and the dummy's extra slots.
+        if (isAvailable() && saved != null) CuriosApi.getCuriosInventory(entity).ifPresent(handler -> handler.readTag(saved));
+    }
+    //?}
     private static final class LoadedCurios {
         private LoadedCurios() {
         }

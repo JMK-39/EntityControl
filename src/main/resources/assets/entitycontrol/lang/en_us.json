@@ -1204,5 +1204,10 @@
   "gui.entitycontrol.breakspawn.ui.equipment.clear.tooltip": "Remove the item from this slot.",
   "gui.entitycontrol.breakspawn.ui.equipment.pick_first.tooltip": "This slot has no item yet.",
   "gui.entitycontrol.breakspawn.ui.equipment.help.title": "Notes",
-  "gui.entitycontrol.breakspawn.ui.equipment.help": "One item per slot: click the item button to pick an item, edit its NBT or clear it; the number on the right is the drop chance on death. Changes go straight into the editor draft and take effect after Save on the main page."
+  "gui.entitycontrol.breakspawn.ui.equipment.help": "One item per slot: click the item button to pick an item, edit its NBT or clear it; the number on the right is the drop chance on death. Changes go straight into the editor draft and take effect after Save on the main page.",
+  "item.entitycontrol.dummy": "Testing Dummy",
+  "item.entitycontrol.dummy.place": "Right-click a block to place the dummy.",
+  "item.entitycontrol.dummy.recover": "Sneak + empty-hand left-click to recover it with its equipment and settings.",
+  "item.entitycontrol.dummy.edit": "Sneak + empty-hand right-click to open the editor.",
+  "jade.entitycontrol.dummy.dummy.recover_hint": "Sneak + empty-hand left-click: recover dummy"
 }

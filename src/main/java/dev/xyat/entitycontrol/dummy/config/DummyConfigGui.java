@@ -5,6 +5,8 @@ import dev.xyat.kineticcore.api.config.client.KTConfigApi;
 import dev.xyat.kineticcore.api.config.client.KTConfigPage;
 import dev.xyat.kineticcore.api.config.client.KTConfigScope;
 import dev.xyat.kineticcore.api.text.KineticI18n;
+import dev.xyat.kineticcore.api.client.event.KineticClientEvents;
+import dev.xyat.kineticcore.api.event.KineticEventSubscription;
 import dev.xyat.entitycontrol.dummy.client.DeathSummaryOverlay;
 import dev.xyat.entitycontrol.dummy.client.DummyTextManager;
 
@@ -15,6 +17,7 @@ public final class DummyConfigGui {
     /** Kept for add-ons that already open the original client display page directly. */
     public static final String PAGE_ID = "entitycontrol:dummy";
     public static final String SERVER_PAGE_ID = "entitycontrol:server";
+    private static KineticEventSubscription languageReady;
 
     private DummyConfigGui() {
     }
@@ -22,6 +25,18 @@ public final class DummyConfigGui {
     public static void load() {
         KTConfigApi.register(buildClientPage());
         KTConfigApi.register(buildServerPage());
+        if (!KineticI18n.hasTranslation("cfg.entitycontrol.dummy.dummy.particleScale.tooltip")) {
+            // The adapter resolves optional tooltip keys when it builds the page. During mod
+            // registration, Minecraft has not loaded those keys yet; refresh once after startup.
+            languageReady = KineticClientEvents.onTick(KineticClientEvents.TickPhase.END, () -> {
+                if (!KineticI18n.hasTranslation("cfg.entitycontrol.dummy.dummy.particleScale.tooltip")) return;
+                KTConfigPage readyPage = buildClientPage();
+                KTConfigApi.unregister(PAGE_ID);
+                KTConfigApi.register(readyPage);
+                languageReady.close();
+                languageReady = null;
+            });
+        }
     }
 
     private static KTConfigPage buildClientPage() {

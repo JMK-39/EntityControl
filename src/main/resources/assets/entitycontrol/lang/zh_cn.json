@@ -1204,5 +1204,10 @@
   "gui.entitycontrol.breakspawn.ui.equipment.clear.tooltip": "移除这个槽位的装备。",
   "gui.entitycontrol.breakspawn.ui.equipment.pick_first.tooltip": "这个槽位还没有物品。",
   "gui.entitycontrol.breakspawn.ui.equipment.help.title": "说明",
-  "gui.entitycontrol.breakspawn.ui.equipment.help": "每个槽位一件装备：点物品按钮选择物品、编辑 NBT 或清空；右边的数字是死亡时掉落的概率。修改会直接进入编辑器草稿，回到主界面保存后生效。"
+  "gui.entitycontrol.breakspawn.ui.equipment.help": "每个槽位一件装备：点物品按钮选择物品、编辑 NBT 或清空；右边的数字是死亡时掉落的概率。修改会直接进入编辑器草稿，回到主界面保存后生效。",
+  "item.entitycontrol.dummy": "测试假人",
+  "item.entitycontrol.dummy.place": "手持假人右键方块即可放置。",
+  "item.entitycontrol.dummy.recover": "潜行时空手左键回收，保留装备和编辑设置。",
+  "item.entitycontrol.dummy.edit": "潜行时空手右键打开编辑界面。",
+  "jade.entitycontrol.dummy.dummy.recover_hint": "潜行空手左键：回收假人"
 }

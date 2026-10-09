@@ -40,3 +40,8 @@ versions/*/src/
 *.zip
 *.7z
 /wiki/
+
+# Local notes, wiki checkouts and archives
+/docs/
+/.superpowers/
+/.worktrees/

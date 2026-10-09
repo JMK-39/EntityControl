@@ -1,3 +1,19 @@
+## 2026-10-09 — Craftable testing dummies / 可合成的测试假人
+
+### English
+
+- Add a testing dummy item with its own icon. Craft it with a vertical column of hay block, armor stand, and hay block; right-click a block to place it.
+- Sneak and left-click a dummy with an empty main hand to recover it directly into your hand, retaining equipment, accessories, attributes, and editor settings. Sneak and right-click continues to open the editor.
+- Add placement and recovery instructions to the item tooltip and Jade overlay.
+- Restore missing hover explanations in Entity Control configuration menus.
+
+### 简体中文
+
+- 新增带独立图标的测试假人物品；在工作台竖排放入“干草块、盔甲架、干草块”即可合成，手持后右键方块放置。
+- 潜行时主手空手左键假人可直接回收到手中，并保留装备、饰品、属性及编辑设置；潜行空手右键仍打开编辑界面。
+- 在物品悬浮提示与 Jade 显示中补充放置和回收说明。
+- 修复实体控制配置菜单中部分配置项缺少悬浮说明的问题。
+
 ## 2026-10-09 — Adjustable damage number distance / 可调伤害数字显示距离
 
 ### English

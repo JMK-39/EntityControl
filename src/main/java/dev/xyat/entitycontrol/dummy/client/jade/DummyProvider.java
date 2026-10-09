@@ -25,6 +25,8 @@ public enum DummyProvider implements IEntityComponentProvider {
         // 样式：灰色 + 意大利斜体，使其看起来像系统备注
         tooltip.add(KineticI18n.translatable("jade.entitycontrol.dummy.dummy.edit_hint")
                 .withStyle(ChatFormatting.ITALIC));
+        tooltip.add(KineticI18n.translatable("jade.entitycontrol.dummy.dummy.recover_hint")
+                .withStyle(ChatFormatting.ITALIC));
     }
 
     @Override
