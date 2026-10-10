@@ -98,7 +98,7 @@ public class CuriosScreen extends KineticPage {
         this.playerInvX = cx - 88;
         this.playerInvY = gridStartY + gridViewH + 10;
 
-        ui.button(startX + panelW - PANEL_MARGIN - BACK_WIDTH, startY + 7, BACK_WIDTH)
+        ui.button(startX + PANEL_MARGIN, startY + 7, BACK_WIDTH)
                 .text(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.back"))
                 .onClick(this::navigateBack)
                 .build();

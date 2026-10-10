@@ -150,6 +150,17 @@ public abstract class BaseSpawnerMixin implements SpawnerRuntimeAccessor {
                 : spawnRange;
     }
 
+    //? if >=26.1 {
+    /*@ModifyVariable(method = "load", at = @At("HEAD"), argsOnly = true, ordinal = 0)
+    private net.minecraft.world.level.storage.ValueInput entitycontrol_spawn$readPersistentState(net.minecraft.world.level.storage.ValueInput input) {
+        entitycontrol_spawn$spawnWaveCount = input.getIntOr(NBT_SPAWN_COUNT, 0);
+        entitycontrol_spawn$cooldownEnd = input.getLongOr(NBT_COOLDOWN_END, 0L);
+        entitycontrol_spawn$entityId = input.read(BaseSpawner.SPAWN_DATA_TAG, SpawnData.CODEC)
+                .map(this::entitycontrol_spawn$readEntityId).orElse(null);
+        entitycontrol_spawn$resetLoadedTuning();
+        return input;
+    }
+    *///?} else {
     @ModifyVariable(
             method = "load",
             at = @At("HEAD"),
@@ -164,12 +175,18 @@ public abstract class BaseSpawnerMixin implements SpawnerRuntimeAccessor {
                 ? tag.getLong(NBT_COOLDOWN_END)
                 : 0L;
         entitycontrol_spawn$entityId = entitycontrol_spawn$readEntityIdFromSpawnerTag(tag);
+        entitycontrol_spawn$resetLoadedTuning();
+        return tag;
+    }
+    //?}
+
+    @Unique
+    private void entitycontrol_spawn$resetLoadedTuning() {
         entitycontrol_spawn$baseSettingsCaptured = false;
         entitycontrol_spawn$tuningApplied = false;
         entitycontrol_spawn$restoreTuningAfterSave = false;
         entitycontrol_spawn$appliedTuningRule = null;
         entitycontrol_spawn$previousTickInitialized = false;
-        return tag;
     }
 
     @ModifyVariable(
@@ -183,6 +200,13 @@ public abstract class BaseSpawnerMixin implements SpawnerRuntimeAccessor {
         return spawnData;
     }
 
+    //? if >=26.1 {
+    /*@ModifyVariable(method = "save", at = @At("HEAD"), argsOnly = true, ordinal = 0)
+    private net.minecraft.world.level.storage.ValueOutput entitycontrol_spawn$prepareSave(net.minecraft.world.level.storage.ValueOutput output) {
+        entitycontrol_spawn$prepareSavedTuning();
+        return output;
+    }
+    *///?} else {
     @ModifyVariable(
             method = "save",
             at = @At("HEAD"),
@@ -190,13 +214,27 @@ public abstract class BaseSpawnerMixin implements SpawnerRuntimeAccessor {
             ordinal = 0
     )
     private CompoundTag entitycontrol_spawn$prepareSave(CompoundTag tag) {
+        entitycontrol_spawn$prepareSavedTuning();
+        return tag;
+    }
+    //?}
+
+    @Unique
+    private void entitycontrol_spawn$prepareSavedTuning() {
         entitycontrol_spawn$restoreTuningAfterSave = entitycontrol_spawn$tuningApplied;
         if (entitycontrol_spawn$restoreTuningAfterSave) {
             entitycontrol_spawn$restoreBaseSettings();
         }
-        return tag;
     }
 
+    //? if >=26.1 {
+    /*@Inject(method = "save", at = @At("RETURN"))
+    private void entitycontrol_spawn$finishSave(net.minecraft.world.level.storage.ValueOutput output, CallbackInfo ci) {
+        output.putInt(NBT_SPAWN_COUNT, entitycontrol_spawn$spawnWaveCount);
+        output.putLong(NBT_COOLDOWN_END, entitycontrol_spawn$cooldownEnd);
+        entitycontrol_spawn$restoreSavedTuning();
+    }
+    *///?} else {
     @Inject(method = "save", at = @At("RETURN"))
     private void entitycontrol_spawn$finishSave(CallbackInfoReturnable<CompoundTag> cir) {
         CompoundTag savedTag = cir.getReturnValue();
@@ -204,7 +242,12 @@ public abstract class BaseSpawnerMixin implements SpawnerRuntimeAccessor {
             savedTag.putInt(NBT_SPAWN_COUNT, entitycontrol_spawn$spawnWaveCount);
             savedTag.putLong(NBT_COOLDOWN_END, entitycontrol_spawn$cooldownEnd);
         }
+        entitycontrol_spawn$restoreSavedTuning();
+    }
+    //?}
 
+    @Unique
+    private void entitycontrol_spawn$restoreSavedTuning() {
         if (entitycontrol_spawn$restoreTuningAfterSave && SpawnerConfig.enableSpawnerBreaker) {
             ResourceLocation entityId = entitycontrol_spawn$getEntityId();
             if (entityId != null) {

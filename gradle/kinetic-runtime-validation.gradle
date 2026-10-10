@@ -101,3 +101,36 @@ tasks.register('checkDamageNumberRange', JavaExec) {
     mainClass = 'dev.xyat.entitycontrol.dummy.client.DamageNumberRangeCheck'
 }
 tasks.named('check').configure { dependsOn 'checkDamageNumberRange' }
+
+// Explicit spawner persistence fixture, excluded from release artifacts.
+def spawnerMetadata = layout.buildDirectory.dir('spawner-validation')
+def writeSpawnerMetadata = tasks.register('writeSpawnerValidationMetadata') {
+    outputs.dir spawnerMetadata
+    doLast {
+        def fileName = project.property('loader') == 'forge' ? 'mods.toml' : 'neoforge.mods.toml'
+        File target = new File(spawnerMetadata.get().asFile, "META-INF/${fileName}")
+        target.parentFile.mkdirs()
+        target.setText('modLoader="javafml"\nloaderVersion="[1,)"\nlicense="LGPLv3"\n[[mods]]\nmodId="entitycontrol_spawner_validation"\nversion="1.0.0"\ndisplayName="Spawner persistence validation"\n', 'UTF-8')
+        new File(spawnerMetadata.get().asFile, 'pack.mcmeta').setText('{"pack":{"description":"Opt-in spawner persistence fixture","pack_format":15}}', 'UTF-8')
+    }
+}
+def spawnerJar = tasks.register('spawnerValidationJar', Jar) {
+    dependsOn 'testClasses', writeSpawnerMetadata
+    from(sourceSets.test.output) { include 'dev/xyat/entitycontrolspawnvalidation/*.class' }
+    from spawnerMetadata
+    archiveFileName = 'entitycontrol-spawner-validation.jar'
+}
+if (project.property('loader') == 'forge') {
+    afterEvaluate {
+        def shipped = tasks.named('reobfJar').get()
+        tasks.register('reobfSpawnerValidationJar', shipped.getClass().superclass) {
+            dependsOn spawnerJar
+            input.set(spawnerJar.flatMap { it.archiveFile })
+            libraries.from(shipped.libraries, sourceSets.main.output)
+            remapOperation.toolType.set(shipped.remapOperation.toolType)
+            remapOperation.toolClasspath.from(shipped.remapOperation.toolClasspath)
+            remapOperation.mappings.from(shipped.remapOperation.mappings)
+            archiveFileName = 'entitycontrol-spawner-validation-reobf.jar'
+        }
+    }
+}

@@ -1,3 +1,15 @@
+## 2026-10-10 — Spawner compatibility and editor navigation / 刷怪笼兼容与编辑页导航
+
+### English
+
+- Fix a 26.1.2 startup failure caused by spawner save/load compatibility. Keep successful spawn counts, cooldowns and original spawner settings when saving and reopening worlds.
+- Move the dummy accessory editor's Back button to the upper left, matching the other Entity Control editors.
+
+### 简体中文
+
+- 修复 26.1.2 刷怪笼存取接口兼容问题引起的启动失败；保存及重新进入存档后保留成功生成次数、冷却时间和刷怪笼原始参数。
+- 假人饰品编辑界面的返回按钮移到左上角，与其他实体控制编辑界面保持一致。
+
 ## 2026-10-09 — Craftable testing dummies / 可合成的测试假人
 
 ### English
