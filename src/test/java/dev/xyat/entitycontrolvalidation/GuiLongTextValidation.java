@@ -237,7 +237,7 @@ public final class GuiLongTextValidation {
                 LOG.info("ENTITY_DAMAGE_CONFIG_PASS default=64 min=1 max=1024 allValueTooltips=true language={}",Minecraft.getInstance().getLanguageManager().getSelected());
             }catch(Throwable error){throw new AssertionError("Damage distance runtime check",error);}
             dev.xyat.entitycontrol.dummy.config.DummyConfigGui.open();
-            try{invoke(field(Minecraft.getInstance().screen,"searchBox"),"setValue","damage_render_distance");}
+            try{((dev.xyat.kineticcore.api.client.gui.widget.KineticTextField)field(Minecraft.getInstance().screen,"searchBox")).setTextValue("damage_render_distance");}
             catch(Exception error){throw new AssertionError("Distance setting is not searchable",error);}
         }
     }
