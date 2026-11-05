@@ -26,6 +26,7 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
     protected LivingEntity previewEntity;
     protected List<T> displayList = new ArrayList<>();
     private boolean visible;
+    protected int pointerX = -1, pointerY = -1;
 
     @Override
     public final void build(EntityModifierScreen parent, KineticUi ui, int x, int y, int w, int h) {
@@ -35,7 +36,7 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
         this.w = w;
         this.h = h;
 
-        searchBox = ui.textField(x, y, parent.panelSearchWidth(w))
+        searchBox = ui.textField(x, y, searchWidth())
                 .label(getSearchHint())
                 .placeholder(getSearchHint())
                 .value(searchValue())
@@ -55,6 +56,11 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
     }
 
     protected void initExtra(KineticUi ui) {
+    }
+
+    /** Width of the search field on the panel's top row; panels with controls beside it make it shorter. */
+    protected int searchWidth() {
+        return parent.panelSearchWidth(w);
     }
 
     protected String searchValue() {
@@ -101,6 +107,7 @@ public abstract class AbstractModifierScrollPanel<T> implements IModifierPanel {
 
     @Override
     public void render(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        pointerX = mouseX; pointerY = mouseY;
         if (!visible || selectedEntityId == null) return;
         renderExtra(graphics, mouseX, mouseY);
     }

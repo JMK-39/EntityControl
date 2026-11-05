@@ -38,8 +38,9 @@ import static dev.xyat.entitycontrol.breakspawn.client.gui.BlockRuleEditorScreen
  * 生物规则按生物保存，所有方块共用；修改直接进入编辑器草稿，在主界面保存。
  */
 public final class BlockEntityPoolScreen extends EcPage {
-    private static final int CARD = 40;
-    private static final int LIST_WIDTH = EntityCardGrid.widthFor(4, CARD) + PAD * 2;
+    private static final int CARD = EntityCardGrid.CARD_SIZE;
+    // Exactly five card columns; the right side takes the rest.
+    private static final int LIST_WIDTH = EntityCardGrid.widthFor(5, CARD) + PAD * 2;
     private static final int LABEL_WIDTH = 104;
     private static final int PAIR_WIDTH = 50;
     private static final List<String> MODES = List.of("AUTO", "SURFACE", "WATER", "AIR", "ANY");
@@ -157,10 +158,12 @@ public final class BlockEntityPoolScreen extends EcPage {
 
     @Override
     protected void buildContent(KineticUi ui, KineticLayout.Rect body) {
+        bindDeleteAction(() -> selectedEntityId != null && blockRule.entityWeights.containsKey(selectedEntityId), this::removeSelected);
         helpRect = null;
         if (selectedEntityId != null && !blockRule.entityWeights.containsKey(selectedEntityId)) selectedEntityId = null;
         KineticLayout.Split columns = KineticLayout.splitHorizontal(body, LIST_WIDTH, GAP);
-        KineticLayout.Rect left = section(columns.first(), tr("pool.list", blockRule.entityWeights.size()));
+        // No section titles: the cards and the selected card outline already say what is listed and edited.
+        KineticLayout.Rect left = section(columns.first(), Component.empty());
         KineticLayout.Split rows = takeRow(left);
         textInput(ui, rows.first(), query, KineticI18n.translatable("gui.entitycontrol.breakspawn.pool.search.placeholder"),
                 tip("search"), value -> {
@@ -182,7 +185,7 @@ public final class BlockEntityPoolScreen extends EcPage {
         BreakSpawnConfig.EntityRule rule = entityRule(id);
         String[] labels = {"weight", "spawn_mode", "entity_switches", "custom_name", "y_range", "light", "dimensions", "biomes",
                 "allowed_blocks", "blocked_blocks", "attributes", "equipment", "entity_nbt"};
-        KineticLayout.Rect area = section(columns.second(), entityName(id));
+        KineticLayout.Rect area = section(columns.second(), Component.empty());
         KineticUi rowsUi = form.attach(this, ui, area, labels.length, LABEL_WIDTH);
         for (int index = 0; index < labels.length; index++) {
             String key = labels[index];
@@ -268,8 +271,8 @@ public final class BlockEntityPoolScreen extends EcPage {
     @Override
     protected void renderContent(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
         cards.render(graphics, mouseX, mouseY);
-        if (helpRect != null) {
-            graphics.wrappedText(tr(blockRule.entityWeights.isEmpty() ? "help.pool_empty" : "help.pool"), helpRect.x(), helpRect.y(),
+        if (helpRect != null && blockRule.entityWeights.isEmpty()) {
+            graphics.wrappedText(tr("help.pool_empty"), helpRect.x(), helpRect.y(),
                     helpRect.width(), KineticTheme.current().text());
         }
     }

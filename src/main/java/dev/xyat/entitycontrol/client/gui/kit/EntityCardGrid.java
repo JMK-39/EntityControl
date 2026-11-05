@@ -18,8 +18,10 @@ import java.util.function.Predicate;
  * 每个键可以对应一个实际实体（附近生物）或实体类型 ID（规则）；两者都没有时绘制文字卡片（例如“默认规则”）。
  */
 public final class EntityCardGrid {
+    public static final int CARD_SIZE = KineticLayout.ENTITY_CARD_SIZE;
     public static final int CARD_GAP = 2;
-    private static final int SCROLLBAR_SPACE = 8;
+    // 2 px gap after the last card column, then the 4 px scrollbar (drawn at the area's right edge).
+    private static final int SCROLLBAR_SPACE = 6;
 
     private final int cardSize;
     private final KineticEntityPreview preview = KineticEntityPreview.create();
@@ -114,7 +116,9 @@ public final class EntityCardGrid {
     }
 
     private int pixelOffset() {
-        return (int) Math.round(scroll.smoothOffset() * (cardSize + CARD_GAP));
+        int rows = (keys.size() + columns - 1) / columns;
+        return Math.min((int) Math.round(scroll.smoothOffset() * (cardSize + CARD_GAP)),
+                Math.max(0, rows * (cardSize + CARD_GAP) - CARD_GAP - area.height()));
     }
 
     private KineticLayout.Rect card(int index) {
@@ -132,14 +136,13 @@ public final class EntityCardGrid {
 
     public void render(KineticGraphics graphics, int mouseX, int mouseY) {
         if (area == null) return;
-        KineticTheme.Palette palette = KineticTheme.current();
         graphics.clipped(area.x(), area.y(), area.right(), area.bottom(), () -> {
             for (int index = 0; index < keys.size(); index++) {
                 KineticLayout.Rect card = card(index);
                 if (card.bottom() < area.y() || card.y() > area.bottom()) continue;
                 String key = keys.get(index);
                 boolean hovered = area.contains(mouseX, mouseY) && card.contains(mouseX, mouseY);
-                KineticEntityPreview.drawCheckerboard(graphics, card.x(), card.y(), card.width(), card.height());
+                KineticTheme.itemSlot(graphics, card.x(), card.y(), card.width(), 4, hovered);
                 Entity entity = entities.apply(key);
                 String type = entity == null ? types.apply(key) : null;
                 if (entity != null) {
@@ -149,12 +152,13 @@ public final class EntityCardGrid {
                     preview.render(graphics, type, "card:" + key, card.x() + 1, card.y() + 1, card.width() - 2,
                             card.height() - 2, hovered);
                 } else {
-                    graphics.fill(card.x(), card.y(), card.right(), card.bottom(), 0xCC202020);
+                    // Global rules use the same item slot as model cards.
                     graphics.wrappedText(fallback.apply(key), card.x() + 3, card.y() + card.height() / 2 - 8,
-                            card.width() - 6, palette.text());
+                            card.width() - 6, KineticTheme.current().text());
                 }
                 if (dimmed.test(key)) {
-                    graphics.fill(card.x(), card.y(), card.right(), card.bottom(), 0x99000000);
+                    graphics.fill(card.x(), card.y(), card.right(), card.bottom(),
+                            0x33000000 | (KineticTheme.current().panelAlt() & 0x00FFFFFF));
                 }
                 EcPage.stateBorder(graphics, card.x(), card.y(), card.width(), card.height(),
                         selected.test(key), hovered, error.test(key), modified.test(key));

@@ -50,8 +50,8 @@ import java.util.TreeSet;
 public final class EntityModifierScreen extends EcPage {
     private enum CategoryFilter { FRIENDLY, AQUATIC, NEUTRAL, MONSTER, UNDEAD, MISC }
 
-    private static final int CARD = 40;
-    private static final int LIST_WIDTH = EntityCardGrid.widthFor(4, CARD) + PAD * 2;
+    private static final int CARD = EntityCardGrid.CARD_SIZE;
+    private static final int LIST_WIDTH = EntityCardGrid.widthFor(5, CARD) + PAD * 2;
     private static final int MODS_PER_PAGE = 8;
     private static final java.lang.reflect.Type DATA_TYPE =
             new com.google.gson.reflect.TypeToken<Map<String, EntityModifierConfig.EntityEditData>>() { }.getType();
@@ -138,7 +138,7 @@ public final class EntityModifierScreen extends EcPage {
 
     /** 面板自带搜索框的宽度：不再与页签按钮并排，只需一个紧凑宽度。 */
     public int panelSearchWidth(int panelWidth) {
-        return Math.max(80, Math.min(200, panelWidth - 8));
+        return Math.max(80, Math.min(240, panelWidth - 8));
     }
 
     public void showModifierContextMenu(double x, double y, List<KineticOverlays.MenuItem> items) {
@@ -249,6 +249,16 @@ public final class EntityModifierScreen extends EcPage {
 
     // ------------------------------------------------------------------ 外框
 
+    /** 单个生物与全局规则下的属性页、效果页，供截图工具依次查看。 */
+    @Override
+    public List<ReviewView> reviewViews() {
+        return List.of(
+                new ReviewView("attributes", () -> { setGlobal(false); switchPanel(attributePanel); }),
+                new ReviewView("effects", () -> { setGlobal(false); switchPanel(buffPanel); }),
+                new ReviewView("global-attributes", () -> { setGlobal(true); switchPanel(attributePanel); }),
+                new ReviewView("global-effects", () -> { setGlobal(true); switchPanel(buffPanel); }));
+    }
+
     @Override
     protected List<HeaderAction> headerActions() {
         return List.of(
@@ -336,10 +346,11 @@ public final class EntityModifierScreen extends EcPage {
 
     @Override
     protected void buildContent(KineticUi ui, KineticLayout.Rect body) {
+        bindDeleteAction(() -> currentPanel != null && currentPanel.canDelete(), () -> currentPanel.deleteSelected());
         helpRect = null;
         editedEntities.refresh(allEntities, this::isTrulyModified);
         KineticLayout.Split columns = KineticLayout.splitHorizontal(body, LIST_WIDTH, GAP);
-        KineticLayout.Rect left = section(columns.first(), tr(globalMode ? "list.global" : "list", allEntities.size()));
+        KineticLayout.Rect left = section(columns.first(), Component.empty());
         KineticLayout.Split rows = takeRow(left);
         KineticLayout.Rect bar = rows.first();
         int filterWidth = 56;
@@ -362,7 +373,7 @@ public final class EntityModifierScreen extends EcPage {
         Component title = globalMode ? tr("section.global")
                 : selectedEntity == null ? KineticI18n.translatable("gui.entitycontrol.modifier.modifier.no_entity")
                 : Component.literal(selectedEntity.translatedName());
-        KineticLayout.Rect panelArea = section(columns.second(), title);
+        KineticLayout.Rect panelArea = section(columns.second(), hasTarget ? Component.empty() : title);
         if (!hasTarget) {
             helpRect = panelArea;
             return;

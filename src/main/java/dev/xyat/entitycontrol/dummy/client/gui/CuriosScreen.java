@@ -17,7 +17,6 @@ import dev.xyat.kineticcore.api.client.gui.selector.KineticSelectors;
 import dev.xyat.kineticcore.api.client.gui.theme.KineticTheme;
 import dev.xyat.kineticcore.api.client.gui.ui.KineticUi;
 import dev.xyat.kineticcore.api.client.gui.widget.KineticCustomControl;
-import dev.xyat.kineticcore.api.client.tooltip.KineticItemTooltips;
 import dev.xyat.kineticcore.api.minecraft.MinecraftContainers;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.runtime.KineticClientRuntime;
@@ -131,7 +130,7 @@ public class CuriosScreen extends KineticPage {
     @Override
     protected void renderBackground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
         int cx = width() / 2;
-        KineticTheme.panelAlt(graphics, startX, startY, panelW, panelH);
+        KineticTheme.panel(graphics, startX, startY, panelW, panelH);
         int titleWidth = 2 * (startX + panelW - PANEL_MARGIN - BACK_WIDTH - TEXT_GAP - cx);
         graphics.scrollingTextCentered(title(), cx, startY + 13, titleWidth, KineticTheme.current().text(), false);
 
@@ -163,23 +162,17 @@ public class CuriosScreen extends KineticPage {
         HoverInfo hover = inventoryControl.hoverInfo(mouseX, mouseY);
         if (hover == null) return;
 
-        List<Component> tooltip = new ArrayList<>();
         if (!hover.stack().isEmpty()) {
-            tooltip.addAll(KineticItemTooltips.textLines(hover.stack()));
-        } else if (hover.curioSlot()) {
-            tooltip.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.slot.curio"));
-        } else {
+            showItemTooltip(hover.stack());
             return;
         }
+        if (!hover.curioSlot()) return;
 
+        List<Component> tooltip = new ArrayList<>();
+        tooltip.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.slot.curio"));
         tooltip.add(Component.empty());
-        if (hover.curioSlot()) {
-            tooltip.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.tooltip.curio.copy"));
-            tooltip.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.tooltip.curio.remove"));
-        } else {
-            tooltip.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.tooltip.inv.copy"));
-            tooltip.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.tooltip.inv.quick"));
-        }
+        tooltip.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.tooltip.curio.copy"));
+        tooltip.add(KineticI18n.translatable("gui.entitycontrol.dummy.dummy.tooltip.curio.remove"));
         showTooltip(tooltip);
     }
 

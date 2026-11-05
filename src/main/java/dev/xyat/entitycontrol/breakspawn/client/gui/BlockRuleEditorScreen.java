@@ -29,11 +29,11 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * 自然方块破坏遭遇。顶栏：返回 / 方块操作 ▾ / 全局默认 / 保存 / 更多 ▾。
+ * 自然方块破坏遭遇。顶栏：返回 / 添加方块 / 全局默认 / 保存 / 更多 ▾。
  * 左侧为已配置的方块（物品格），右侧同时显示“触发概率”“触发条件”“生成范围”和刷怪池入口，不再分页签。
  */
 public final class BlockRuleEditorScreen extends EcPage {
-    private static final int LIST_WIDTH = 7 * (ItemSlotGrid.SLOT + ItemSlotGrid.GAP) + 8 + PAD * 2;
+    private static final int LIST_WIDTH = 10 * (ItemSlotGrid.SLOT + ItemSlotGrid.GAP) + 8 + PAD * 2;
     private static final int LABEL_WIDTH = 96;
     private static final int PAIR_WIDTH = 50;
 
@@ -94,7 +94,7 @@ public final class BlockRuleEditorScreen extends EcPage {
     @Override
     protected List<HeaderAction> headerActions() {
         return List.of(
-                HeaderAction.menu(tr("block_actions"), tip("block_actions"), this::blockMenu),
+                HeaderAction.button("add", tr("add_block"), tip("add_block"), this::addBlock),
                 HeaderAction.button("global", tr("global"), tip("global"), () -> openChild(new GlobalSettingsScreen(config, this::changed))),
                 HeaderAction.button("save", KineticI18n.translatable("gui.entitycontrol.breakspawn.save"),
                         KineticI18n.translatable("gui.entitycontrol.breakspawn.save.tooltip"), this::save).enabled(dirty()),
@@ -106,11 +106,18 @@ public final class BlockRuleEditorScreen extends EcPage {
 
     private List<KineticOverlays.MenuItem> blockMenu() {
         List<KineticOverlays.MenuItem> items = new ArrayList<>();
-        items.add(KineticOverlays.MenuItem.action(tr("add_block"), tip("add_block"), this::addBlock));
+        items.add(selectedRule() != null
+                ? KineticOverlays.MenuItem.action(tr("edit_pool"), tip("edit_pool"), this::editSelectedPool)
+                : KineticOverlays.MenuItem.disabled(tr("edit_pool"), tip("select_block")));
         items.add(selectedRule() != null
                 ? KineticOverlays.MenuItem.danger(tr("remove_block"), tip("remove_block"), this::removeBlock)
                 : KineticOverlays.MenuItem.disabled(tr("remove_block"), tip("select_block")));
         return items;
+    }
+
+    private void editSelectedPool() {
+        BreakSpawnConfig.BlockRule rule = selectedRule();
+        if (rule != null) openChild(new BlockEntityPoolScreen(config, selectedBlockId, rule, this::changed));
     }
 
     private void revert() {
@@ -186,10 +193,11 @@ public final class BlockRuleEditorScreen extends EcPage {
 
     @Override
     protected void buildContent(KineticUi ui, KineticLayout.Rect body) {
+        bindDeleteAction(() -> selectedBlockId != null && config.blocks.containsKey(selectedBlockId), this::removeBlock);
         helpRect = null;
         helpText = null;
         KineticLayout.Split columns = KineticLayout.splitHorizontal(body, LIST_WIDTH, GAP);
-        KineticLayout.Rect left = section(columns.first(), tr("blocks", config.blocks.size()));
+        KineticLayout.Rect left = section(columns.first(), Component.empty());
         KineticLayout.Split rows = takeRow(left);
         textInput(ui, rows.first(), query, KineticI18n.translatable("gui.entitycontrol.breakspawn.search.blocks.placeholder"),
                 tip("search"), value -> {
@@ -208,7 +216,7 @@ public final class BlockRuleEditorScreen extends EcPage {
         KineticLayout.Split leftCol = takeTop(halves.first(), PAD * 2 + 10 + GAP + ROW * 5);
         KineticLayout.Split rightCol = takeTop(halves.second(), PAD * 2 + 10 + GAP + ROW * 6);
 
-        Form chance = form(section(leftCol.first(), tr("section.chance", blockName(selectedBlockId))), LABEL_WIDTH);
+        Form chance = form(section(leftCol.first(), Component.empty()), LABEL_WIDTH);
         decimalField(ui, number(chance.row(tr("base_chance"), tip("base_chance"))), rule.baseChance * 100D, 0D, 100D,
                 tip("base_chance"), value -> {
                     if (value == null) return;
@@ -266,9 +274,9 @@ public final class BlockRuleEditorScreen extends EcPage {
         intRow(ui, spawn, "vertical_radius", rule.verticalRadius, 0, value -> rule.verticalRadius = value);
         intRow(ui, spawn, "attempts", rule.maxSpawnAttempts, 1, value -> rule.maxSpawnAttempts = value);
         actionButton(ui, compact(spawn.row(tr("pool"), tip("pool"))), tr("pool.button", rule.entityWeights.size()), tip("pool"), true,
-                () -> openChild(new BlockEntityPoolScreen(config, selectedBlockId, rule, this::changed)));
-        helpRect = rightCol.second();
-        helpText = KineticI18n.translatable("gui.entitycontrol.breakspawn.blocks.stack_hint");
+                this::editSelectedPool);
+        helpRect = null;
+        helpText = null;
     }
 
     private static KineticLayout.Rect csv(KineticLayout.Rect row) {
@@ -285,12 +293,13 @@ public final class BlockRuleEditorScreen extends EcPage {
 
     private void intPair(KineticUi ui, KineticLayout.Rect row, int minValue, int maxValue, int min, int max,
                          java.util.function.IntConsumer minSetter, java.util.function.IntConsumer maxSetter) {
-        intField(ui, new KineticLayout.Rect(row.x(), row.y(), PAIR_WIDTH, H), minValue, min, max, tr("pair.min"), value -> {
+        int pairWidth = Math.min(PAIR_WIDTH, Math.max(1, (row.width() - GAP) / 2));
+        intField(ui, new KineticLayout.Rect(row.x(), row.y(), pairWidth, H), minValue, min, max, tr("pair.min"), value -> {
             if (value == null) return;
             minSetter.accept(value);
             changed();
         });
-        intField(ui, new KineticLayout.Rect(row.x() + PAIR_WIDTH + GAP, row.y(), PAIR_WIDTH, H), maxValue, min, max, tr("pair.max"),
+        intField(ui, new KineticLayout.Rect(row.x() + pairWidth + GAP, row.y(), pairWidth, H), maxValue, min, max, tr("pair.max"),
                 value -> {
                     if (value == null) return;
                     maxSetter.accept(value);
@@ -321,6 +330,12 @@ public final class BlockRuleEditorScreen extends EcPage {
         int index = blocks.indexAt(mouseX, mouseY);
         if (index < 0 || index >= visibleBlocks.size()) return false;
         String id = visibleBlocks.get(index);
+        Block block = block(id);
+        ItemStack stack = block == null ? ItemStack.EMPTY : new ItemStack(block.asItem());
+        if (!stack.isEmpty()) {
+            itemTooltip(stack);
+            return true;
+        }
         BreakSpawnConfig.BlockRule rule = config.blocks.get(id);
         List<Component> lines = new ArrayList<>();
         lines.add(blockName(id));

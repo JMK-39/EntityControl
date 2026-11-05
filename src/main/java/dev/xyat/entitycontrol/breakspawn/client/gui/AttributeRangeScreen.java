@@ -154,19 +154,17 @@ public final class AttributeRangeScreen extends EcPage {
                         tip("attributes.select_first")),
                 has && rule.attributes.containsKey(selected)
                         ? KineticOverlays.MenuItem.danger(KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.clear"),
-                        tip("attributes.clear"), () -> {
-                            rule.attributes.remove(selected);
-                            onChange.run();
-                            rebuild();
-                        })
+                        tip("attributes.clear"), this::removeSelected)
                         : KineticOverlays.MenuItem.disabled(KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.clear"),
                         tip("attributes.select_first")))));
     }
 
     @Override
     protected void buildContent(KineticUi ui, KineticLayout.Rect body) {
+        bindDeleteAction(() -> selected != null && rule.attributes.containsKey(selected), this::removeSelected);
         KineticLayout.Split columns = halves(body);
-        KineticLayout.Rect left = section(columns.first(), tr("attributes.list", rule.attributes.size()));
+        // No section titles: the list rows show which attributes are set, the selected row shows what is edited.
+        KineticLayout.Rect left = section(columns.first(), Component.empty());
         KineticLayout.Split rows = takeRow(left);
         textInput(ui, rows.first(), query, KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.search.placeholder"),
                 tip("search"), value -> {
@@ -182,12 +180,17 @@ public final class AttributeRangeScreen extends EcPage {
         String id = selected;
         BreakSpawnConfig.AttributeRange range = rule.attributes.get(id);
         double base = baseValue(id);
-        Form form = form(section(columns.second(), attributeName(id)), LABEL_WIDTH);
+        Form form = form(section(columns.second(), Component.empty()), LABEL_WIDTH);
         decimalField(ui, number(form.row(tr("attributes.min"), tip("attributes.min"))), range == null ? base : range.min,
                 -1.0E9D, 1.0E9D, tip("attributes.min"), value -> update(id, value, true));
         decimalField(ui, number(form.row(tr("attributes.max"), tip("attributes.max"))), range == null ? base : range.max,
                 -1.0E9D, 1.0E9D, tip("attributes.max"), value -> update(id, value, false));
         helpRect = form.remaining();
+    }
+
+    private void removeSelected() {
+        if (selected == null || rule.attributes.remove(selected) == null) return;
+        onChange.run(); rebuild();
     }
 
     private void update(String id, Double value, boolean min) {
@@ -208,9 +211,8 @@ public final class AttributeRangeScreen extends EcPage {
     protected void renderContent(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
         list.render(graphics, mouseX, mouseY, id -> id.equals(selected), rule.attributes::containsKey, id -> attribute(id) == null);
         if (helpRect != null) {
-            Component text = selected == null ? tr("attributes.help")
-                    : KineticI18n.translatable("gui.entitycontrol.breakspawn.attributes.random_hint").copy().append("\n")
-                    .append(tr("attributes.base", format(baseValue(selected))));
+            // With an attribute selected only its default value is shown; the range fields speak for themselves.
+            Component text = selected == null ? tr("attributes.help") : tr("attributes.base", format(baseValue(selected)));
             graphics.wrappedText(text, helpRect.x(), helpRect.y() + GAP, helpRect.width(), KineticTheme.current().text());
         }
     }

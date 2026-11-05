@@ -193,7 +193,8 @@ ext.kineticConfigureReleaseJar = { TaskProvider<? extends Jar> releaseJar ->
                 destinationDirectory.set(rootProject.layout.buildDirectory.dir('libs'))
             } else {
                 // A relative path such as build/release is relative to the repository root, not to versions/<node>/.
-                destinationDirectory.set(rootProject.file(outputPath))
+                // Each Minecraft version gets its own folder (D:/NEWMODS/1.20.1, .../1.21.1, .../26.1.2).
+                destinationDirectory.set(new File(rootProject.file(outputPath), pMinecraft.toString()))
             }
         } else {
             destinationDirectory.set(rootProject.layout.buildDirectory.dir('libs'))

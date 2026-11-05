@@ -37,9 +37,10 @@ import java.util.function.Consumer;
  */
 public final class SpawnerControlScreen extends EcPage {
     private static final String GLOBAL = "__global__";
-    private static final int CARD = 40;
-    private static final int LIST_WIDTH = EntityCardGrid.widthFor(4, CARD) + PAD * 2;
-    private static final int LABEL_WIDTH = 84;
+    private static final int CARD = EntityCardGrid.CARD_SIZE;
+    private static final int LIST_WIDTH = EntityCardGrid.widthFor(5, CARD) + PAD * 2;
+    // Wide enough for most English labels (Fixed delay (s), Speed multiplier); pairs still get two ~40 px fields.
+    private static final int LABEL_WIDTH = 76;
     private static final int PAIR_WIDTH = 50;
 
     private final SpawnerConfig.SpawnerData data;
@@ -294,7 +295,7 @@ public final class SpawnerControlScreen extends EcPage {
         fields.clear();
         helpRect = null;
         KineticLayout.Split columns = KineticLayout.splitHorizontal(body, LIST_WIDTH, GAP);
-        KineticLayout.Rect left = section(columns.first(), tr("list", allEntityIds.size()));
+        KineticLayout.Rect left = section(columns.first(), Component.empty());
         KineticLayout.Split rows = takeRow(left);
         int menuWidth = 56;
         KineticLayout.Rect bar = rows.first();
@@ -320,10 +321,7 @@ public final class SpawnerControlScreen extends EcPage {
 
         SpawnerConfig.SpawnerRule rule = displayRule();
         KineticLayout.Split halves = halves(columns.second());
-        Component owner = isGlobal() ? tr("global_card")
-                : entityName(selected).copy().append(tr(hasCustomRule(selected) ? "state.custom" : "state.global")
-                .withStyle(hasCustomRule(selected) ? ChatFormatting.GREEN : ChatFormatting.AQUA));
-        buildTuning(ui, section(halves.first(), tr("section.tuning", owner)), rule);
+        buildTuning(ui, section(halves.first(), Component.empty()), rule);
         buildBreaker(ui, section(halves.second(), tr("section.breaker")), rule);
     }
 
@@ -336,7 +334,8 @@ public final class SpawnerControlScreen extends EcPage {
                 (r, v) -> r.minSpawnDelaySeconds = v, (r, v) -> r.maxSpawnDelaySeconds = v, false);
         boolean fixed = rule.fixedSpawnDelaySeconds >= 0D;
         KineticLayout.Rect fixedRow = form.row(tr("row.fixed"), tip("fixed_toggle"));
-        ui.toggle(fixedRow.x(), fixedRow.y(), PAIR_WIDTH).value(fixed)
+        int fixedWidth = Math.min(PAIR_WIDTH, Math.max(1, (fixedRow.width() - GAP) / 2));
+        ui.toggle(fixedRow.x(), fixedRow.y(), fixedWidth).value(fixed)
                 .labels(tr("on"), tr("off"))
                 .tooltip(tip("fixed_toggle"))
                 .onChange(value -> {
@@ -345,7 +344,7 @@ public final class SpawnerControlScreen extends EcPage {
                 })
                 .build();
         if (fixed) {
-            decimal(ui, new KineticLayout.Rect(fixedRow.x() + PAIR_WIDTH + GAP, fixedRow.y(), PAIR_WIDTH, H), "fixed_delay",
+            decimal(ui, new KineticLayout.Rect(fixedRow.x() + fixedWidth + GAP, fixedRow.y(), fixedWidth, H), "fixed_delay",
                     rule.fixedSpawnDelaySeconds, 0.05D, 1638.35D, (r, v) -> r.fixedSpawnDelaySeconds = v);
         }
         decimal(ui, number(form.row(tr("row.speed"), tip("speed"))), "speed", rule.speedMultiplier, 0.01D, 10D,
@@ -415,8 +414,9 @@ public final class SpawnerControlScreen extends EcPage {
     /** 最小 – 最大一对输入框：改一边时另一边自动保持“最小 ≤ 最大”，不重建界面。 */
     private void pair(KineticUi ui, KineticLayout.Rect row, String minKey, double minValue, String maxKey, double maxValue,
                       double min, double max, DoubleSetter minSetter, DoubleSetter maxSetter, boolean integer) {
-        KineticLayout.Rect first = new KineticLayout.Rect(row.x(), row.y(), PAIR_WIDTH, H);
-        KineticLayout.Rect second = new KineticLayout.Rect(row.x() + PAIR_WIDTH + GAP, row.y(), PAIR_WIDTH, H);
+        int pairWidth = Math.min(PAIR_WIDTH, Math.max(1, (row.width() - GAP) / 2));
+        KineticLayout.Rect first = new KineticLayout.Rect(row.x(), row.y(), pairWidth, H);
+        KineticLayout.Rect second = new KineticLayout.Rect(row.x() + pairWidth + GAP, row.y(), pairWidth, H);
         Consumer<Double> onMin = value -> {
             if (value == null) return;
             edit(r -> minSetter.set(r, value));
@@ -454,10 +454,6 @@ public final class SpawnerControlScreen extends EcPage {
     @Override
     protected void renderContent(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
         cards.render(graphics, mouseX, mouseY);
-        if (helpRect != null) {
-            graphics.wrappedText(tr(isGlobal() ? "help.global" : "help.entity"), helpRect.x(), helpRect.y() + GAP,
-                    helpRect.width(), KineticTheme.current().text());
-        }
     }
 
     @Override

@@ -30,10 +30,10 @@ import java.util.function.Supplier;
  * 实体控制所有界面的统一外框与排版规范。
  *
  * <pre>
- * ┌ 外框（距画布边缘 6）───────────────────────────────────────┐
- * │ [‹ 返回]            标题（居中）          [操作] [更多 ▾] │  ← 顶栏，控件距边框 6
+ * ┌ 外框（画布本身，屏幕安全边距 4）───────────────────────────┐
+ * │ [返回]              标题（居中）          [操作] [更多 ▾] │  ← 顶栏，控件距边框 4
  * │ ─────────────────────────────────────────────────────── │
- * │ 内容区 body()：面板之间间距 4，面板内边距 6，控件间距 4     │
+ * │ 内容区 body()：面板之间间距 4，面板内边距 4，控件间距 4     │
  * │ 状态行（可选）                                            │
  * └──────────────────────────────────────────────────────────┘
  * </pre>
@@ -42,10 +42,10 @@ import java.util.function.Supplier;
  * 注册，悬停标签文字即显示说明。
  */
 public abstract class EcPage extends KineticPage {
-    /** 画布边缘到外框。 */
-    public static final int OUTER = 6;
+    /** 外框覆盖整个逻辑画布，屏幕安全边距由核心统一处理。 */
+    public static final int OUTER = 0;
     /** 边框到内容的内边距。 */
-    public static final int PAD = 6;
+    public static final int PAD = 4;
     /** 控件、面板之间的最小间距。 */
     public static final int GAP = 4;
     /** 标准控件高度。 */
@@ -124,7 +124,7 @@ public abstract class EcPage extends KineticPage {
 
     protected EcPage(Component title) {
         super(title);
-        useCanvas(CANVAS_WIDTH, CANVAS_HEIGHT, 0);
+        useCanvas(CANVAS_WIDTH, CANVAS_HEIGHT, 4);
         setPausesGame(false);
     }
 
@@ -136,6 +136,11 @@ public abstract class EcPage extends KineticPage {
     /** 顶栏居中显示的标题；默认为页面标题。 */
     protected Component headerTitle() {
         return title();
+    }
+
+    /** Normal pages use the canvas frame; compact pickers may provide a centered frame. */
+    protected KineticLayout.Rect frameBounds() {
+        return new KineticLayout.Rect(OUTER, OUTER, width() - OUTER * 2, height() - OUTER * 2);
     }
 
     /** 顶栏右侧的操作按钮（从左到右）。 */
@@ -183,15 +188,16 @@ public abstract class EcPage extends KineticPage {
         sections.clear();
         headerButtons.clear();
 
-        frame = new KineticLayout.Rect(OUTER, OUTER, width() - OUTER * 2, height() - OUTER * 2);
+        frame = frameBounds();
         header = new KineticLayout.Rect(frame.x() + PAD, frame.y() + PAD, frame.width() - PAD * 2, H);
         // 不设底部状态行：说明全部放在悬停提示里，结果用提示弹窗反馈。
         int bottom = frame.bottom() - PAD;
-        int bodyTop = header.bottom() + GAP * 2 + 1;
+        // The body starts 2 px under the header divider (drawn at header.bottom() + GAP).
+        int bodyTop = header.bottom() + GAP + 2;
         body = new KineticLayout.Rect(frame.x() + PAD, bodyTop, frame.width() - PAD * 2, Math.max(0, bottom - bodyTop));
 
         Component backText = KineticI18n.translatable("gui.entitycontrol.common.back");
-        int backWidth = Math.min(buttonWidth(backText, 56), Math.min(CONTROL_WIDTH, header.width() / 4));
+        int backWidth = 40;
         ui.button(header.x(), header.y(), backWidth)
                 .text(backText)
                 .tooltip(KineticI18n.translatable("tip.entitycontrol.common.back"))
@@ -240,7 +246,10 @@ public abstract class EcPage extends KineticPage {
         int titleRight = right + (actions.isEmpty() ? 0 : actionGap) - titleGap;
         int side = Math.max(titleLeft - header.x(), header.right() - titleRight);
         int centeredWidth = header.width() - side * 2;
-        titleRect = centeredWidth > 0
+        // Centered when the title fits between the buttons; otherwise it uses all the space after Back so it
+        // scrolls only when even that is too narrow.
+        int titleWidth = dev.xyat.kineticcore.api.client.gui.text.KineticText.width(title());
+        titleRect = centeredWidth > 0 && titleWidth <= centeredWidth
                 ? new KineticLayout.Rect(header.x() + side, header.y(), centeredWidth, H)
                 : new KineticLayout.Rect(titleLeft, header.y(), Math.max(0, titleRight - titleLeft), H);
 
@@ -255,6 +264,7 @@ public abstract class EcPage extends KineticPage {
     public final KineticLayout.Rect section(KineticLayout.Rect rect, Component title) {
         sections.add(new Section(rect, title));
         KineticLayout.Rect inner = inner(rect);
+        if (title == null || title.getString().isBlank()) return inner;
         return new KineticLayout.Rect(inner.x(), inner.y() + 10 + GAP, inner.width(), Math.max(0, inner.height() - 10 - GAP));
     }
 
@@ -271,7 +281,50 @@ public abstract class EcPage extends KineticPage {
     }
 
     /** 按文字宽度计算按钮宽度。 */
+    // Fixed by the action key, so translations cannot change the layout.
+    private static final java.util.Set<String> SHORT_ACTION_KEYS = java.util.Set.of(
+            "gui.entitycontrol.breakspawn.back",
+            "gui.entitycontrol.breakspawn.close",
+            "gui.entitycontrol.breakspawn.equipment.clear",
+            "gui.entitycontrol.breakspawn.equipment.select",
+            "gui.entitycontrol.common.back",
+            "gui.entitycontrol.common.cancel",
+            "gui.entitycontrol.common.more",
+            "gui.entitycontrol.dummy.dummy.back",
+            "gui.entitycontrol.modifier.buff_editor.apply",
+            "gui.entitycontrol.modifier.config.back",
+            "gui.entitycontrol.modifier.editor.filter",
+            "gui.entitycontrol.modifier.modifier.buff.dim_add_btn",
+            "gui.entitycontrol.modifier.modifier.buff.dim_remove_btn",
+            "gui.entitycontrol.modifier.modifier.close",
+            "gui.entitycontrol.modifier.modifier.edit_val",
+            "gui.entitycontrol.reset.editor.filter",
+            "gui.entitycontrol.reset.rule_edit.back",
+            "gui.entitycontrol.reset.rule_list.back",
+            "gui.entitycontrol.reset.rule_list.rule.cancelled.off",
+            "gui.entitycontrol.spawn.editor.filter",
+            "gui.entitycontrol.spawn.editor.save",
+            "gui.entitycontrol.spawn.spawn.biome.add",
+            "gui.entitycontrol.spawn.spawn.biome.remove",
+            "gui.entitycontrol.spawn.spawn.exit",
+            "gui.entitycontrol.spawn.spawn.restore",
+            "gui.entitycontrol.spawn.spawn.save",
+            "gui.entitycontrol.spawn.spawn.status.active.colored",
+            "gui.entitycontrol.spawn.spawner.close",
+            "gui.entitycontrol.spawn.spawner.filter",
+            "gui.entitycontrol.spawn.spawner.off",
+            "gui.entitycontrol.spawn.spawner.restore",
+            "gui.entitycontrol.spawn.spawner.save",
+            "gui.entitycontrol.spawn.spawner.save_short"
+    );
+
+    private static boolean isShortAction(Component text) {
+        return text.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents translation
+                && SHORT_ACTION_KEYS.contains(translation.getKey());
+    }
+
     public static int buttonWidth(Component text, int minimum) {
+        if (isShortAction(text)) return 40;
         // The same width in every language; the label scrolls inside the button when longer.
         return Math.max(minimum, 64);
     }
@@ -395,7 +448,7 @@ public abstract class EcPage extends KineticPage {
             scroll.update(rows, Math.max(1, area.height() / ROW_HEIGHT));
             page.forms.add(this);
             return ui.scrollViewport(area.x(), area.y(), area.right(), area.bottom(),
-                    () -> scroll.smoothOffset() * ROW_HEIGHT);
+                    this::pixelOffset);
         }
 
         /** 第 index 行的控件区域（未滚动坐标）。 */
@@ -428,7 +481,8 @@ public abstract class EcPage extends KineticPage {
         }
 
         private int pixelOffset() {
-            return (int) Math.round(scroll.smoothOffset() * ROW_HEIGHT);
+            return Math.min((int) Math.round(scroll.smoothOffset() * ROW_HEIGHT),
+                    Math.max(0, rows * ROW_HEIGHT - area.height()));
         }
 
         private void render(KineticGraphics graphics, int mouseX, int mouseY) {
@@ -441,7 +495,7 @@ public abstract class EcPage extends KineticPage {
                         continue;
                     }
                     graphics.hLine(area.x() + PAD, contentRight() - PAD - 1, top + ROW_HEIGHT - 1,
-                            (palette.border() & 0x00FFFFFF) | 0x80000000);
+                            palette.accentHover());
                 }
                 for (Label label : rowLabels) {
                     KineticLayout.Rect rect = label.rect().move(0, -offset);
@@ -744,7 +798,9 @@ public abstract class EcPage extends KineticPage {
     /** 普通按钮：宽度按文字计算，不超过 rect 宽度。 */
     public final KineticButton actionButton(KineticUi ui, KineticLayout.Rect rect, Component text, Component tip,
                                             boolean enabled, Runnable action) {
-        KineticLayout.Rect fitted = fit(rect, text);
+        KineticLayout.Rect fitted = isShortAction(text)
+                ? new KineticLayout.Rect(rect.x(), rect.y(), Math.min(rect.width(), 40), rect.height())
+                : fit(rect, text);
         var builder = ui.button(fitted.x(), fitted.y(), fitted.width()).text(text).enabled(enabled).onClick(action);
         if (tip != null) builder.tooltip(tip);
         return builder.build();
@@ -757,7 +813,9 @@ public abstract class EcPage extends KineticPage {
     public final KineticButton menuButton(KineticUi ui, KineticLayout.Rect rect, Component text, Component tip,
                                           boolean enabled, Supplier<List<KineticOverlays.MenuItem>> items) {
         Component label = text.copy().append(" ▾");
-        KineticLayout.Rect fitted = fit(rect, label);
+        KineticLayout.Rect fitted = isShortAction(text)
+                ? new KineticLayout.Rect(rect.x(), rect.y(), Math.min(rect.width(), 40), rect.height())
+                : fit(rect, label);
         KineticButton[] self = new KineticButton[1];
         var builder = ui.button(fitted.x(), fitted.y(), fitted.width())
                 .text(label)
@@ -795,16 +853,19 @@ public abstract class EcPage extends KineticPage {
         KineticTheme.Palette palette = KineticTheme.current();
         KineticTheme.canvasBackground(graphics, width(), height());
         KineticTheme.panel(graphics, frame.x(), frame.y(), frame.width(), frame.height());
-        graphics.hLine(frame.x() + PAD, frame.right() - PAD - 1, header.bottom() + GAP, palette.border());
+        graphics.hLine(frame.x() + PAD, frame.right() - PAD - 1, header.bottom() + GAP, palette.accentHover());
         graphics.scrollingTextCentered(headerTitle(), titleRect.x() + titleRect.width() / 2, titleRect.y() + 4,
                 titleRect.width(), palette.text(), false);
         for (Section section : sections) {
             KineticLayout.Rect rect = section.rect();
-            KineticTheme.panelAlt(graphics, rect.x(), rect.y(), rect.width(), rect.height());
-            graphics.scrollingText(section.title(), rect.x() + PAD, rect.y() + PAD, rect.width() - PAD * 2,
-                    palette.text(), false);
+            KineticTheme.surface(graphics, rect.x(), rect.y(), rect.width(), rect.height(), KineticTheme.Surface.PANEL_ALT);
+            if (section.title() != null && !section.title().getString().isBlank()) {
+                graphics.scrollingText(section.title(), rect.x() + PAD, rect.y() + PAD, rect.width() - PAD * 2,
+                        palette.text(), false);
+            }
         }
 
+        renderSectionDividers(graphics, palette.accentHover());
         renderContent(graphics, mouseX, mouseY, partialTick);
 
         for (Label label : labels) {
@@ -816,6 +877,32 @@ public abstract class EcPage extends KineticPage {
         }
         for (ScrollArea area : areas) {
             area.scroll().render(graphics, mouseX, mouseY, area.rect().right() - 4, area.rect().y(), 4, area.rect().height(), 16);
+        }
+    }
+
+    /** Separate neighbouring regions once, without surrounding every region with another frame. */
+    private void renderSectionDividers(KineticGraphics graphics, int color) {
+        for (int first = 0; first < sections.size(); first++) {
+            KineticLayout.Rect a = sections.get(first).rect();
+            for (int second = first + 1; second < sections.size(); second++) {
+                KineticLayout.Rect b = sections.get(second).rect();
+                int top = Math.max(a.y(), b.y()), bottom = Math.min(a.bottom(), b.bottom());
+                if (top < bottom) {
+                    if (a.right() <= b.x() && b.x() - a.right() <= GAP) {
+                        graphics.vLine((a.right() + b.x()) / 2, top, bottom - 1, color);
+                    } else if (b.right() <= a.x() && a.x() - b.right() <= GAP) {
+                        graphics.vLine((b.right() + a.x()) / 2, top, bottom - 1, color);
+                    }
+                }
+                int left = Math.max(a.x(), b.x()), right = Math.min(a.right(), b.right());
+                if (left < right) {
+                    if (a.bottom() <= b.y() && b.y() - a.bottom() <= GAP) {
+                        graphics.hLine(left, right - 1, (a.bottom() + b.y()) / 2, color);
+                    } else if (b.bottom() <= a.y() && a.y() - b.bottom() <= GAP) {
+                        graphics.hLine(left, right - 1, (b.bottom() + a.y()) / 2, color);
+                    }
+                }
+            }
         }
     }
 

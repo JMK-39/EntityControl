@@ -153,9 +153,7 @@ public final class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
             int rowY = rowList.rowTop(index);
             int removeX = rowList.controlX() + rowList.rowsWidth() - REMOVE_BUTTON_WIDTH - 4;
             if (input.inside(removeX, rowY + REMOVE_BUTTON_INSET, REMOVE_BUTTON_WIDTH, rowList.rowHeight() - REMOVE_BUTTON_INSET * 2)) {
-                EntityModifierConfig.EntityEditData data = parent.getLocalData().get(selectedEntityId);
-                if (data != null) data.buffs.remove(effectId);
-                updateSearch(searchBox == null ? "" : searchBox.textValue());
+                removeEffect(effectId);
                 return true;
             }
         }
@@ -165,5 +163,20 @@ public final class BuffPanel extends AbstractModifierScrollPanel<MobEffect> {
                 : new EntityModifierConfig.PotionBuff();
         parent.openChild(new BuffEditScreen(parent, selectedEntityId, effectId, buffData));
         return true;
+    }
+
+    private String deleteTarget() {
+        if (!isVisible() || rowList == null || selectedEntityId == null) return null;
+        int index = rowList.rowAt(pointerX, pointerY);
+        if (index < 0 || index >= rowList.items().size()) return null;
+        var id = KineticRegistries.mobEffects().id(rowList.items().get(index));
+        return id != null && isBuffModified(id.toString()) ? id.toString() : null;
+    }
+    @Override public boolean canDelete() { return deleteTarget() != null; }
+    @Override public void deleteSelected() { String id = deleteTarget(); if (id != null) removeEffect(id); }
+    private void removeEffect(String effectId) {
+        EntityModifierConfig.EntityEditData data = parent.getLocalData().get(selectedEntityId);
+        if (data != null) data.buffs.remove(effectId);
+        updateSearch(searchBox == null ? "" : searchBox.textValue());
     }
 }

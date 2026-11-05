@@ -2,6 +2,7 @@ package dev.xyat.entitycontrol.spawn.client.gui;
 
 import dev.xyat.entitycontrol.client.gui.kit.EcPage;
 import dev.xyat.entitycontrol.client.gui.kit.EntityCardGrid;
+import dev.xyat.entitycontrol.client.gui.kit.DimensionPickerPage;
 import dev.xyat.entitycontrol.client.gui.kit.PickListPage;
 import dev.xyat.entitycontrol.client.gui.kit.TextRowList;
 import dev.xyat.entitycontrol.spawn.Network.SpawnNetwork;
@@ -49,9 +50,9 @@ public final class SpawnControlScreen extends EcPage {
             "monster", "creature", "ambient", "axolotls",
             "underground_water_creature", "water_creature", "water_ambient", "misc"
     };
-    private static final int CARD = 40;
-    private static final int LIST_WIDTH = EntityCardGrid.widthFor(4, CARD) + PAD * 2;
-    private static final int LABEL_WIDTH = 92;
+    private static final int CARD = EntityCardGrid.CARD_SIZE;
+    private static final int LIST_WIDTH = EntityCardGrid.widthFor(5, CARD) + PAD * 2;
+    private static final int LABEL_WIDTH = 52;
     private static final int PAIR_WIDTH = 50;
 
     public BiomeSpawnConfig.GlobalSettings globals;
@@ -246,6 +247,19 @@ public final class SpawnControlScreen extends EcPage {
         return tr("title.profile", currentEditIndex);
     }
 
+    /** 每个标签页一个视图，供截图工具依次查看。 */
+    @Override
+    public List<ReviewView> reviewViews() {
+        List<ReviewView> views = new ArrayList<>();
+        for (Tab value : Tab.values()) {
+            views.add(new ReviewView(value.name().toLowerCase(Locale.ROOT), () -> {
+                tab = value;
+                rebuild();
+            }));
+        }
+        return views;
+    }
+
     @Override
     protected List<HeaderAction> headerActions() {
         return List.of(
@@ -265,16 +279,16 @@ public final class SpawnControlScreen extends EcPage {
                         KineticOverlays.MenuItem.toggle(tr("switch.rules"), oldTip("rule.override"), globals.enable_rule_override, () -> {
                             globals.enable_rule_override = !globals.enable_rule_override;
                             changed();
-                        }),
+                        }).asButton(),
                         KineticOverlays.MenuItem.toggle(tr("switch.biomes"), oldTip("biome.override"), globals.enable_biome_override, () -> {
                             globals.enable_biome_override = !globals.enable_biome_override;
                             changed();
-                        }),
+                        }).asButton(),
                         KineticOverlays.MenuItem.toggle(tr("switch.autoscan"), oldTip("autoscan"), globals.auto_scan, () -> {
                             globals.auto_scan = !globals.auto_scan;
                             if (globals.auto_scan) SpawnNetwork.refreshSpawnBackup(currentEditIndex);
                             changed();
-                        }))),
+                        }).asButton())),
                 HeaderAction.button("save", tr("save"), tr("save.tooltip"), this::save).enabled(dirty()),
                 HeaderAction.more(this::moreMenu)
         );
@@ -386,6 +400,9 @@ public final class SpawnControlScreen extends EcPage {
 
     @Override
     protected void buildContent(KineticUi ui, KineticLayout.Rect body) {
+        bindDeleteAction(() -> selectedId != null && (!BiomeSpawnConfig.isEntityIdValid(selectedId)
+                        || tab == Tab.BIOMES && selectedBiome != null && node() != null && node().biomes.containsKey(selectedBiome)),
+                () -> { if (!BiomeSpawnConfig.isEntityIdValid(selectedId)) deleteInvalid(); else removeBiome(node(), selectedBiome); });
         fields.clear();
         noteRect = null;
         noteText = null;
@@ -410,7 +427,7 @@ public final class SpawnControlScreen extends EcPage {
     }
 
     private void buildEntityList(KineticUi ui, KineticLayout.Rect area) {
-        KineticLayout.Rect left = section(area, tr("list", profile.entities.size()));
+        KineticLayout.Rect left = section(area, Component.empty());
         KineticLayout.Split rows = takeRow(left);
         int menuWidth = 56;
         KineticLayout.Rect bar = rows.first();
@@ -440,7 +457,7 @@ public final class SpawnControlScreen extends EcPage {
 
     private void buildRules(KineticUi ui, KineticLayout.Rect area, BiomeSpawnConfig.EntityNode node) {
         KineticLayout.Split halves = halves(area);
-        Form form = form(section(halves.first(), tr("section.rules", entityName(selectedId))), LABEL_WIDTH);
+        Form form = form(section(halves.first(), Component.empty()), LABEL_WIDTH);
         KineticLayout.Rect control = fit(form.row(tr("row.control"), oldTip("enable",
                 old(node.enable_control ? "status.active.colored" : "status.ignored.colored"))), old("status.active.colored"), old("status.ignored.colored"));
         ui.toggle(control.x(), control.y(), control.width()).value(node.enable_control)
@@ -501,35 +518,27 @@ public final class SpawnControlScreen extends EcPage {
                 value -> node.min_spawn_light = value, value -> node.max_spawn_light = value);
         if (node.dim_whitelist == null) node.dim_whitelist = new ArrayList<>();
         if (node.dim_blacklist == null) node.dim_blacklist = new ArrayList<>();
-        toggleMenu(ui, compact(limits.row(tr("row.dim_whitelist"), oldTip("dim_w"))), tr("dim_whitelist"), oldTip("dim_w"),
-                dimensionOptions(node.dim_whitelist, node.dim_blacklist, "dim_w"), !knownDimensions.isEmpty(), this::dimensionsChanged);
-        toggleMenu(ui, compact(limits.row(tr("row.dim_blacklist"), oldTip("dim_b"))), tr("dim_blacklist"), oldTip("dim_b"),
-                dimensionOptions(node.dim_blacklist, node.dim_whitelist, "dim_b"), !knownDimensions.isEmpty(), this::dimensionsChanged);
-        noteRect = limits.remaining();
-        noteText = tr("help.dimensions");
+        dimensionButton(ui, compact(limits.row(tr("row.dim_whitelist"), oldTip("dim_w"))), tr("dim_whitelist"),
+                tr("row.dim_whitelist"), oldTip("dim_w"), node.dim_whitelist, node.dim_blacklist);
+        dimensionButton(ui, compact(limits.row(tr("row.dim_blacklist"), oldTip("dim_b"))), tr("dim_blacklist"),
+                tr("row.dim_blacklist"), oldTip("dim_b"), node.dim_blacklist, node.dim_whitelist);
+        noteRect = null;
+        noteText = null;
     }
 
-    private void dimensionsChanged() {
-        markEdited();
-        rebuild();
-    }
-
-    /** 维度白名单 / 黑名单：同一维度只能在其中一个列表里。 */
-    private List<ToggleOption> dimensionOptions(List<String> target, List<String> other, String tipKey) {
-        List<String> dimensions = new ArrayList<>(knownDimensions);
-        for (String value : target) if (!dimensions.contains(value)) dimensions.add(value);
-        List<ToggleOption> options = new ArrayList<>();
-        for (String dimension : dimensions) {
-            options.add(new ToggleOption(Component.literal(dimension), oldTip(tipKey), () -> target.contains(dimension), value -> {
-                if (value) {
-                    if (!target.contains(dimension)) target.add(dimension);
-                    other.remove(dimension);
-                } else {
-                    target.remove(dimension);
-                }
+    private void dimensionButton(KineticUi ui, KineticLayout.Rect rect, Component label, Component title,
+                                 Component tooltip, List<String> target, List<String> other) {
+        ui.button(rect.x(), rect.y(), Math.min(rect.width(), 40)).text(label).tooltip(tooltip).onClick(() -> {
+            List<String> dimensions = new ArrayList<>(knownDimensions);
+            dimensions.addAll(target);
+            dimensions.addAll(other);
+            openChild(new DimensionPickerPage(title, dimensions, target, values -> {
+                target.clear();
+                target.addAll(values);
+                other.removeAll(values);
+                markEdited();
             }));
-        }
-        return options;
+        }).build();
     }
 
     private void buildBiomes(KineticUi ui, KineticLayout.Rect area, BiomeSpawnConfig.EntityNode node) {
@@ -537,7 +546,7 @@ public final class SpawnControlScreen extends EcPage {
         if (node.deleted_biomes == null) node.deleted_biomes = new ArrayList<>();
         if (selectedBiome != null && !node.biomes.containsKey(selectedBiome)) selectedBiome = null;
         KineticLayout.Split halves = halves(area);
-        KineticLayout.Rect listArea = section(halves.first(), tr("section.biomes", entityName(selectedId), node.biomes.size()));
+        KineticLayout.Rect listArea = section(halves.first(), Component.empty());
         KineticLayout.Split rows = takeRow(listArea);
         menuButton(ui, compact(rows.first()), tr("biome.actions"), tr("biome.actions.tooltip"), true, () -> {
             List<KineticOverlays.MenuItem> items = new ArrayList<>();
@@ -665,7 +674,7 @@ public final class SpawnControlScreen extends EcPage {
         }
         List<TextRowList.Row> rows = new ArrayList<>();
         for (String category : categories) rows.add(new TextRowList.Row(category, categoryName(category)));
-        sideList.layout(this, section(columns.first(), tr("categories", categories.size())), rows);
+        sideList.layout(this, section(columns.first(), Component.empty()), rows);
         if (selectedCategory == null) {
             noteRect = section(columns.second(), tr("categories.empty"));
             noteText = tr("help.categories");
@@ -701,8 +710,8 @@ public final class SpawnControlScreen extends EcPage {
                     changed();
                     rebuild();
                 });
-        noteRect = form.remaining();
-        noteText = tr("help.categories");
+        noteRect = null;
+        noteText = null;
     }
 
     private static int defaultWeight(String category) {
@@ -728,8 +737,9 @@ public final class SpawnControlScreen extends EcPage {
      */
     private void intPair(KineticUi ui, KineticLayout.Rect row, String minKey, Integer minValue, String maxKey, Integer maxValue,
                          int min, int max, boolean nullable, IntSetter minSetter, IntSetter maxSetter) {
-        KineticLayout.Rect first = new KineticLayout.Rect(row.x(), row.y(), PAIR_WIDTH, H);
-        KineticLayout.Rect second = new KineticLayout.Rect(row.x() + PAIR_WIDTH + GAP, row.y(), PAIR_WIDTH, H);
+        int pairWidth = Math.min(PAIR_WIDTH, Math.max(1, (row.width() - GAP) / 2));
+        KineticLayout.Rect first = new KineticLayout.Rect(row.x(), row.y(), pairWidth, H);
+        KineticLayout.Rect second = new KineticLayout.Rect(row.x() + pairWidth + GAP, row.y(), pairWidth, H);
         fields.put(minKey, intField(ui, first, minValue, min, max, oldTip(minKey), value -> {
             if (value == null && !nullable) return;
             minSetter.set(value);

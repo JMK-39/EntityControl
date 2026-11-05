@@ -35,8 +35,8 @@ import java.util.Map;
  * 顶栏：返回 / 保存规则 / 更多 ▾（删除规则）。每条规则单独保存到服务器。
  */
 public final class EntityResetRuleListScreen extends EcPage {
-    private static final int CARD = 40;
-    private static final int LABEL_WIDTH = 104;
+    private static final int CARD = EntityCardGrid.CARD_SIZE;
+    private static final int LABEL_WIDTH = 64;
 
     private final List<String> allEntityIds = new ArrayList<>();
     private final Map<String, String> searchData = new HashMap<>();
@@ -173,19 +173,19 @@ public final class EntityResetRuleListScreen extends EcPage {
 
     @Override
     protected void buildContent(KineticUi ui, KineticLayout.Rect body) {
+        bindDeleteAction(() -> selectedId != null && !waitingForServer && !waitingForSync && EntityReseConfig.hasRule(selectedId), this::remove);
         if (!syncRequested && KineticClientRuntime.connected()) {
             syncRequested = true;
             waitingForSync = true;
             EntityReseRuleNetwork.requestRules();
         }
         helpRect = null;
-        KineticLayout.Split columns = KineticLayout.splitHorizontal(body, body.width() - 260 - GAP, GAP);
-        KineticLayout.Rect left = section(columns.first(),
-                tr("list", EntityReseConfig.ENTITY_RULES_CACHE.size(), allEntityIds.size()));
+        KineticLayout.Split columns = KineticLayout.splitHorizontal(body, EntityCardGrid.widthFor(5, CARD) + PAD * 2, GAP);
+        KineticLayout.Rect left = section(columns.first(), Component.empty());
         KineticLayout.Split rows = takeRow(left);
         KineticLayout.Rect bar = rows.first();
         int filterWidth = 56;
-        textInput(ui, new KineticLayout.Rect(bar.x(), bar.y(), Math.min(200, bar.width() - filterWidth - GAP), H), query,
+        textInput(ui, new KineticLayout.Rect(bar.x(), bar.y(), Math.min(240, bar.width() - filterWidth - GAP), H), query,
                 KineticI18n.translatable("gui.entitycontrol.reset.rule_list.search_hint"), tr("search.tooltip"), value -> {
                     query = value;
                     cards.reset();
@@ -209,8 +209,7 @@ public final class EntityResetRuleListScreen extends EcPage {
             return;
         }
         boolean editable = !waitingForServer && !waitingForSync;
-        Component title = entityName(selectedId).copy().append(tr(EntityReseConfig.hasRule(selectedId) ? "state.configured" : "state.none"));
-        Form form = form(section(columns.second(), title), LABEL_WIDTH);
+        Form form = form(section(columns.second(), Component.empty()), LABEL_WIDTH);
         intField(ui, number(form.row(KineticI18n.translatable("gui.entitycontrol.reset.rule_edit.threshold"), tr("threshold.tooltip"))),
                 threshold, 1, 1_000_000, tr("threshold.tooltip"), value -> {
                     if (value != null) threshold = value;
@@ -232,8 +231,9 @@ public final class EntityResetRuleListScreen extends EcPage {
     protected void renderContent(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
         cards.render(graphics, mouseX, mouseY);
         if (helpRect != null) {
-            Component text = waitingForSync ? tr("syncing") : tr(selectedId == null ? "help" : "help.rule");
-            graphics.wrappedText(text, helpRect.x(), helpRect.y() + GAP, helpRect.width(), KineticTheme.current().text());
+            // Only the empty state and the sync wait need words; a selected rule shows its fields.
+            if (waitingForSync || selectedId == null)
+                graphics.wrappedText(tr(waitingForSync ? "syncing" : "help"), helpRect.x(), helpRect.y() + GAP, helpRect.width(), KineticTheme.current().text());
         }
     }
 

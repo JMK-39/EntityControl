@@ -43,7 +43,9 @@ public final class ItemSlotGrid {
     }
 
     private int pixelOffset() {
-        return (int) Math.round(scroll.smoothOffset() * (SLOT + GAP));
+        int rows = (stacks.size() + columns - 1) / columns;
+        return Math.min((int) Math.round(scroll.smoothOffset() * (SLOT + GAP)),
+                Math.max(0, rows * (SLOT + GAP) - GAP - area.height()));
     }
 
     private KineticLayout.Rect slot(int index) {

@@ -46,7 +46,8 @@ public final class TextRowList {
     }
 
     private int pixelOffset() {
-        return (int) Math.round(scroll.smoothOffset() * (ROW + GAP));
+        return Math.min((int) Math.round(scroll.smoothOffset() * (ROW + GAP)),
+                Math.max(0, rows.size() * (ROW + GAP) - GAP - area.height()));
     }
 
     private KineticLayout.Rect row(int index) {

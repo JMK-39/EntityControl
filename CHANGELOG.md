@@ -1,3 +1,72 @@
+## 26.10.26 — 2026-10-26
+- The attribute page puts the operation, value and delete controls on the top row beside the search; the list runs to the bottom.
+- 属性页的运算方式、数值与删除属性移到顶行搜索框右侧，列表一直延伸到底部。
+- Explanations next to filled-in content are gone (spawn equipment, buff editor, block rules, entity pools, global break settings, spawner, spawn dimensions and categories, reset rules); only empty states keep a short guide. Random attribute ranges show just the default value.
+- 去掉内容旁的说明文字（生成装备、状态效果、方块规则、刷怪池、全局破坏设置、刷怪笼、生成维度与分类、重置规则），只在空白状态保留简短指引；随机属性范围只显示默认值。
+- Save buttons read Save.
+- 保存按钮统一为“保存”。
+
+## 26.10.24 — 2026-10-24
+- The spawn equipment editor uses the standard 22 px item slots.
+- 生成装备编辑改用 22 像素标准物品格。
+
+## 2026-10-20 — Shared interface frames / 统一界面边框
+
+- Cancel buttons read Back.
+- “取消”按钮统一为“返回”。
+- Chinese text on 1.21.1 and 26.1.2 no longer puts spaces around 数据组件 (for example 编辑数据组件 instead of 编辑 数据组件).
+- 1.21.1 与 26.1.2 的中文不再在“数据组件”两侧留空格（例如“编辑数据组件”而不是“编辑 数据组件”）。
+- Spawn equipment uses vanilla equipment slots: empty slots show the vanilla helmet, chestplate, leggings, boots, sword and shield outlines, the slot name is in the tooltip, left-clicking an empty slot opens the item search and right-clicking a slot opens replace / NBT / clear. The mob is shown in 3D between the armor and hand slots, wearing the configured equipment, like the vanilla inventory; the notes take a narrower column (on 1.21.1 and 26.1.2 they now describe the new clicks and say components instead of NBT). The dummy's empty slot outlines now also show on 26.1.2.
+- 生成装备改用原版装备槽：空槽显示原版头盔、胸甲、护腿、靴子、剑和盾牌轮廓，槽位名称放在悬浮提示里；左键空槽打开物品搜索，右键槽位可替换、编辑 NBT 或清空。生物以 3D 形式显示在盔甲槽与手持槽之间并穿戴配置的装备，与原版背包一致；说明栏改窄（1.21.1 与 26.1.2 的说明也更新为新的点击方式，并称为数据组件）。假人空槽轮廓在 26.1.2 上也能正常显示。
+- Entity lists keep 2 px between the last card column and the scrollbar and no longer reserve a fixed minimum width, so the right-hand forms are wider; page content starts higher and long header titles use the free space instead of scrolling. The mob pool fits five card columns, and redundant section titles (mob count, selected mob, attribute count, attribute name) were removed.
+- 生物列表的最后一列与滚动条间距改为 2 像素，不再保留固定最小宽度，右侧表单更宽；页面内容整体上移，长标题优先使用空余空间而非滚动；生物池正好放下 5 列，去掉多余的分区标题（生物数量、所选生物名、属性数量、属性名）。
+- Spawner Control gives its setting labels 76 instead of 52 pixels, so labels such as Fixed delay (s) and Speed multiplier show in full instead of scrolling.
+- 刷怪笼控制的设置标签列由 52 像素加宽到 76 像素，“固定延迟”“速度倍率”等标签完整显示，不再滚动。
+- The dummy screen no longer shows a light line through the Inventory label and the Env / HP Drop buttons: the equipment panel and the vanilla inventory background now meet below that row, on plain texture.
+- 假人界面的“背包”标签与环境伤害、掉血按钮不再被一条浅色线穿过：装备面板与原版背包背景改在该行下方的纯色区域衔接。
+- Pages retain one white outer frame. Neighbouring content regions use borderless surfaces and single gray-white dividers; controls, entity cards, interactive rows and dialogs keep their own outlines.
+- 页面统一保留一层白色外框，相邻内容区使用无边框底色与单条灰白分隔线；控件、生物卡片、交互条目及弹窗保留各自的描边。
+- Equipment previews retain their configured NBT and count on Forge. Equipment, accessory and block icons use native item tooltips, including modded tooltip components.
+- Text lists, item and entity grids, and scrolling forms stop at their actual content bottom; drawing and hit testing share the same offset.
+- Forge 装备预览保留配置的 NBT 与数量；装备、饰品及方块图标使用原生物品提示，保留模组自定义提示组件。
+- 文字列表、物品与生物网格及滚动表单按实际内容末端停止，绘制与命中使用同一偏移，消除末行后的空白。
+
+## 2026-10-16 — Standard entity cards and dimension windows / 标准生物卡片与维度窗口
+
+### English
+
+- Entity editors use the Core's 50 px model cards with 2 px gaps. Five columns leave space for the settings form; entity pools retain four columns. Existing settings-panel widths are preserved, and each card has the standard item slot background.
+- Search fields use more of their available width. Delete reuses existing rule, biome, effect and equipment removal actions while text fields retain keyboard priority.
+- Spawn dimension allowlists, blocklists and buff dimension restrictions open a compact text selection window with dimension IDs and translated names. Apply updates the local draft; Back cancels the selection.
+- Editor frames and their content use 4 px margins. Short Back and Apply actions stay 40 px wide; list headings no longer repeat entry counts.
+
+### 简体中文
+
+- 生物编辑器统一使用核心 50 像素模型卡片，间隔 2 像素；五列网格为设置表单保留空间，生物池保持四列，原设置栏宽度不缩小，每张卡片使用标准物品格背景。
+- 搜索框在可用范围内加宽；Delete 复用已有的规则、群系、效果与装备移除动作，文本框编辑优先。
+- 生成规则的维度白名单、黑名单与效果的限定维度改用紧凑的纯文字多选窗口，显示维度 ID 与译名；应用只更新本地草稿，返回取消本次选择。
+- 编辑器外框与内容留出 4 像素间距，返回、应用等短文字按钮保持 40 像素宽，列表标题不再重复数量。
+
+## 2026-10-15 — Card backgrounds / 卡片背景
+
+### English
+
+- The global rule card and disabled mobs keep the light card background instead of turning black.
+
+### 简体中文
+
+- 全局规则卡片与已禁用的生物保持浅色卡片背景，不再变黑。
+
+## 2026-10-13 — Attribute list rows / 属性列表行
+
+### English
+
+- The attribute list in the entity modifier shows whole rows only, so no edge of a hidden row appears just above the operation and value controls.
+
+### 简体中文
+
+- 实体修改器的属性列表只显示完整的行，操作与数值控件上方不再露出被遮住行的边缘。
+
 ## 2026-10-10 — Spawner compatibility and editor navigation / 刷怪笼兼容与编辑页导航
 
 ### English

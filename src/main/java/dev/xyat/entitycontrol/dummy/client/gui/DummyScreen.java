@@ -33,13 +33,13 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
             200,
             200
     );
-    private static final KineticTexture EMPTY_HELMET = KineticTexture.of("minecraft", "textures/item/empty_armor_slot_helmet.png", 16, 16);
+    private static final KineticTexture EMPTY_HELMET = dev.xyat.entitycontrol.client.gui.kit.EmptySlotIcons.of("head");
     private static final KineticTexture INVENTORY_TEXTURE = KineticTexture.of("minecraft", "textures/gui/container/generic_54.png", 256, 256);
-    private static final KineticTexture EMPTY_CHEST = KineticTexture.of("minecraft", "textures/item/empty_armor_slot_chestplate.png", 16, 16);
-    private static final KineticTexture EMPTY_LEGS = KineticTexture.of("minecraft", "textures/item/empty_armor_slot_leggings.png", 16, 16);
-    private static final KineticTexture EMPTY_BOOTS = KineticTexture.of("minecraft", "textures/item/empty_armor_slot_boots.png", 16, 16);
-    private static final KineticTexture EMPTY_SWORD = KineticTexture.of("minecraft", "textures/item/empty_slot_sword.png", 16, 16);
-    private static final KineticTexture EMPTY_SHIELD = KineticTexture.of("minecraft", "textures/item/empty_armor_slot_shield.png", 16, 16);
+    private static final KineticTexture EMPTY_CHEST = dev.xyat.entitycontrol.client.gui.kit.EmptySlotIcons.of("chest");
+    private static final KineticTexture EMPTY_LEGS = dev.xyat.entitycontrol.client.gui.kit.EmptySlotIcons.of("legs");
+    private static final KineticTexture EMPTY_BOOTS = dev.xyat.entitycontrol.client.gui.kit.EmptySlotIcons.of("feet");
+    private static final KineticTexture EMPTY_SWORD = dev.xyat.entitycontrol.client.gui.kit.EmptySlotIcons.of("mainhand");
+    private static final KineticTexture EMPTY_SHIELD = dev.xyat.entitycontrol.client.gui.kit.EmptySlotIcons.of("offhand");
 
     // Labels stop before controls in the same row, with a four-pixel gap.
     private static final int LABEL_X = 25;
@@ -277,8 +277,12 @@ public class DummyScreen extends KineticContainerPage<DummyMenu> {
     protected void renderContainerBackground(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
         // Keep the original equipment panel above the vanilla player inventory background. The panel in the texture is
         // 176 px wide at x 13, the same as the vanilla inventory, which is drawn down to its bottom border.
-        graphics.texture(TEXTURE, leftPos(), topPos(), 0, 0, 200, 101);
-        graphics.texture(INVENTORY_TEXTURE, leftPos() + 13, topPos() + 101, 0, 126, 176, 96);
+        // The two meet at y 113, below the Inventory label and the Env/HP Drop buttons, where both textures are plain:
+        // the dummy panel is plain until its own slot rows at 114, and generic_54 is plain from v 126 to its slot border
+        // at v 139. Starting the inventory at v 126 put the seam through that row, and at fractional GUI scales it
+        // picked up the white bottom edge of generic_54's chest slots (v 124) as a line. Slots stay at y 114.
+        graphics.texture(TEXTURE, leftPos(), topPos(), 0, 0, 200, 113);
+        graphics.texture(INVENTORY_TEXTURE, leftPos() + 13, topPos() + 113, 0, 138, 176, 84);
 
         for (int i = 0; i < Math.min(6, menu().slots.size()); i++) {
             if (menu().slots.get(i).getItem().isEmpty()) {

@@ -79,9 +79,5 @@ public final class GlobalSettingsScreen extends EcPage {
 
     @Override
     protected void renderContent(KineticGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        if (helpRect != null) {
-            graphics.wrappedText(KineticI18n.translatable("gui.entitycontrol.breakspawn.global.hint"), helpRect.x() + PAD,
-                    helpRect.y() + GAP, helpRect.width() - PAD * 2, KineticTheme.current().text());
-        }
     }
 }

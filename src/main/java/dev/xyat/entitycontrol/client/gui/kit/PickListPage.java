@@ -69,7 +69,7 @@ public final class PickListPage extends EcPage {
     protected void buildContent(KineticUi ui, KineticLayout.Rect body) {
         KineticLayout.Split split = takeRow(body);
         KineticLayout.Rect search = split.first();
-        textInput(ui, new KineticLayout.Rect(search.x(), search.y(), Math.min(200, search.width()), H), query,
+        textInput(ui, new KineticLayout.Rect(search.x(), search.y(), Math.min(240, search.width()), H), query,
                 KineticI18n.translatable("gui.entitycontrol.common.search"),
                 KineticI18n.translatable("tip.entitycontrol.common.search"), value -> {
                     query = value;

@@ -13,4 +13,8 @@ public interface IModifierPanel {
     void onEntitySelected(String entityId, LivingEntity previewEntity);
 
     void setVisible(boolean visible);
+
+    default boolean canDelete() { return false; }
+
+    default void deleteSelected() { }
 }

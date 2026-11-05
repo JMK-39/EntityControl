@@ -29,6 +29,8 @@ if (coreProperties.isFile()) {
     if (output) {
         File directory = new File(output)
         if (!directory.isAbsolute()) directory = new File(coreRoot, output)
+        // Release jars live in one folder per Minecraft version; the flat folder is still read for older jars.
+        pools.add(new File(directory, minecraft))
         pools.add(directory)
     }
 }

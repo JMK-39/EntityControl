@@ -3,6 +3,21 @@ package dev.xyat.entitycontrolvalidation;
 import dev.xyat.kineticcore.api.client.event.KineticClientEvents;
 import dev.xyat.kineticcore.api.client.gui.KineticGui;
 import dev.xyat.kineticcore.api.client.gui.page.KineticPage;
+import dev.xyat.kineticcore.api.client.gui.layout.KineticLayout;
+import dev.xyat.kineticcore.api.client.gui.overlay.KineticOverlays;
+import dev.xyat.kineticcore.api.client.gui.widget.KineticButton;
+import dev.xyat.kineticcore.internal.client.gui.screen.KineticScreenHost;
+import dev.xyat.entitycontrol.spawn.client.gui.SpawnControlScreen;
+import dev.xyat.entitycontrol.spawn.config.BiomeSpawnConfig;
+import dev.xyat.entitycontrol.breakspawn.client.gui.BlockRuleEditorScreen;
+import dev.xyat.entitycontrol.breakspawn.client.gui.BlockEntityPoolScreen;
+import dev.xyat.entitycontrol.breakspawn.config.BreakSpawnConfig;
+import dev.xyat.entitycontrol.spawn.client.gui.SpawnerControlScreen;
+import dev.xyat.entitycontrol.spawn.config.SpawnerConfig;
+import dev.xyat.entitycontrol.reset.client.gui.EntityResetRuleListScreen;
+import dev.xyat.entitycontrol.reset.config.EntityReseConfig;
+import dev.xyat.entitycontrol.client.gui.kit.EcPage;
+import dev.xyat.entitycontrol.client.gui.kit.DimensionPickerPage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.locale.Language;
@@ -17,14 +32,17 @@ import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/*** Uses the existing client and unsaved page drafts. Never clicks or saves editor changes. */
+/*** Uses the existing client and independent unsaved samples. Stage 4 clicks local draft controls, never Save. */
 public final class GuiLongTextValidation {
     private static final Logger LOG=LoggerFactory.getLogger(GuiLongTextValidation.class);
     private static final String ROOT=System.getProperty("entitycontrol.guiValidation.output","D:/IDEAWork/EntityControl/.gradle/gui-long-text-20261004/");
-    private static final String[] NAMES={"attributes-global","attributes-zombie","buffs-zombie","buffs-modified","dummy","curios","components","components-invalid","core-lists","spawn-equipment","damage-distance","config-tooltips","portable-dummy"};
+    private static final String[] NAMES={"attributes-global","attributes-zombie","buffs-zombie","buffs-modified","dummy","curios","components","components-invalid","core-lists","spawn-equipment","damage-distance","config-tooltips","portable-dummy","entity-selector","spawn-main","spawn-switches","break-main","break-context","spawner-main","reset-main","break-attribute-range","modifier-buff-edit","break-global-settings","generic-pick-list"};
     private static final BitSet capturedPages = new BitSet();
+    private static final List<String> checks = new ArrayList<>();
+    private static final Set<String> capturedCases = new LinkedHashSet<>();
     private static boolean installed,started,screenshot,finished,originalFullscreen;
     private static String originalLanguage;
+    private static String failureDetail="";
     private static int originalScale,originalWidth,originalHeight,phase=-1,page=-1,captures,failures;
     private static long due;
     private static CompletableFuture<Void> reload;
@@ -57,19 +75,30 @@ public final class GuiLongTextValidation {
             if(page==11 && mc.screen!=null)hoverConfigRow();
             // Server editor-close packets arrive after the synchronous interaction checks.
             if(page==12 && !(KineticGui.currentPage() instanceof DummyItemPreviewPage))KineticGui.open(new DummyItemPreviewPage());
-            if(!screenshot && now>=due) { capture("start");layout();screenshot=true;due=now+(phase==4?3400:550);return; }
+            if(page>=14 && page<=19 && !screenshot && now>=due && !Stage4.advance()) {
+                due=now+250;return;
+            }
+            if(!screenshot && now>=due) {
+                if(page<=3)Stage4.modifierLayout();
+                capture("start");layout();screenshot=true;due=now+(phase==4?3400:550);return;
+            }
             if(screenshot && now>=due) {
                 if(phase==4)capture("scroll");
                 nextPage();
             }
         } catch(Throwable error) {
-            failures++;LOG.error("ENTITY_GUI_FAIL phase="+phase+" page="+page,error);
+            failures++;
+            failureDetail=errorDetail(error,"phase="+phase+" page="+page+" case="+(page>=0 && page<NAMES.length?NAMES[page]:"none")+" "+Stage4.diagnostics());
+            LOG.error("ENTITY_GUI_FAIL phase="+phase+" page="+page,error);
             finish();
         }
     }
     private static void nextPhase() {
         if(stressOriginal!=null){Language.inject(stressOriginal);stressOriginal=null;}
         phase++;page=-1;
+        // One English 1080p round by default; list phases (0-4) in entitycontrol.guiValidation.phases to run more.
+        String selectedPhases=System.getProperty("entitycontrol.guiValidation.phases","1");
+        while(phase<5 && !Boolean.getBoolean("entitycontrol.guiValidation.fullHdOnly") && !List.of(selectedPhases.split(",")).contains(String.valueOf(phase)))phase++;
         boolean fullHdOnly=Boolean.getBoolean("entitycontrol.guiValidation.fullHdOnly");
         if(phase>=(fullHdOnly?2:5)){finish();return;}
         var mc=Minecraft.getInstance();
@@ -87,17 +116,21 @@ public final class GuiLongTextValidation {
         String selectedPages=System.getProperty("entitycontrol.guiValidation.pages", "");
         while(page<NAMES.length && !selectedPages.isBlank() && !List.of(selectedPages.split(",")).contains(String.valueOf(page)))page++;
         if(page>=NAMES.length){nextPhase();return;}
+        Stage4.reset();
         openPage(page);
         screenshot=false;due=System.currentTimeMillis()+1000;
         LOG.info("ENTITY_GUI_OPEN phase={} case={} page={}",phase,NAMES[page],KineticGui.currentPage()!=null?KineticGui.currentPage().getClass().getName():String.valueOf(Minecraft.getInstance().screen));
     }
     private static void openPage(int index) throws Exception {
         var mc=Minecraft.getInstance();
+        if(index>=14 && index<=19){Stage4.open(index);return;}
+        if(index>=20){openIsolatedEditor(index);return;}
         if(index==12){
             CompletableFuture.runAsync(()->DummyItemValidation.run(mc.getSingleplayerServer()),mc.getSingleplayerServer()).get();
             KineticGui.open(new DummyItemPreviewPage());return;
         }
         if(index==10){KineticGui.open(new DamageDistanceProbePage());return;}
+        if(index==13){dev.xyat.kineticcore.api.client.gui.selector.KineticSelectors.openEntitySelector(net.minecraft.network.chat.Component.literal("Entity selector"),java.util.List.of("minecraft:zombie"),ids->{});return;}
         if(index==11){
             var registered=dev.xyat.kineticcore.api.config.client.KTConfigApi.find(
                     dev.xyat.entitycontrol.dummy.config.DummyConfigGui.PAGE_ID).orElseThrow();
@@ -159,8 +192,27 @@ public final class GuiLongTextValidation {
             var rule = new dev.xyat.entitycontrol.breakspawn.config.BreakSpawnConfig.EntityRule();
             var equipment = new dev.xyat.entitycontrol.breakspawn.config.BreakSpawnConfig.EquipmentSpec();
             equipment.itemId = "minecraft:diamond_sword";
+            equipment.count = 3;
+            ItemStack named = new ItemStack(Items.DIAMOND_SWORD);
+            //? if >=1.21 {
+            /*named.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,Component.literal("Native equipment validation"));
+            equipment.components = dev.xyat.entitycontrol.breakspawn.data.EquipmentData.format(named);
+            *///?} else {
+            named.setHoverName(Component.literal("Native equipment validation"));
+            equipment.nbt = named.getTag().toString();
+            //?}
             rule.equipment.put("mainhand", equipment);
-            KineticGui.open(new dev.xyat.entitycontrol.breakspawn.client.gui.EquipmentEditorScreen("minecraft:zombie",rule,()->{}));
+            var editor = new dev.xyat.entitycontrol.breakspawn.client.gui.EquipmentEditorScreen("minecraft:zombie",rule,()->{});
+            KineticGui.open(editor);
+            ItemStack preview = (ItemStack)invoke(editor,"stack",equipment);
+            Stage4.require(preview.getCount()==3 && preview.getHoverName().getString().equals("Native equipment validation"),
+                    "equipment preview preserves the configured native stack data and count");
+            var icon=(KineticLayout.Rect)((Map<?,?>)field(editor,"icons")).get("mainhand");
+            invoke(editor,"contentTooltips",icon.x()+1,icon.y()+1);
+            Object overlay=((KineticScreenHost)mc.screen).kineticRuntime().overlays();
+            Stage4.require(field(overlay,"tooltip").getClass().getSimpleName().equals("ItemTooltip"),
+                    "equipment icon uses Core's native item tooltip");
+            checks.add("Native equipment data, count and ItemTooltip preserved");
         }else if(index==8){KineticGui.open(new CoreListsPage());
         }else{
         //? if >=1.21 {
@@ -170,6 +222,57 @@ public final class GuiLongTextValidation {
         //?}
         }
     }
+    private static void openIsolatedEditor(int index) throws Exception {
+        EcPage editor;
+        switch(index) {
+            case 20 -> {
+                var rule=new BreakSpawnConfig.EntityRule();
+                var range=new BreakSpawnConfig.AttributeRange();range.min=20D;range.max=40D;
+                String attribute=dev.xyat.kineticcore.api.registry.KineticRegistries.attributes().ids().stream()
+                        .map(Object::toString).filter(id->id.endsWith("max_health")).findFirst().orElseThrow();
+                rule.attributes.put(attribute,range);
+                editor=new dev.xyat.entitycontrol.breakspawn.client.gui.AttributeRangeScreen("minecraft:zombie",rule,()->{});
+                Stage4.setField(editor,"selected",attribute);
+            }
+            case 21 -> {
+                var parent=new dev.xyat.entitycontrol.modifier.client.gui.EntityModifierScreen("{}");
+                var buff=new dev.xyat.entitycontrol.modifier.config.EntityModifierConfig.PotionBuff();
+                buff.chance=0.25D;buff.minLevel=1;buff.maxLevel=3;
+                buff.dimensions="minecraft:overworld,minecraft:the_end";
+                editor=new dev.xyat.entitycontrol.modifier.client.gui.BuffEditScreen(parent,"minecraft:zombie","minecraft:speed",buff);
+            }
+            case 22 -> {
+                var sample=new BreakSpawnConfig.ConfigRoot();
+                sample.global.minSpawnCount=1;sample.global.maxSpawnCount=4;
+                sample.global.horizontalRadius=12;sample.global.verticalRadius=6;
+                editor=new dev.xyat.entitycontrol.breakspawn.client.gui.GlobalSettingsScreen(sample,()->{});
+            }
+            case 23 -> {
+                var entries=new ArrayList<dev.xyat.entitycontrol.client.gui.kit.PickListPage.Entry>();
+                for(int i=0;i<60;i++) entries.add(new dev.xyat.entitycontrol.client.gui.kit.PickListPage.Entry(
+                        "validation:long_attribute_identifier_"+i,
+                        Component.literal("A long translated attribute name for a bounded selection row "+i)));
+                List<String> applied=new ArrayList<>();
+                var picker=new dev.xyat.entitycontrol.client.gui.kit.PickListPage(
+                        Component.literal("Select attributes — isolated sample"),entries,
+                        List.of("validation:long_attribute_identifier_0"),applied::addAll);
+                ((Set<String>)field(picker,"picked")).add("validation:long_attribute_identifier_2");
+                editor=picker;
+            }
+            default -> throw new AssertionError("Unknown isolated editor "+index);
+        }
+        KineticGui.open(editor);
+        Stage4.require(editor.width()==640 && editor.height()==360 && editor.frame().x()==0 && editor.frame().y()==0,
+                "isolated child editor keeps its full shared canvas and outer frame");
+        for(var child:Minecraft.getInstance().screen.children()) {
+            if(!(child instanceof dev.xyat.kineticcore.api.client.gui.widget.KineticControl control) || !control.controlVisible())continue;
+            Stage4.require(control.controlX()>=4 && control.controlY()>=4
+                            && control.controlX()+control.controlWidth()<=636 && control.controlY()+control.controlHeight()<=356,
+                    "isolated child editor controls stay inside the four-pixel canvas inset");
+        }
+        checks.add("Isolated child editor covered: "+editor.getClass().getSimpleName()+"; no live configuration or save request");
+    }
+
     private static final class DummyItemPreviewPage extends KineticPage {
         DummyItemPreviewPage(){super(Component.literal("Portable testing dummy"));}
         @Override protected void build(dev.xyat.kineticcore.api.client.gui.ui.KineticUi ui) { }
@@ -221,9 +324,16 @@ public final class GuiLongTextValidation {
                 var constructor=Class.forName(manager.getName()+"$FloatingText").getDeclaredConstructors()[0];constructor.setAccessible(true);
                 var draw=manager.getDeclaredMethod("drawLabels",dev.xyat.kineticcore.api.client.gui.render.KineticGraphics.class,java.util.function.Function.class,net.minecraft.world.phys.Vec3.class,float.class);draw.setAccessible(true);
                 var player=Minecraft.getInstance().player;var origin=player.position();
+                // Floating numbers are only drawn without cumulative damage; a pack may have it enabled.
+                var cumulative=dev.xyat.entitycontrol.dummy.config.DummyClientConfig.accumulateDamage;
+                boolean wasCumulative=cumulative.get();
+                Object previousDistance=dev.xyat.entitycontrol.dummy.config.DummyClientConfig.damageRenderDistance.get();
+                cumulative.set(false);
+                try {
                 for(int distance:new int[]{1,64,1024,16,64}) {
                     entry.writeSnapshot(distance);config.save();particles.clear();
-                    for(double blocks:new double[]{1,64,1024,1025}){
+                    // Just inside each limit: exactly on it, rounding at large world coordinates can put a label outside.
+                    for(double blocks:new double[]{0.99,63.99,1023.99,1025}){
                         var point=origin.add(blocks,0,0);particles.add(constructor.newInstance(point,point,"42",0xFFFFFF,false,0f,0f));
                     }
                     int[] projections={0};
@@ -233,7 +343,11 @@ public final class GuiLongTextValidation {
                     if(projections[0]!=expected)throw new AssertionError("Live distance render: "+distance+" -> "+projections[0]);
                     LOG.info("ENTITY_DAMAGE_RANGE_PASS configured={} visible={} immediate=true",distance,projections[0]);
                 }
-                particles.clear();
+                } finally {
+                    particles.clear();
+                    cumulative.set(wasCumulative);
+                    entry.writeSnapshot(previousDistance);config.save();
+                }
                 LOG.info("ENTITY_DAMAGE_CONFIG_PASS default=64 min=1 max=1024 allValueTooltips=true language={}",Minecraft.getInstance().getLanguageManager().getSelected());
             }catch(Throwable error){throw new AssertionError("Damage distance runtime check",error);}
             dev.xyat.entitycontrol.dummy.config.DummyConfigGui.open();
@@ -265,6 +379,7 @@ public final class GuiLongTextValidation {
         var mc=Minecraft.getInstance();Path path=Path.of(ROOT,String.format("%d-%02d-%s-%s.png",phase,page,NAMES[page],frame));Files.createDirectories(path.getParent());
         try(var image=Screenshot.takeScreenshot(mc.getMainRenderTarget())){image.writeToFile(path);}
         capturedPages.set(page);
+        capturedCases.add(phase+":"+page);
         captures++;LOG.info("ENTITY_GUI_CAPTURE phase={} case={} image={}x{}",phase,NAMES[page],mc.getWindow().getWidth(),mc.getWindow().getHeight());
     }
     /*** Logs controls of the open screen that overlap or sit closer than 2 px (Core layout check). */
@@ -284,28 +399,456 @@ public final class GuiLongTextValidation {
         mc.setScreen(null);
         mc.getWindow().setWindowed(originalWidth,originalHeight);
         if(originalFullscreen && !mc.getWindow().isFullscreen())mc.getWindow().toggleFullScreen();
+        String next=System.getProperty("entitycontrol.guiValidation.thenValidation", "").trim();
+        try {
+            writeResult(next);
+        } catch(Exception error) { failures++;LOG.error("ENTITY_GUI_RESULT_FAIL",error); }
         LOG.info("ENTITY_GUI_{} pages={} captures={} failures={} userSettingsRestored=true",failures==0?"PASS":"FAIL",capturedPages.cardinality(),captures,failures);
+        if(failures==0 && !next.isBlank())try {
+            String type=next.endsWith(".install()")?next.substring(0,next.length()-".install()".length()):next;
+            Class.forName(type).getMethod("install").invoke(null);
+            LOG.info("ENTITY_GUI_CHAIN_STARTED {}",next);return;
+        } catch(Exception error) {
+            failures++;LOG.error("ENTITY_GUI_CHAIN_FAIL {}",next,error);
+            failureDetail=errorDetail(error,"chain="+next);
+            try { writeResult(next); }
+            catch(Exception resultError){LOG.error("ENTITY_GUI_RESULT_FAIL",resultError);}
+        }
         dev.xyat.kineticcore.api.runtime.KineticClientRuntime.stopClient();
     }
-    /*** Core list styles: text rows (single-select yellow, multi-select green), button rows with green picks, and an open autocomplete popup. */
+
+    private static void writeResult(String next)throws java.io.IOException {
+        Path directory=Path.of(ROOT).toAbsolutePath();Files.createDirectories(directory);
+        Files.writeString(directory.resolve("result.txt"), "ENTITY_GUI_"+(failures==0?"PASS":"FAIL")+"\n"
+                +"pages="+capturedPages+"\nphasePages="+capturedCases+"\ncaptures="+captures+"\nfailures="+failures
+                +"\nchecks="+checks+"\nnext="+(failures==0?next:"")+"\nfailureDetail="+failureDetail+"\n");
+    }
+
+    private static String errorDetail(Throwable error,String context) {
+        var trace=new java.io.StringWriter();error.printStackTrace(new java.io.PrintWriter(trace));
+        return context+"\n"+trace;
+    }
+
+    /** Real input through the current host; each step waits for a rendered frame before reading menu bounds. */
+    private static final class Stage4 {
+        private static final List<String> ENTITY_IDS=List.of("minecraft:zombie","minecraft:skeleton","minecraft:creeper",
+                "minecraft:spider","minecraft:cave_spider","minecraft:drowned","minecraft:husk","minecraft:stray",
+                "minecraft:witch","minecraft:enderman","minecraft:blaze","minecraft:slime","minecraft:magma_cube",
+                "minecraft:pig","minecraft:cow","minecraft:sheep","minecraft:chicken","minecraft:rabbit",
+                "minecraft:horse","minecraft:iron_golem");
+        private static int step;
+        private static long selectorWaitStarted,selectorDeadline,lastWaitLog;
+        private static KineticPage owner;
+        private static BiomeSpawnConfig.GlobalSettings globals;
+        private static BreakSpawnConfig.ConfigRoot blocks;
+        private static String firstBlock,secondBlock;
+        private static String serverSpawnGlobals,serverSpawnProfile,serverBlocks,serverSpawnerRules,serverResetRules;
+
+        static void reset(){step=0;owner=null;globals=null;blocks=null;selectorWaitStarted=selectorDeadline=lastWaitLog=0L;}
+
+        static String diagnostics() {
+            var mc=Minecraft.getInstance();var current=KineticGui.currentPage();
+            return "stage4Step="+step+" screen="+(mc.screen==null?"null":mc.screen.getClass().getName())
+                    +" currentPage="+(current==null?"null":current.getClass().getName())
+                    +" itemSearchReady="+dev.xyat.kineticcore.api.client.search.KineticItemSearch.ready()
+                    +" selectorWaitMs="+(selectorWaitStarted==0L?0L:System.currentTimeMillis()-selectorWaitStarted);
+        }
+
+        static void open(int index)throws Exception {
+            // These snapshots detect accidental writes to the live client configuration, too.
+            serverSpawnGlobals=BiomeSpawnConfig.GSON.toJson(BiomeSpawnConfig.globals);
+            serverSpawnProfile=BiomeSpawnConfig.GSON.toJson(BiomeSpawnConfig.currentProfile);
+            serverBlocks=BreakSpawnConfig.GSON.toJson(BreakSpawnConfig.CURRENT);
+            serverSpawnerRules=SpawnerConfig.GSON.toJson(SpawnerConfig.SPAWNER_RULES_CACHE);
+            serverResetRules=BreakSpawnConfig.GSON.toJson(EntityReseConfig.ENTITY_RULES_CACHE);
+            if(index<=15) {
+                globals=new BiomeSpawnConfig.GlobalSettings();
+                var profile=new BiomeSpawnConfig.ConfigProfile();
+                for(String id:ENTITY_IDS) {
+                    var node=new BiomeSpawnConfig.EntityNode();node.category="monster";node.enable_control=true;
+                    node.biomes.put("minecraft:plains",new BiomeSpawnConfig.SpawnerDataNode());profile.entities.put(id,node);
+                }
+                owner=new SpawnControlScreen(globals,profile,1);
+            } else if(index<=17) {
+                blocks=new BreakSpawnConfig.ConfigRoot();
+                for(String id:List.of("minecraft:diamond_ore","minecraft:stone")) {
+                    var rule=BreakSpawnConfig.createBlockRuleFromDefaults(blocks.global);
+                    rule.entityWeights.put("minecraft:zombie",3);rule.entityWeights.put("minecraft:skeleton",1);
+                    blocks.blocks.put(id,rule);
+                }
+                blocks.entities.put("minecraft:zombie",new BreakSpawnConfig.EntityRule());
+                blocks.entities.put("minecraft:skeleton",new BreakSpawnConfig.EntityRule());
+                firstBlock=blocks.blocks.keySet().iterator().next();secondBlock=blocks.blocks.keySet().stream().skip(1).findFirst().orElseThrow();
+                owner=new BlockRuleEditorScreen(blocks);
+            } else if(index==18) {
+                var snapshot=new SpawnerConfig.SpawnerEditorSnapshot();snapshot.entityIds.addAll(ENTITY_IDS);
+                snapshot.data.global.fixedSpawnDelaySeconds=12.5D;
+                snapshot.data.global.tuningEnabled=true;
+                snapshot.data.entities.put("minecraft:zombie",snapshot.data.global.copy());
+                owner=new SpawnerControlScreen(snapshot);
+            } else {
+                owner=new EntityResetRuleListScreen();
+                // Suppress the normal opening read request; no server traffic is necessary for layout validation.
+                setField(owner,"syncRequested",true);
+                setField(owner,"selectedId","minecraft:zombie");invoke(owner,"loadRule");
+            }
+            KineticGui.open(owner);
+        }
+
+        static boolean advance()throws Exception {
+            var mc=Minecraft.getInstance();
+            require(mc.getWindow().getWidth()==1920 && mc.getWindow().getHeight()==1080,"stage4 must run at 1920x1080");
+            if(page==14) {
+                switch(step++) {
+                    case 0 -> {
+                        require(KineticGui.currentPage()==owner,"spawn main owner");
+                        require(!header("save").isEnabled(),"fresh spawn sample is clean");
+                        geometry(owner,"cards",KineticLayout.ENTITY_CARD_SIZE);clickEntityCard("minecraft:zombie");return false;
+                    }
+                    case 1 -> {
+                        var node=(BiomeSpawnConfig.EntityNode)invoke(owner,"node");
+                        node.dim_blacklist.add("minecraft:overworld");
+                        clickPageButton("gui.entitycontrol.spawn.editor.dim_whitelist");return false;
+                    }
+                    case 2 -> {
+                        assertDimensionWindow();clickDimension("minecraft:overworld");return false;
+                    }
+                    case 3 -> {
+                        require(KineticGui.currentPage() instanceof DimensionPickerPage,"multi-select stays open after picking a row");
+                        var node=(BiomeSpawnConfig.EntityNode)invoke(owner,"node");
+                        require(node.dim_whitelist.isEmpty(),"picker keeps changes local before Apply");
+                        capture("dimension-whitelist-window");
+                        clickPageButton("gui.entitycontrol.common.dimensions.apply");return false;
+                    }
+                    case 4 -> {
+                        require(KineticGui.currentPage()==owner,"Apply returns to the same parent draft");
+                        var node=(BiomeSpawnConfig.EntityNode)invoke(owner,"node");
+                        require(node.dim_whitelist.contains("minecraft:overworld") && !node.dim_blacklist.contains("minecraft:overworld"),"dimension lists stay mutually exclusive");
+                        require(header("save").isEnabled(),"dimension draft enables Save without sending it");
+                        clickPageButton("gui.entitycontrol.spawn.editor.dim_blacklist");return false;
+                    }
+                    case 5 -> { assertDimensionWindow();clickDimension("minecraft:overworld");return false; }
+                    case 6 -> { clickPageButton("gui.entitycontrol.common.back");return false; }
+                    default -> {
+                        require(KineticGui.currentPage()==owner,"Back cancels the dimension window");
+                        var node=(BiomeSpawnConfig.EntityNode)invoke(owner,"node");
+                        require(node.dim_whitelist.contains("minecraft:overworld") && !node.dim_blacklist.contains("minecraft:overworld"),"cancelled dimension picks do not change the draft");
+                        check("spawn-five-standard-cards-and-dimension-window-draft");return true;
+                    }
+                }
+            }
+            if(page==15) {
+                switch(step++) {
+                    case 0 -> { geometry(owner,"cards",KineticLayout.ENTITY_CARD_SIZE);clickPageButton("gui.entitycontrol.spawn.editor.switches");return false; }
+                    case 1 -> {
+                        assertSwitchMenu(false,false,true);capture("before-toggle");clickMenu(0);return false;
+                    }
+                    case 2 -> {
+                        require(globals.enable_rule_override && !globals.enable_biome_override && globals.auto_scan,"rules toggle changes only its draft flag");
+                        require(header("save").isEnabled(),"spawn toggle enables Save without clicking it");
+                        clickPageButton("gui.entitycontrol.spawn.editor.switches");return false;
+                    }
+                    case 3 -> { assertSwitchMenu(true,false,true);clickMenu(1);return false; }
+                    case 4 -> {
+                        require(globals.enable_rule_override && globals.enable_biome_override && globals.auto_scan,"biome toggle updates local draft");
+                        clickPageButton("gui.entitycontrol.spawn.editor.switches");return false;
+                    }
+                    case 5 -> { assertSwitchMenu(true,true,true);clickMenu(2);return false; }
+                    case 6 -> {
+                        require(globals.enable_rule_override && globals.enable_biome_override && !globals.auto_scan,"autoscan only switches true to false; no refresh");
+                        clickPageButton("gui.entitycontrol.spawn.editor.switches");return false;
+                    }
+                    default -> { assertSwitchMenu(true,true,false);check("three-button-toggles-local-picked-save");return true; }
+                }
+            }
+            if(page==16) {
+                switch(step) {
+                    case 0 -> {
+                        require(KineticGui.currentPage()==owner,"block main owner");
+                        geometry(owner,"blocks",22);
+                        require(header("add").text().getString().equals(Component.translatable("gui.entitycontrol.breakspawn.ui.add_block").getString()),"Add block is a direct header button without a menu arrow");
+                        selectorWaitStarted=System.currentTimeMillis();selectorDeadline=selectorWaitStarted+30_000L;
+                        clickControl(header("add"),false);step=1;return false;
+                    }
+                    case 1 -> {
+                        if(mc.screen==null || !mc.screen.getClass().getSimpleName().equals("ItemSelectorScreen")) {
+                            long now=System.currentTimeMillis();
+                            require(now<selectorDeadline,"Timed out after 30s waiting for Add block's asynchronous Core item selector: "+diagnostics());
+                            if(lastWaitLog==0L || now-lastWaitLog>=5_000L) {
+                                lastWaitLog=now;LOG.info("ENTITY_STAGE4_WAIT_SELECTOR {}",diagnostics());
+                            }
+                            return false;
+                        }
+                        var options=(dev.xyat.kineticcore.api.client.gui.selector.KineticSelectors.ItemSelectorOptions)field(mc.screen,"options");
+                        require(options.itemResultsOnly() && options.accepts(new ItemStack(Items.STONE)) && !options.accepts(new ItemStack(Items.DIAMOND_SWORD)),"selector accepts blocks only");
+                        LOG.info("ENTITY_STAGE4_SELECTOR_READY waitedMs={}",System.currentTimeMillis()-selectorWaitStarted);
+                        capture("add-selector");clickPageButton("gui.kineticcore.config.back");step=2;return false;
+                    }
+                    default -> {
+                        require(KineticGui.currentPage()==owner && blocks.blocks.size()==2,"selector Back returns to the same clean block sample");
+                        require(!header("save").isEnabled(),"cancelling Add does not dirty sample");
+                        check("block-direct-add-selector-back");return true;
+                    }
+                }
+            }
+            if(page==18) {
+                switch(step++) {
+                    case 0 -> {
+                        geometry(owner,"cards",KineticLayout.ENTITY_CARD_SIZE);capture("global-fixed-delay");
+                        clickEntityCard("minecraft:zombie");return false;
+                    }
+                    default -> {
+                        require("minecraft:zombie".equals(field(owner,"selected")),"Spawner card selects its own local rule");
+                        require(!header("save").isEnabled(),"Spawner selection does not dirty its sample");
+                        geometry(owner,"cards",KineticLayout.ENTITY_CARD_SIZE);check("spawner-five-standard-columns-global-and-selected-fixed-pairs");return true;
+                    }
+                }
+            }
+            if(page==19) {
+                require(KineticGui.currentPage()==owner && (boolean)field(owner,"syncRequested") && !(boolean)field(owner,"waitingForSync"),"Reset layout sample opens without a rules request");
+                geometry(owner,"cards",KineticLayout.ENTITY_CARD_SIZE);
+                require("minecraft:zombie".equals(field(owner,"selectedId")),"Reset form displays the selected entity");
+                check("reset-five-standard-columns-selected-form-no-request");return true;
+            }
+            switch(step++) {
+                case 0 -> {
+                    geometry(owner,"blocks",22);
+                    require(firstBlock.equals(field(owner,"selectedBlockId")),"first block initially selected");
+                    rightClickSecond();return false;
+                }
+                case 1 -> {
+                    assertBlockMenu();capture("menu-before-edit");clickMenu(0);return false;
+                }
+                case 2 -> {
+                    require(KineticGui.currentPage() instanceof BlockEntityPoolScreen,"context Edit opens the real pool editor");
+                    var pool=KineticGui.currentPage();
+                    require(secondBlock.equals(field(pool,"blockId")) && field(pool,"config")==blocks && field(pool,"blockRule")==blocks.blocks.get(secondBlock),"pool belongs to the second right-clicked block");
+                    capture("second-block-pool");clickPageButton("gui.entitycontrol.common.back");return false;
+                }
+                case 3 -> {
+                    require(KineticGui.currentPage()==owner && secondBlock.equals(field(owner,"selectedBlockId")),"pool Back returns to the same parent and second selection");
+                    require(blocks.blocks.size()==2,"editing and returning did not remove blocks");rightClickSecond();return false;
+                }
+                case 4 -> { assertBlockMenu();capture("menu-before-delete");clickMenu(1);return false; }
+                default -> {
+                    require(blocks.blocks.size()==1 && blocks.blocks.containsKey(firstBlock) && !blocks.blocks.containsKey(secondBlock),"Delete removes only the second right-clicked block");
+                    require(firstBlock.equals(field(owner,"selectedBlockId")),"Delete selects the remaining first block");
+                    require(header("save").isEnabled(),"Delete enables Save without sending it");
+                    deleteKey();
+                    require(blocks.blocks.isEmpty() && field(owner,"selectedBlockId")==null,"Delete key reuses removal for the selected remaining block");
+                    check("block-second-right-click-edit-back-delete-and-delete-key");return true;
+                }
+            }
+        }
+
+        private static void assertSwitchMenu(boolean rules,boolean biomes,boolean autoscan)throws Exception {
+            List<?> controls=menuControls();require(controls.size()==3,"three spawn switches");
+            boolean[] expected={rules,biomes,autoscan};
+            for(int i=0;i<3;i++) {
+                var item=(KineticOverlays.MenuItem)invoke(controls.get(i),"item");
+                var button=(KineticButton)invoke(controls.get(i),"button");
+                require(item.isButton() && !item.isChoice() && item.checked()!=null,"switch explicitly requests a genuine button row");
+                require(Boolean.valueOf(expected[i]).equals(item.checked()) && button.isPicked()==expected[i] && !button.isSelected(),"switch retains green toggle state");
+                require(!(boolean)invokeStaticTextRow(item),"render path uses button drawing, not selection-row drawing");
+            }
+        }
+
+        private static Object invokeStaticTextRow(KineticOverlays.MenuItem item)throws Exception {
+            Object overlay=overlays(),menu=field(overlay,"contextMenu");
+            return invoke(overlay,"textRow",item,menu);
+        }
+
+        private static void assertBlockMenu()throws Exception {
+            require(secondBlock.equals(field(owner,"selectedBlockId")),"right-click selects second block before constructing actions");
+            List<?> controls=menuControls();require(controls.size()==2,"block context contains Edit pool and Delete only");
+            String[] keys={"edit_pool","remove_block"};
+            for(int i=0;i<2;i++) {
+                var item=(KineticOverlays.MenuItem)invoke(controls.get(i),"item");
+                require(item.label().getString().equals(Component.translatable("gui.entitycontrol.breakspawn.ui."+keys[i]).getString()) && item.enabled(),"block context action "+keys[i]);
+                require(!(boolean)invokeStaticTextRow(item),"block action uses genuine button drawing");
+            }
+        }
+
+        private static void rightClickSecond()throws Exception {
+            var visible=(List<?>)field(owner,"visibleBlocks");require(visible.size()==2 && secondBlock.equals(visible.get(1)),"second rendered block matches expected id");
+            var rect=(KineticLayout.Rect)invoke(field(owner,"blocks"),"slot",1);
+            clickPage(rect.x()+rect.width()/2.0,rect.y()+rect.height()/2.0,1);
+        }
+
+        private static void clickEntityCard(String id)throws Exception {
+            Object grid=field(owner,"cards");var keys=(List<?>)field(grid,"keys");int index=keys.indexOf(id);
+            require(index>=0,"sample contains entity card "+id);
+            var rect=(KineticLayout.Rect)invoke(grid,"card",index);
+            clickPage(rect.x()+rect.width()/2.0,rect.y()+rect.height()/2.0,0);
+        }
+
+        static void modifierLayout()throws Exception {
+            geometry(KineticGui.currentPage(),"cards",KineticLayout.ENTITY_CARD_SIZE);
+            checks.add(phase+":"+page+":modifier-five-standard-columns-title-free-contained");
+            LOG.info("ENTITY_STAGE4_CHECK phase={} page={} modifier-five-standard-columns-title-free-contained",phase,page);
+        }
+
+        private static void assertDimensionWindow()throws Exception {
+            require(KineticGui.currentPage() instanceof DimensionPickerPage,"dimension button opens a compact multi-select window");
+            var picker=KineticGui.currentPage();var frame=(KineticLayout.Rect)field(picker,"frame");
+            require(frame.width()==360 && frame.height()==240 && frame.x()>4 && frame.y()>4,"dimension window is compact and centered");
+            var list=field(picker,"rows");var rows=(List<?>)field(list,"rows");
+            Object overworld=rows.stream().filter(row->{try{return invoke(row,"key").equals("minecraft:overworld");}catch(Exception error){throw new AssertionError(error);}}).findFirst().orElseThrow();
+            var text=(Component)invoke(overworld,"text");
+            require(text.getString().contains("minecraft:overworld") && !text.getString().equals("minecraft:overworld"),"dimension ID includes a translated name");
+            for(var child:Minecraft.getInstance().screen.children())if(child instanceof KineticButton button)
+                require(button.controlWidth()==40,"short dimension window actions remain 40px");
+        }
+
+        private static void clickDimension(String id)throws Exception {
+            for(var child:Minecraft.getInstance().screen.children()) {
+                if(child instanceof dev.xyat.kineticcore.api.client.gui.widget.KineticTextField search) {
+                    search.setTextValue(id);break;
+                }
+            }
+            Object list=field(KineticGui.currentPage(),"rows");var rows=(List<?>)field(list,"rows");
+            int index=-1;for(int i=0;i<rows.size();i++)if(invoke(rows.get(i),"key").equals(id)){index=i;break;}
+            require(index>=0,"dimension window contains "+id);
+            var rect=(KineticLayout.Rect)invoke(list,"row",index);
+            clickPage(rect.x()+rect.width()/2.0,rect.y()+rect.height()/2.0,0);
+        }
+
+        /** Check actual built rectangles, including both ends of every narrowed right-side input pair. */
+        private static void geometry(KineticPage target,String gridName,int size)throws Exception {
+            Object grid=field(target,gridName);
+            var area=(KineticLayout.Rect)field(grid,"area");
+            var body=((EcPage)target).body();
+            int columns=gridName.equals("blocks")?10:5;
+            require(((Number)field(grid,"columns")).intValue()==columns,"grid keeps standard card sizes and the intended number of columns");
+            require(area.y()==body.y()+EcPage.PAD+EcPage.H+EcPage.GAP,"left content moves up by the removed title row");
+            var sections=(List<?>)field(target,"sections");
+            require(!sections.isEmpty() && ((Component)invoke(sections.get(0),"title")).getString().isBlank(),"left count title is removed");
+            String method=gridName.equals("blocks")?"slot":"card";
+            var first=(KineticLayout.Rect)invoke(grid,method,0);
+            var last=(KineticLayout.Rect)invoke(grid,method,columns-1);
+            var next=(KineticLayout.Rect)invoke(grid,method,columns);
+            require(first.width()==size && last.y()==first.y() && next.x()==first.x() && next.y()>=first.bottom()+2,"standard slots keep two-pixel gaps and wrap after the last column");
+            require(last.right()<=area.right()-6,"last column leaves room for its scrollbar (2026-10-22: 6 px, scrollbar closer to the cards)");
+            String selectedName="";
+            if(target instanceof SpawnControlScreen p) {
+                selectedName=(String)invoke(p,"entityName",field(p,"selectedId"));
+            } else if(target instanceof SpawnerControlScreen p) {
+                String selected=(String)field(p,"selected");
+                if(!selected.equals("__global__"))selectedName=((Component)invoke(p,"entityName",selected)).getString();
+            } else if(target instanceof EntityResetRuleListScreen p) {
+                selectedName=((Component)invoke(p,"entityName",field(p,"selectedId"))).getString();
+            } else if(target instanceof dev.xyat.entitycontrol.modifier.client.gui.EntityModifierScreen p) {
+                Object selected=field(p,"selectedEntity");
+                if(selected!=null)selectedName=(String)invoke(selected,"translatedName");
+            } else if(target instanceof BlockRuleEditorScreen p) {
+                selectedName=((Component)invoke(p,"blockName",field(p,"selectedBlockId"))).getString();
+            }
+            for(Object section:sections) {
+                var title=(Component)invoke(section,"title");
+                require(selectedName.isBlank() || !title.getString().contains(selectedName),"right-side section does not duplicate selected entity/block name");
+            }
+            List<KineticLayout.Rect> panels=new ArrayList<>();
+            for(Object section:sections)panels.add((KineticLayout.Rect)invoke(section,"rect"));
+            for(var listener:Minecraft.getInstance().screen.children()) {
+                if(!(listener instanceof dev.xyat.kineticcore.api.client.gui.widget.KineticControl control) || !control.controlVisible())continue;
+                int x=control.controlX(),y=control.controlY(),right=x+control.controlWidth(),bottom=y+control.controlHeight();
+                if(y<body.y())continue;
+                var panel=panels.stream().filter(r->r.contains(x,y)).findFirst().orElseThrow(()->new AssertionError("control outside content panels at "+x+","+y));
+                require(x>=panel.x()+2 && y>=panel.y()+2 && right<=panel.right()-2 && bottom<=panel.bottom()-2,
+                        "content control stays inside its panel: "+x+","+y+".."+right+","+bottom+" panel="+panel);
+            }
+            LOG.info("ENTITY_STAGE4_GEOMETRY phase={} page={} columns={} card={} grid={} sections={} titleRowRemoved=true controlsContained=true",phase,page,columns,size,area,sections.size());
+        }
+
+        private static void setField(Object target,String name,Object value)throws Exception {
+            for(Class<?> type=target.getClass();type!=null;type=type.getSuperclass())try {
+                var f=type.getDeclaredField(name);f.setAccessible(true);f.set(target,value);return;
+            }catch(NoSuchFieldException ignored){}
+            throw new NoSuchFieldException(name);
+        }
+
+        private static Object overlays(){return ((KineticScreenHost)Minecraft.getInstance().screen).kineticRuntime().overlays();}
+        private static List<?> menuControls()throws Exception {
+            Object menu=field(overlays(),"contextMenu");require(menu!=null,"actual context menu is open");
+            return (List<?>)invoke(menu,"controls");
+        }
+        private static KineticButton header(String id)throws Exception{return (KineticButton)invoke(owner,"headerButton",id);}
+        private static void clickMenu(int index)throws Exception {clickControl((KineticButton)invoke(menuControls().get(index),"button"),true);}
+        private static void clickPageButton(String key) {
+            String label=Component.translatable(key).getString();
+            for(var listener:Minecraft.getInstance().screen.children())if(listener instanceof KineticButton button && (button.text().getString().equals(label) || button.text().getString().equals(label+" ▾"))) {
+                if(key.endsWith(".back"))require(button.controlWidth()==40,"Back is 40px");
+                clickControl(button,false);return;
+            }
+            throw new AssertionError("Missing actual button "+key);
+        }
+        private static void clickControl(KineticButton button,boolean screenCoordinates) {
+            require(button!=null && button.isEnabled(),"button is enabled");
+            double x=button.controlX()+button.controlWidth()/2.0,y=button.controlY()+button.controlHeight()/2.0;
+            if(screenCoordinates)clickScreen(x,y,0);else clickPage(x,y,0);
+        }
+        private static void clickPage(double x,double y,int button) {
+            var host=(KineticScreenHost)Minecraft.getInstance().screen;clickScreen(host.toScreenX(x),host.toScreenY(y),button);
+        }
+        private static void clickScreen(double x,double y,int button) {
+            var screen=Minecraft.getInstance().screen;
+            //? if >=26.1 {
+            /*var input=new net.minecraft.client.input.MouseButtonEvent(x,y,new net.minecraft.client.input.MouseButtonInfo(button,0));
+            screen.mouseClicked(input,false);screen.mouseReleased(input);
+            *///?} else {
+            screen.mouseClicked(x,y,button);screen.mouseReleased(x,y,button);
+            //?}
+        }
+        private static void deleteKey() {
+            //? if >=26.1 {
+            /*Minecraft.getInstance().screen.keyPressed(new net.minecraft.client.input.KeyEvent(261,0,0));*/
+            //?} else {
+            Minecraft.getInstance().screen.keyPressed(261,0,0);
+            //?}
+        }
+        private static void check(String name) {
+            require(serverSpawnGlobals.equals(BiomeSpawnConfig.GSON.toJson(BiomeSpawnConfig.globals))
+                    && serverSpawnProfile.equals(BiomeSpawnConfig.GSON.toJson(BiomeSpawnConfig.currentProfile))
+                    && serverBlocks.equals(BreakSpawnConfig.GSON.toJson(BreakSpawnConfig.CURRENT))
+                    && serverSpawnerRules.equals(SpawnerConfig.GSON.toJson(SpawnerConfig.SPAWNER_RULES_CACHE))
+                    && serverResetRules.equals(BreakSpawnConfig.GSON.toJson(EntityReseConfig.ENTITY_RULES_CACHE)),"live client configuration is unchanged");
+            checks.add(phase+":"+page+":"+name);LOG.info("ENTITY_STAGE4_CHECK phase={} page={} {}",phase,page,name);
+        }
+        private static void require(boolean condition,String message){if(!condition)throw new AssertionError(message);}
+    }
+    /*** Core list styles in a 2x2 grid, each with its own search: single-select text rows (yellow), multi-select text
+     * rows (green), multi-select button rows (green), and an open autocomplete popup. */
     private static final class CoreListsPage extends KineticPage {
-        CoreListsPage(){super(Component.literal("GUI test only - Core list styles (not part of the mod)"));}
+        private static final List<String> IDS=List.of("minecraft:plains","minecraft:forest","minecraft:desert","minecraft:a_deliberately_long_biome_identifier_to_check_scrolling","minecraft:taiga","minecraft:swamp","minecraft:jungle","minecraft:badlands","minecraft:savanna","minecraft:snowy_plains","minecraft:meadow","minecraft:cherry_grove");
+        private final String[] queries={"","",""};
+        CoreListsPage(){super(Component.literal("GUI test only - Core list styles (not part of the mod)"));useCanvas(640,360,4);}
         @Override protected void renderBackground(dev.xyat.kineticcore.api.client.gui.render.KineticGraphics g,int mx,int my,float pt){
-            dev.xyat.kineticcore.api.client.gui.theme.KineticTheme.shadow(g,width(),height());
-            dev.xyat.kineticcore.api.client.gui.theme.KineticTheme.panel(g,4,4,width()-8,height()-8);
-            g.scrollingTextCentered(title(),width()/2,14,width()-24,0xFFFFFF,false);
+            dev.xyat.kineticcore.api.client.gui.theme.KineticTheme.panel(g,0,0,width(),height());
+            dev.xyat.kineticcore.api.client.gui.theme.KineticTheme.separator(g,4,24,width()-8);
+            g.scrollingText(title(),52,8,width()-56,0xFFFFFF,false);
+        }
+        private List<String> filtered(int area){
+            return IDS.stream().filter(id->dev.xyat.kineticcore.api.client.search.KineticSearch.match(id,queries[area])).toList();
+        }
+        private void search(dev.xyat.kineticcore.api.client.gui.ui.KineticUi ui,int area,int x,int y,int w){
+            ui.textField(x,y,w).value(queries[area]).placeholder(Component.literal("Search")).onChange(value->{if(!value.equals(queries[area])){queries[area]=value;rebuild();}}).build();
         }
         @Override protected void build(dev.xyat.kineticcore.api.client.gui.ui.KineticUi ui) {
-            int col=(width()-40)/3;
-            var ids=List.of("minecraft:plains","minecraft:forest","minecraft:desert","minecraft:a_deliberately_long_biome_identifier_to_check_scrolling","minecraft:taiga","minecraft:swamp","minecraft:jungle","minecraft:badlands");
+            ui.button(4,4,40).text(Component.literal("Back")).onClick(this::close).build();
+            int w=(width()-12)/2, h=(height()-28-4-4)/2, x1=4, x2=8+w, y1=28, y2=32+h, listH=h-20;
+            search(ui,0,x1,y1,w);
             var single=new ArrayList<dev.xyat.kineticcore.api.client.gui.widget.list.SelectionItem>();
-            for(String id:ids)single.add(new dev.xyat.kineticcore.api.client.gui.widget.list.SelectionItem(Component.literal(id),null,null,true,false));
-            ui.selectionList(10,30,col,110,single).selected(1).textRows().build();
+            for(String id:filtered(0))single.add(new dev.xyat.kineticcore.api.client.gui.widget.list.SelectionItem(Component.literal(id),null,null,true,false));
+            ui.selectionList(x1,y1+20,w,listH,single).selected(Math.min(1,single.size()-1)).textRows().build();
+            search(ui,1,x2,y1,w);
             var multi=new ArrayList<dev.xyat.kineticcore.api.client.gui.widget.list.ToggleItem>();
-            for(int i=0;i<ids.size();i++)multi.add(new dev.xyat.kineticcore.api.client.gui.widget.list.ToggleItem(Component.literal(ids.get(i)),null,i%3==0,true));
-            ui.toggleList(20+col,30,col,110,multi).textRows().build();
-            ui.toggleList(30+2*col,30,col,110,multi).build();
-            var field=ui.autoComplete(10,160,col,()->ids.stream().map(dev.xyat.kineticcore.api.client.search.KineticSuggestion::of).toList()).value("minecraft:").build();
+            for(String id:filtered(1))multi.add(new dev.xyat.kineticcore.api.client.gui.widget.list.ToggleItem(Component.literal(id),null,IDS.indexOf(id)%3==0,true));
+            ui.toggleList(x2,y1+20,w,listH,multi).textRows().build();
+            search(ui,2,x1,y2,w);
+            var buttons=new ArrayList<dev.xyat.kineticcore.api.client.gui.widget.list.ToggleItem>();
+            for(String id:filtered(2))buttons.add(new dev.xyat.kineticcore.api.client.gui.widget.list.ToggleItem(Component.literal(id),null,IDS.indexOf(id)%3==0,true));
+            ui.toggleList(x1,y2+20,w,listH,buttons).build();
+            var field=ui.autoComplete(x2,y2,w,()->IDS.stream().map(dev.xyat.kineticcore.api.client.search.KineticSuggestion::of).toList()).value("minecraft:").build();
             focus(field);
         }
     }

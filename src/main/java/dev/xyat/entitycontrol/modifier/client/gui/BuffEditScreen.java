@@ -1,6 +1,7 @@
 package dev.xyat.entitycontrol.modifier.client.gui;
 
 import dev.xyat.entitycontrol.client.gui.kit.EcPage;
+import dev.xyat.entitycontrol.client.gui.kit.DimensionPickerPage;
 import dev.xyat.entitycontrol.modifier.config.EntityModifierConfig;
 import dev.xyat.kineticcore.api.client.gui.layout.KineticLayout;
 import dev.xyat.kineticcore.api.client.gui.overlay.KineticOverlays;
@@ -96,20 +97,14 @@ public final class BuffEditScreen extends EcPage {
                 KineticI18n.translatable("gui.entitycontrol.modifier.modifier.buff.max"), value -> {
                     if (value != null) maxLevel = value;
                 });
-        List<ToggleOption> options = new ArrayList<>();
-        for (String dimension : allDimensions) {
-            options.add(new ToggleOption(Component.literal(dimension), tr("dimension.tooltip"), () -> dimensions.contains(dimension),
-                    value -> {
-                        if (value) {
-                            if (!dimensions.contains(dimension)) dimensions.add(dimension);
-                        } else {
-                            dimensions.remove(dimension);
-                        }
-                    }));
-        }
-        toggleMenu(ui, compact(form.row(tr("dimensions"), tr("dimension.tooltip"))), tr("dimensions.button"), tr("dimension.tooltip"),
-                options, !options.isEmpty(), null);
-        helpRect = section(columns.second(), tr("help.title"));
+        KineticLayout.Rect dimensionRow = compact(form.row(tr("dimensions"), tr("dimension.tooltip")));
+        ui.button(dimensionRow.x(), dimensionRow.y(), Math.min(dimensionRow.width(), 40))
+                .text(tr("dimensions.button")).tooltip(tr("dimension.tooltip"))
+                .onClick(() -> openChild(new DimensionPickerPage(tr("dimensions"), allDimensions, dimensions, values -> {
+                    dimensions.clear();
+                    dimensions.addAll(values);
+                }))).build();
+        helpRect = null;
     }
 
     @Override
