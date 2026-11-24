@@ -6,6 +6,7 @@ import dev.xyat.entitycontrol.spawn.SpawnModule;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import dev.xyat.kineticcore.api.runtime.KineticPlatform;
+import dev.xyat.kineticcore.api.runtime.KineticPaths;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.Entity;
@@ -33,9 +34,9 @@ import java.util.TreeMap;
 public class SpawnerConfig {
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    private static final Path BASE_DIR = KineticPlatform.configDirectory().resolve("kineticcore");
-    private static final Path CONFIG_PATH = BASE_DIR.resolve("spawner.json");
-    private static final Path BACKUP_PATH = BASE_DIR.resolve("spawner_backup.json");
+    private static final Path BASE_DIR = KineticPlatform.configDirectory().resolve("kineticcore/entitycontrol");
+    private static final Path CONFIG_PATH = BASE_DIR.resolve("spawner_rules.json");
+    private static final Path BACKUP_PATH = BASE_DIR.resolve("spawner_rules_backup.json");
 
     public static final Map<String, SpawnerRule> SPAWNER_RULES_CACHE = new HashMap<>();
     public static final Set<String> SPAWNER_BLACKLIST_CACHE = new HashSet<>();
@@ -143,6 +144,8 @@ public class SpawnerConfig {
     }
 
     public static void load() {
+        KineticPaths.migrateConfigFile("kineticcore/spawner.json", "kineticcore/entitycontrol/spawner_rules.json");
+        KineticPaths.migrateConfigFile("kineticcore/spawner_backup.json", "kineticcore/entitycontrol/spawner_rules_backup.json");
         try {
             Files.createDirectories(BASE_DIR);
             boolean configExisted = Files.exists(CONFIG_PATH);
@@ -328,7 +331,7 @@ public class SpawnerConfig {
             SpawnerData loaded = GSON.fromJson(reader, SpawnerData.class);
             return loaded == null ? new SpawnerData() : loaded;
         } catch (Exception e) {
-            SpawnModule.LOGGER.error("Failed to read spawner.json", e);
+            SpawnModule.LOGGER.error("Failed to read spawner_rules.json", e);
             return new SpawnerData();
         }
     }
@@ -342,7 +345,7 @@ public class SpawnerConfig {
             SpawnerBackupData loaded = GSON.fromJson(reader, SpawnerBackupData.class);
             return loaded == null ? new SpawnerBackupData() : loaded;
         } catch (Exception e) {
-            SpawnModule.LOGGER.error("Failed to read spawner_backup.json", e);
+            SpawnModule.LOGGER.error("Failed to read spawner_rules_backup.json", e);
             return new SpawnerBackupData();
         }
     }

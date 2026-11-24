@@ -8,6 +8,7 @@ import dev.xyat.entitycontrol.spawn.SpawnModule;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import dev.xyat.kineticcore.api.runtime.KineticPlatform;
+import dev.xyat.kineticcore.api.runtime.KineticPaths;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
@@ -49,10 +50,19 @@ public class BiomeSpawnConfig {
     public static final int MAX_PROFILE_COUNT = 64;
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    private static final Path BASE_DIR = KineticPlatform.configDirectory().resolve("kineticcore").resolve("spawn_control");
+    private static final Path BASE_DIR = KineticPlatform.configDirectory().resolve("kineticcore/entitycontrol");
     private static final Path GLOBALS_PATH = BASE_DIR.resolve("globals.toml");
-    private static final Path BACKUP_PATH = BASE_DIR.resolve("spawn_backup.json");
-    private static final String PROFILE_PREFIX = "profile_";
+    private static final Path BACKUP_PATH = BASE_DIR.resolve("natural_spawn_backup.json");
+    private static final String PROFILE_PREFIX = "spawn_profile_";
+
+    static {
+        KineticPaths.migrateConfigFile("kineticcore/spawn_control/globals.toml", "kineticcore/entitycontrol/globals.toml");
+        KineticPaths.migrateConfigFile("kineticcore/spawn_control/spawn_backup.json", "kineticcore/entitycontrol/natural_spawn_backup.json");
+        for (int index = MIN_PROFILE_COUNT; index <= MAX_PROFILE_COUNT; index++) {
+            KineticPaths.migrateConfigFile("kineticcore/spawn_control/profile_" + index + ".json",
+                    "kineticcore/entitycontrol/spawn_profile_" + index + ".json");
+        }
+    }
 
     public static GlobalSettings globals = new GlobalSettings();
     public static ConfigProfile currentProfile = new ConfigProfile();

@@ -2,6 +2,7 @@ package dev.xyat.entitycontrol.modifier.event;
 
 import dev.xyat.entitycontrol.modifier.config.EntityModifierConfig;
 import dev.xyat.entitycontrol.modifier.config.ModifierMath;
+import dev.xyat.entitycontrol.modifier.config.ModifierAttributeRules;
 import dev.xyat.entitycontrol.modifier.network.EntityModifierNetwork;
 import dev.xyat.kineticcore.api.event.KineticEventPriority;
 import dev.xyat.kineticcore.api.player.event.KineticPlayerEvents;
@@ -78,7 +79,7 @@ public final class ModifierEventHandler {
 
     private static EntityModifierConfig.EntityEditData findRule(LivingEntity living, ResourceLocation entityId) {
         EntityModifierConfig.EntityEditData individual = EntityModifierConfig.ENTITY_DATA.get(entityId.toString());
-        // An individual rule replaces the complete global rule; never merge partial attributes.
+        // Preserve the existing effect selection; attributes are resolved independently below.
         if (individual != null && individual.hasRules()) return individual;
         EntityModifierConfig.EntityEditData global = EntityModifierConfig.ENTITY_DATA.get(EntityModifierConfig.GLOBAL_KEY);
         return global != null && global.hasRules() ? global : null;
@@ -105,14 +106,10 @@ public final class ModifierEventHandler {
         }
 
         CompoundTag originals = new CompoundTag();
-        Map<String, EntityModifierConfig.AttributeRule> operations = new LinkedHashMap<>();
-        for (Map.Entry<String, Double> entry : rule.attributes.entrySet()) {
-            operations.put(entry.getKey(), new EntityModifierConfig.AttributeRule("SET", entry.getValue()));
-        }
-        operations.putAll(rule.attributeRules);
+        Map<String, EntityModifierConfig.AttributeRule> operations = ModifierAttributeRules.resolve(
+                EntityModifierConfig.ENTITY_DATA.get(EntityModifierConfig.GLOBAL_KEY),
+                EntityModifierConfig.ENTITY_DATA.get(entityId.toString()), entityId.toString());
         for (Map.Entry<String, EntityModifierConfig.AttributeRule> entry : operations.entrySet()) {
-            if (rule == EntityModifierConfig.ENTITY_DATA.get(EntityModifierConfig.GLOBAL_KEY)
-                    && !entry.getValue().appliesTo(entityId.toString())) continue;
             applyAttribute(living, entry.getKey(), entry.getValue().mode, entry.getValue().value,
                     originals, dynamic);
         }

@@ -60,6 +60,6 @@ public class DummyConfig {
     }
 
     public static void register() {
-        KTCommonConfigApi.register(SPEC, "kineticcore/dummy_server.toml");
+        KTCommonConfigApi.register(SPEC, "kineticcore/entitycontrol/dummy_server.toml");
     }
 }

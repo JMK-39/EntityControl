@@ -192,6 +192,6 @@ public class DummyClientConfig {
     }
 
     public static void register() {
-        KTClientConfigAdapter.registerSpec(SPEC, "kineticcore/dummy_client.toml");
+        KTClientConfigAdapter.registerSpec(SPEC, "kineticcore/entitycontrol/dummy_client.toml");
     }
 }

@@ -12,6 +12,7 @@ import net.minecraft.server.level.ServerLevel;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import dev.xyat.kineticcore.api.runtime.KineticPlatform;
+import dev.xyat.kineticcore.api.runtime.KineticPaths;
 
 import java.io.Reader;
 import java.io.StringReader;
@@ -28,7 +29,7 @@ import java.util.TreeMap;
 
 public class EntityModifierConfig {
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path CONFIG_PATH = KineticPlatform.configDirectory().resolve("kineticcore/entity_modifier.json");
+    private static final Path CONFIG_PATH = KineticPlatform.configDirectory().resolve("kineticcore/entitycontrol/entity_modifiers.json");
 
     public static Map<String, EntityEditData> ENTITY_DATA = new TreeMap<>();
 
@@ -113,6 +114,7 @@ public class EntityModifierConfig {
     }
 
     private static Map<String, EntityEditData> readConfigFile() {
+        KineticPaths.migrateConfigFile("kineticcore/entity_modifier.json", "kineticcore/entitycontrol/entity_modifiers.json");
         if (!Files.exists(CONFIG_PATH)) {
             return new TreeMap<>();
         }
@@ -120,7 +122,7 @@ public class EntityModifierConfig {
         try (Reader reader = Files.newBufferedReader(CONFIG_PATH, StandardCharsets.UTF_8)) {
             return parseConfig(reader);
         } catch (Exception e) {
-            ModifierModule.LOGGER.error("Failed to load entity_modifier.json", e);
+            ModifierModule.LOGGER.error("Failed to load entity_modifiers.json", e);
             return null;
         }
     }
@@ -131,7 +133,7 @@ public class EntityModifierConfig {
             return new TreeMap<>();
         }
         if (!root.isJsonObject()) {
-            throw new IllegalArgumentException("entity_modifier.json root must be an object");
+            throw new IllegalArgumentException("entity_modifiers.json root must be an object");
         }
 
         Map<String, EntityEditData> loaded = new TreeMap<>();
@@ -373,7 +375,7 @@ public class EntityModifierConfig {
             }
             return true;
         } catch (Exception e) {
-            ModifierModule.LOGGER.error("Failed to save entity_modifier.json", e);
+            ModifierModule.LOGGER.error("Failed to save entity_modifiers.json", e);
             return false;
         }
     }

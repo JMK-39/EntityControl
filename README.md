@@ -8,7 +8,7 @@ Entity Control gives pack authors and server administrators visual tools for mob
 - Entity attributes, combat resets, and block-break encounters.
 - Craftable, portable testing dummies, equipment presets, and damage/DPS displays.
 
-Supports Minecraft **1.20.1 / Forge 47.4.2+** with **Java 17**, **1.21.1 / NeoForge 21.1+** (validated with 21.1.252) with **Java 21**, and **26.1.2 / NeoForge 26.1.2.0+** (validated with 26.1.2.112) with **Java 25**. Requires **KineticCore 26.10.7+ on Forge 1.20.1 (26.10.5+ on NeoForge)** matching the Minecraft/loader. Install required mods on the server and connecting clients.
+Supports Minecraft **1.20.1 / Forge 47.4.2+** with **Java 17**, **1.21.1 / NeoForge 21.1+** (validated with 21.1.252) with **Java 21**, and **26.1.2 / NeoForge 26.1.2.0+** (validated with 26.1.2.112) with **Java 25**. Requires **KineticCore 26.11.24+** matching the Minecraft/loader. Install required mods on the server and connecting clients.
 
 Optional: Jade 11+ / Curios 5.10+ on Forge 1.20.1, Jade 15+ / Curios 9.x on NeoForge 1.21.1, or Jade 26.1+ / Curios 15+ on NeoForge 26.1.2.
 
@@ -20,7 +20,7 @@ Entity Control 为整合包作者与服务器管理员提供生物生成、遭�
 - 实体属性、战斗重置与方块破坏遭遇。
 - 可合成、可回收的测试假人，装备预设及伤害和 DPS 显示。
 
-支持 Minecraft **1.20.1 / Forge 47.4.2+**（**Java 17**）、**1.21.1 / NeoForge 21.1+**（验证使用 21.1.252，**Java 21**），以及 **26.1.2 / NeoForge 26.1.2.0+**（验证使用 26.1.2.112，**Java 25**）；必需与 Minecraft、加载器匹配的 **KineticCore 26.10.7+（Forge 1.20.1；NeoForge 为 26.10.5+）**。服务端与连接的客户端均安装必需模组。
+支持 Minecraft **1.20.1 / Forge 47.4.2+**（**Java 17**）、**1.21.1 / NeoForge 21.1+**（验证使用 21.1.252，**Java 21**），以及 **26.1.2 / NeoForge 26.1.2.0+**（验证使用 26.1.2.112，**Java 25**）；必需与 Minecraft、加载器匹配的 **KineticCore 26.11.24+**。服务端与连接的客户端均安装必需模组。
 
 可选：Forge 1.20.1 使用 Jade 11+、Curios 5.10+；NeoForge 1.21.1 使用 Jade 15+、Curios 9.x；NeoForge 26.1.2 使用 Jade 26.1+、Curios 15+。
 
@@ -31,3 +31,24 @@ See the [English Wiki tutorial](https://github.com/JMK-39/EntityControl/wiki/Tut
 详细用法见[中文 Wiki 教程](https://github.com/JMK-39/EntityControl/wiki/使用教程)。
 
 [Changelog / 更新日志](CHANGELOG.md)
+
+## Configuration files / 配置文件
+
+Requires KineticCore 26.11.24 or newer. Configuration files are grouped under `config/kineticcore/entitycontrol/`. Old files migrate automatically before loading; an existing new file wins and the conflicting old file is preserved.
+
+需要 KineticCore 26.11.24 或更新版本。配置统一归档在 `config/kineticcore/entitycontrol/`；首次读取前自动迁移旧文件，已有新文件优先，并保留发生冲突的旧文件。
+
+| Old path below `config/kineticcore/` / 旧相对路径 | New filename / 新文件名 |
+| --- | --- |
+| `entity_modifier.json` | `entity_modifiers.json` |
+| `break_spawn.json` | `block_break_spawns.json` |
+| `spawner.json` | `spawner_rules.json` |
+| `spawner_backup.json` | `spawner_rules_backup.json` |
+| `entity_rese.toml` | `entity_reset.toml` |
+| `dummy_client.toml` | `dummy_client.toml` |
+| `dummy_server.toml` | `dummy_server.toml` |
+| `spawn_control/globals.toml` | `globals.toml` |
+| `spawn_control/spawn_backup.json` | `natural_spawn_backup.json` |
+| `spawn_control/profile_<n>.json` | `spawn_profile_<n>.json` |
+
+Spawn profiles 1-64 migrate individually; unknown files in the old directory remain untouched. / 生物生成配置 1-64 逐文件迁移，旧目录中无法识别的文件保留原处。

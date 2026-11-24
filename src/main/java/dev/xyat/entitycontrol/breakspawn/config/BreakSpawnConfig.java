@@ -6,6 +6,7 @@ import dev.xyat.entitycontrol.breakspawn.BreakSpawnModule;
 import dev.xyat.kineticcore.api.registry.KineticRegistries;
 import dev.xyat.kineticcore.api.resource.KineticResourceIds;
 import dev.xyat.kineticcore.api.runtime.KineticPlatform;
+import dev.xyat.kineticcore.api.runtime.KineticPaths;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -29,7 +30,7 @@ import java.util.TreeMap;
 
 public final class BreakSpawnConfig {
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path CONFIG_PATH = KineticPlatform.configDirectory().resolve("kineticcore").resolve("break_spawn.json");
+    private static final Path CONFIG_PATH = KineticPlatform.configDirectory().resolve("kineticcore/entitycontrol/block_break_spawns.json");
     private static final int MAX_NBT_LENGTH = 131072;
 
     public static volatile ConfigRoot CURRENT = new ConfigRoot();
@@ -194,6 +195,7 @@ public final class BreakSpawnConfig {
     }
 
     private static ConfigRoot readConfigFile() {
+        KineticPaths.migrateConfigFile("kineticcore/break_spawn.json", "kineticcore/entitycontrol/block_break_spawns.json");
         if (!Files.exists(CONFIG_PATH)) {
             return new ConfigRoot();
         }
@@ -201,7 +203,7 @@ public final class BreakSpawnConfig {
             ConfigRoot parsed = GSON.fromJson(reader, ConfigRoot.class);
             return parsed == null ? new ConfigRoot() : parsed;
         } catch (Exception e) {
-            BreakSpawnModule.LOGGER.error("Failed to load break_spawn.json", e);
+            BreakSpawnModule.LOGGER.error("Failed to load block_break_spawns.json", e);
             return null;
         }
     }
@@ -564,7 +566,7 @@ public final class BreakSpawnConfig {
             }
             return true;
         } catch (Exception e) {
-            BreakSpawnModule.LOGGER.error("Failed to save break_spawn.json", e);
+            BreakSpawnModule.LOGGER.error("Failed to save block_break_spawns.json", e);
             return false;
         }
     }

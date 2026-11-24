@@ -102,6 +102,49 @@ tasks.register('checkDamageNumberRange', JavaExec) {
 }
 tasks.named('check').configure { dependsOn 'checkDamageNumberRange' }
 
+tasks.register('checkModifierAttributeRules', JavaExec) {
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.xyat.entitycontrol.modifier.config.ModifierAttributeRulesCheck'
+}
+tasks.named('check').configure { dependsOn 'checkModifierAttributeRules' }
+
+// Explicit actual-entity fixture; excluded from every release artifact.
+def modifierMetadata = layout.buildDirectory.dir('modifier-validation')
+def writeModifierMetadata = tasks.register('writeModifierValidationMetadata') {
+    outputs.dir modifierMetadata
+    doLast {
+        def fileName = project.property('loader') == 'forge' ? 'mods.toml' : 'neoforge.mods.toml'
+        File target = new File(modifierMetadata.get().asFile, "META-INF/${fileName}")
+        target.parentFile.mkdirs()
+        target.setText('modLoader="javafml"\nloaderVersion="[1,)"\nlicense="LGPLv3"\n[[mods]]\nmodId="entitycontrol_modifier_validation"\nversion="1.0.0"\ndisplayName="Entity modifier validation"\n', 'UTF-8')
+        if (project.property('loader') == 'forge') {
+            new File(modifierMetadata.get().asFile, 'pack.mcmeta').setText(
+                    '{"pack":{"pack_format":15,"description":"Entity modifier validation"}}', 'UTF-8')
+        }
+    }
+}
+def modifierJar = tasks.register('modifierValidationJar', Jar) {
+    dependsOn 'testClasses', writeModifierMetadata
+    from(sourceSets.test.output) { include 'dev/xyat/entitycontrolmodifiervalidation/*.class' }
+    from modifierMetadata
+    archiveFileName = 'entitycontrol-modifier-validation.jar'
+}
+if (project.property('loader') == 'forge') {
+    afterEvaluate {
+        def shipped = tasks.named('reobfJar').get()
+        tasks.register('reobfModifierValidationJar', shipped.getClass().superclass) {
+            dependsOn modifierJar
+            input.set(modifierJar.flatMap { it.archiveFile })
+            libraries.from(shipped.libraries, sourceSets.main.output)
+            remapOperation.toolType.set(shipped.remapOperation.toolType)
+            remapOperation.toolClasspath.from(shipped.remapOperation.toolClasspath)
+            remapOperation.mappings.from(shipped.remapOperation.mappings)
+            archiveFileName = 'entitycontrol-modifier-validation-reobf.jar'
+        }
+    }
+}
+
 // Explicit spawner persistence fixture, excluded from release artifacts.
 def spawnerMetadata = layout.buildDirectory.dir('spawner-validation')
 def writeSpawnerMetadata = tasks.register('writeSpawnerValidationMetadata') {

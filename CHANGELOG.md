@@ -1,3 +1,9 @@
+## 26.11.24 — 2026-11-24
+- Configuration files now live under `config/kineticcore/entitycontrol/`; old flat files and supported spawn profiles migrate individually, preserving existing destinations. Requires KineticCore 26.11.24.
+- 配置归档至 `config/kineticcore/entitycontrol/`，旧平铺文件和支持的生成配置逐文件自动迁移，保留已有目标文件；需要 KineticCore 26.11.24。
+- Entity-specific attribute rules override the same attribute while other matching global attributes still apply. Existing effect selection is unchanged.
+- 实体专属属性规则优先覆盖同名属性，其余属性继续应用命中的全局规则；状态效果仍按原有逻辑选择。
+
 ## 26.10.26 — 2026-10-26
 - The attribute page puts the operation, value and delete controls on the top row beside the search; the list runs to the bottom.
 - 属性页的运算方式、数值与删除属性移到顶行搜索框右侧，列表一直延伸到底部。
