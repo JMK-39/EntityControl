@@ -4,6 +4,12 @@
 
 Entity Control gives pack authors and server administrators visual tools for mob spawning, encounter rules, and combat testing.
 
+**Configure entities with model previews.** Browse entity model cards, inspect equipment beside the entity preview, and view the minimum and maximum fields in the attribute-range editor.
+
+![EntityControl: entity model cards, equipment preview and attribute minimum/maximum fields](https://raw.githubusercontent.com/wiki/JMK-39/EntityControl/media/showcase-20261126/en/entity-visual-editors.gif)
+
+*Captured editor views · Minecraft 1.20.1 Forge*
+
 - Spawn profiles, biome spawn tables, and advanced spawners.
 - Entity attributes, combat resets, and block-break encounters.
 - Craftable, portable testing dummies, equipment presets, and damage/DPS displays.
@@ -15,6 +21,12 @@ Optional: Jade 11+ / Curios 5.10+ on Forge 1.20.1, Jade 15+ / Curios 9.x on NeoF
 ## 简体中文
 
 Entity Control 为整合包作者与服务器管理员提供生物生成、遭遇战规则和战斗测试的可视化工具。
+
+**对照模型配置实体。** 通过模型卡片浏览实体，在预览旁查看装备，并在属性范围编辑器中查看最小值与最大值字段。
+
+![EntityControl 实拍：实体模型卡片、装备预览与属性范围字段](https://raw.githubusercontent.com/wiki/JMK-39/EntityControl/media/showcase-20261126/zh/entity-visual-editors.gif)
+
+*实拍编辑器视图 · Minecraft 1.20.1 Forge*
 
 - 生成配置档、群系刷怪表与高级刷怪笼。
 - 实体属性、战斗重置与方块破坏遭遇。
