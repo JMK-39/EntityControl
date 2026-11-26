@@ -8,14 +8,10 @@ Entity Control gives pack authors and server administrators visual tools for mob
 
 Select Max Health in the zombie's Random Attributes editor. Enter a minimum of 28 and a maximum of 60, then check the updated values on the rule row.
 
-![Selecting a zombie's Max Health and changing its draft range to 28–60 with the on-screen editor](https://raw.githubusercontent.com/wiki/JMK-39/EntityControl/media/tutorials-20261126/en.gif)
+![Selecting a zombie's Max Health and changing its draft range to 28–60 with the on-screen editor](https://raw.githubusercontent.com/wiki/JMK-39/EntityControl/media/bilingual-editors/EntityControl/en.gif)
 
-<details>
-<summary>Full walkthrough with Mandarin narration</summary>
+[Watch with English narration](https://raw.githubusercontent.com/wiki/JMK-39/EntityControl/media/bilingual-editors/EntityControl/en.mp4) · [Download English subtitles](https://raw.githubusercontent.com/wiki/JMK-39/EntityControl/media/bilingual-editors/EntityControl/en.srt)
 
-https://github.com/user-attachments/assets/00122cb9-11ec-4ac3-a95b-23ad3056867e
-
-</details>
 
 [Editor guide](https://github.com/JMK-39/EntityControl/wiki/Block-Break-Encounters)
 
@@ -37,14 +33,10 @@ Entity Control 为整合包作者与服务器管理员提供生物生成、遭�
 
 在僵尸的随机属性编辑器中点选「最大生命值」，把最小值改为 28、最大值改为 60。改动实时反映在当前遭遇规则草稿的属性列表里。
 
-![在僵尸随机属性编辑器里点选最大生命值，并把草稿范围更新为 28 至 60 的实录](https://raw.githubusercontent.com/wiki/JMK-39/EntityControl/media/tutorials-20261126/zh.gif)
+![在僵尸随机属性编辑器里点选最大生命值，并把草稿范围更新为 28 至 60 的实录](https://raw.githubusercontent.com/wiki/JMK-39/EntityControl/media/bilingual-editors/EntityControl/zh.gif)
 
-<details>
-<summary>播放完整普通话讲解</summary>
+[观看中文配音版](https://raw.githubusercontent.com/wiki/JMK-39/EntityControl/media/bilingual-editors/EntityControl/zh.mp4) · [下载中文字幕](https://raw.githubusercontent.com/wiki/JMK-39/EntityControl/media/bilingual-editors/EntityControl/zh.srt)
 
-https://github.com/user-attachments/assets/00122cb9-11ec-4ac3-a95b-23ad3056867e
-
-</details>
 
 [编辑器使用指南](https://github.com/JMK-39/EntityControl/wiki/%E7%A0%B4%E5%9D%8F%E6%96%B9%E5%9D%97%E8%A7%A6%E5%8F%91%E9%81%AD%E9%81%87)
 

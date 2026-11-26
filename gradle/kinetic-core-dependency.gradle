@@ -8,10 +8,15 @@ def versionParts = { String value ->
     if (!(value ==~ /\d+(?:\.\d+){2,}/)) throw new GradleException("Invalid KineticCore version '${value}'.")
     value.tokenize('.').collect { it.toBigInteger() }
 }
-def compareVersions = { String a, String b ->
+def compareVersions = { String a, String b, boolean preferDateOnly = true ->
     def left = versionParts(a)
     def right = versionParts(b)
     for (int i = 0; i < Math.max(left.size(), right.size()); i++) {
+        // A new date-only artifact replaces old revisions on the same date.
+        if (i == 3 && preferDateOnly) {
+            int dateOnly = (left.size() == 3) <=> (right.size() == 3)
+            if (dateOnly) return dateOnly
+        }
         int result = (i < left.size() ? left[i] : 0) <=> (i < right.size() ? right[i] : 0)
         if (result) return result
     }
@@ -83,7 +88,7 @@ if (!requested && !gradle.startParameter.offline) {
 }
 if (!selected) throw new GradleException("No local KineticCore for ${loader}/${minecraft}. Other Minecraft/loader JARs cannot be used.")
 String minimum = project.property('kineticcore_min_version').toString()
-if (compareVersions(selected, minimum) < 0) throw new GradleException("KineticCore ${selected} is below required ${minimum}.")
+if (compareVersions(selected, minimum, false) < 0) throw new GradleException("KineticCore ${selected} is below required ${minimum}.")
 def local = candidates.find { it.version == selected }
 def override = project.findProperty('kineticcore_jar')?.toString()
 if (override) {

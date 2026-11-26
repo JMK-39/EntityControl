@@ -57,7 +57,7 @@ jobs:
           if [ -z "$mod_name" ]; then
             mod_name="${GITHUB_REPOSITORY##*/}"
           fi
-          version="$(TZ=Asia/Shanghai date +'%y.%-m.%-d')"
+          version="$(TZ=Asia/Shanghai date +'%y.%m.%d')"
           {
             echo "mod_id=$mod_id"
             echo "mod_name=$mod_name"

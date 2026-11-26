@@ -8,14 +8,19 @@ import java.text.SimpleDateFormat
 def getDynamicVersion() {
     if (rootProject.ext.has('kineticBuildVersion')) return rootProject.ext.kineticBuildVersion
     def useAuto = project.findProperty('use_auto_version')?.toString() ?: 'false'
-    def resolved
-    if (useAuto.toBoolean()) {
-        def formatter = new SimpleDateFormat("yy.M.d")
-        formatter.timeZone = TimeZone.getTimeZone('Asia/Shanghai')
-        resolved = formatter.format(new Date())
-    } else {
-        resolved = project.findProperty('mod_version')?.toString() ?: "0.0.0"
+    def formatter = new SimpleDateFormat('yy.MM.dd', Locale.ROOT)
+    formatter.timeZone = TimeZone.getTimeZone('Asia/Shanghai')
+    formatter.lenient = false
+    String configured = project.property('mod_version').toString()
+    if (!(configured ==~ /\d{2}\.(?:0[1-9]|1[0-2])\.(?:0[1-9]|[12]\d|3[01])/)) {
+        throw new GradleException('EntityControl version must use YY.MM.DD, for example 26.11.26.')
     }
+    try {
+        formatter.parse(configured)
+    } catch (java.text.ParseException ex) {
+        throw new GradleException("Invalid EntityControl release date: ${configured}", ex)
+    }
+    def resolved = useAuto.toBoolean() ? formatter.format(new Date()) : configured
     rootProject.ext.kineticBuildVersion = resolved
     return resolved
 }

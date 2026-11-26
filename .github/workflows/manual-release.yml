@@ -4,12 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       mod_version:
-        description: Release version in YY.M.D format (for example, 26.9.25)
+        description: Release version in YY.MM.DD format (for example, 26.09.25)
         required: true
         type: string
 
 permissions:
   contents: write
+
+concurrency:
+  group: mod-release-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build-and-release:
@@ -30,29 +34,19 @@ jobs:
         with:
           gradle-version: '9.8.0'
 
-      - name: Validate version and reject duplicate release
+      - name: Validate version format
         env:
           VERSION: ${{ inputs.mod_version }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           python - <<'PY'
           from datetime import datetime
           import os
           import re
           version = os.environ["VERSION"]
-          if not re.fullmatch(r"\d{2}\.(?:[1-9]|1[0-2])\.(?:[1-9]|[12]\d|3[01])", version):
-              raise SystemExit("Version must use YY.M.D without leading zeroes, such as 26.9.25")
+          if not re.fullmatch(r"\d{2}\.(?:0[1-9]|1[0-2])\.(?:0[1-9]|[12]\d|3[01])", version):
+              raise SystemExit("Version must use YY.MM.DD, such as 26.09.25")
           datetime.strptime(version, "%y.%m.%d")
           PY
-          tag="v$VERSION"
-          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $tag already exists" >&2
-            exit 1
-          fi
-          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
-            echo "Tag $tag already exists" >&2
-            exit 1
-          fi
 
       - name: Build mod JARs
         env:
@@ -63,31 +57,47 @@ jobs:
           -Pmod_version="$VERSION"
           -Poutput_mods_dir=build/release
 
-      - name: Check release artifacts
-        env:
-          MOD_ID: entitycontrol
-          VERSION: ${{ inputs.mod_version }}
-        run: |
-          required_artifacts=(
-            build/release/"$MOD_ID"-forge-1.20.1-"$VERSION".jar
-            build/release/"$MOD_ID"-neoforge-1.21.1-"$VERSION".jar
-            build/release/"$MOD_ID"-neoforge-26.1.2-"$VERSION".jar
-          )
-          for artifact in "${required_artifacts[@]}"; do
-            if [ ! -s "$artifact" ]; then
-              echo "Missing or empty release JAR: $artifact" >&2
-              exit 1
-            fi
-            echo "$artifact"
-          done
-
       - name: Publish GitHub Release
         env:
+          MOD_ID: entitycontrol
+          MOD_NAME: EntityControl
           VERSION: ${{ inputs.mod_version }}
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "v$VERSION"
-          build/release/entitycontrol-*-"$VERSION".jar
-          --repo "$GITHUB_REPOSITORY"
-          --title "EntityControl $VERSION"
-          --generate-notes
+        run: |
+          shopt -s nullglob dotglob
+          artifacts=(
+            "build/release/$MOD_ID-forge-1.20.1-$VERSION.jar"
+            "build/release/$MOD_ID-neoforge-1.21.1-$VERSION.jar"
+            "build/release/$MOD_ID-neoforge-26.1.2-$VERSION.jar"
+          )
+          found=(build/release/*)
+          if (( ${#found[@]} != ${#artifacts[@]} )); then
+            echo "Expected exactly three platform JARs in build/release" >&2
+            exit 1
+          fi
+          for artifact in "${artifacts[@]}"; do
+            if [[ ! -f "$artifact" || ! -s "$artifact" || -L "$artifact" ]]; then
+              echo "Missing or invalid release JAR: $artifact" >&2
+              exit 1
+            fi
+          done
+
+          tag="v$VERSION"
+          if lookup=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json tagName 2>&1); then
+            gh release upload "$tag" "${artifacts[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            case "$lookup" in
+              'release not found'|'gh: release not found') ;;
+              *) printf '%s\n' "$lookup" >&2; exit 1 ;;
+            esac
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+              tag_options=(--verify-tag)
+            else
+              case "$?" in
+                2) tag_options=(--target "$GITHUB_SHA") ;;
+                *) echo "Could not verify whether $tag exists" >&2; exit 1 ;;
+              esac
+            fi
+            gh release create "$tag" "${artifacts[@]}" "${tag_options[@]}" \
+              --repo "$GITHUB_REPOSITORY" --title "$MOD_NAME $VERSION" --generate-notes
+          fi
