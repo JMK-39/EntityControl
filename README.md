@@ -31,6 +31,8 @@ Optional: Jade 11+ / Curios 5.10+ on Forge 1.20.1, Jade 15+ / Curios 9.x on NeoF
 
 Entity Control 为整合包作者与服务器管理员提供生物生成、遭遇战规则和战斗测试的可视化工具。
 
+<a name="zh-walkthrough"></a>
+
 ### 给遭遇里的僵尸设置生命值范围
 
 在僵尸的随机属性编辑器中点选「最大生命值」，把最小值改为 28、最大值改为 60。改动实时反映在当前遭遇规则草稿的属性列表里。
