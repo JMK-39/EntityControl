@@ -4,11 +4,20 @@
 
 Entity Control gives pack authors and server administrators visual tools for mob spawning, encounter rules, and combat testing.
 
-**Configure entities with model previews.** Browse entity model cards, inspect equipment beside the entity preview, and view the minimum and maximum fields in the attribute-range editor.
+### Set a zombie's random health range
 
-![EntityControl: entity model cards, equipment preview and attribute minimum/maximum fields](https://raw.githubusercontent.com/wiki/JMK-39/EntityControl/media/showcase-20261126/en/entity-visual-editors.gif)
+Select Max Health in the zombie's Random Attributes editor. Enter a minimum of 28 and a maximum of 60, then check the updated values on the rule row.
 
-*Captured editor views · Minecraft 1.20.1 Forge*
+![Selecting a zombie's Max Health and changing its draft range to 28–60 with the on-screen editor](https://raw.githubusercontent.com/wiki/JMK-39/EntityControl/media/tutorials-20261126/en.gif)
+
+<details>
+<summary>Full walkthrough with Mandarin narration</summary>
+
+https://github.com/user-attachments/assets/00122cb9-11ec-4ac3-a95b-23ad3056867e
+
+</details>
+
+[Editor guide](https://github.com/JMK-39/EntityControl/wiki/Block-Break-Encounters)
 
 - Spawn profiles, biome spawn tables, and advanced spawners.
 - Entity attributes, combat resets, and block-break encounters.
@@ -22,11 +31,20 @@ Optional: Jade 11+ / Curios 5.10+ on Forge 1.20.1, Jade 15+ / Curios 9.x on NeoF
 
 Entity Control 为整合包作者与服务器管理员提供生物生成、遭遇战规则和战斗测试的可视化工具。
 
-**对照模型配置实体。** 通过模型卡片浏览实体，在预览旁查看装备，并在属性范围编辑器中查看最小值与最大值字段。
+### 给遭遇里的僵尸设置生命值范围
 
-![EntityControl 实拍：实体模型卡片、装备预览与属性范围字段](https://raw.githubusercontent.com/wiki/JMK-39/EntityControl/media/showcase-20261126/zh/entity-visual-editors.gif)
+在僵尸的随机属性编辑器中点选「最大生命值」，把最小值改为 28、最大值改为 60。改动实时反映在当前遭遇规则草稿的属性列表里。
 
-*实拍编辑器视图 · Minecraft 1.20.1 Forge*
+![在僵尸随机属性编辑器里点选最大生命值，并把草稿范围更新为 28 至 60 的实录](https://raw.githubusercontent.com/wiki/JMK-39/EntityControl/media/tutorials-20261126/zh.gif)
+
+<details>
+<summary>播放完整普通话讲解</summary>
+
+https://github.com/user-attachments/assets/00122cb9-11ec-4ac3-a95b-23ad3056867e
+
+</details>
+
+[编辑器使用指南](https://github.com/JMK-39/EntityControl/wiki/%E7%A0%B4%E5%9D%8F%E6%96%B9%E5%9D%97%E8%A7%A6%E5%8F%91%E9%81%AD%E9%81%87)
 
 - 生成配置档、群系刷怪表与高级刷怪笼。
 - 实体属性、战斗重置与方块破坏遭遇。
